@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Sidebar } from "./components/Sidebar";
 import { TaskList } from "./components/TaskList";
 import { api, type List, type Task, type TaskPatch } from "./api";
+
+/** Map a physical-pixel drop point to the task id under it, if any. */
+function taskIdAt(pos: { x: number; y: number }): string | null {
+  const dpr = window.devicePixelRatio || 1;
+  const el = document.elementFromPoint(pos.x / dpr, pos.y / dpr);
+  return el?.closest("[data-task-id]")?.getAttribute("data-task-id") ?? null;
+}
 
 function App() {
   const [lists, setLists] = useState<List[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [nextLists, nextTasks] = await Promise.all([api.listLists(), api.allTasks()]);
@@ -26,6 +35,36 @@ function App() {
     return () => {
       unlisten.then((fn) => fn());
     };
+  }, [load]);
+
+  // Remember the active list so tray captures land in it.
+  useEffect(() => {
+    if (selectedId) api.setActiveList(selectedId).catch(() => {});
+  }, [selectedId]);
+
+  // Drag a file from Finder onto a task row to attach it as a copy.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent(async (event) => {
+        const p = event.payload;
+        if (p.type === "over") {
+          setDragOverTaskId(taskIdAt(p.position));
+        } else if (p.type === "drop") {
+          const taskId = taskIdAt(p.position);
+          setDragOverTaskId(null);
+          if (taskId && p.paths.length) {
+            for (const path of p.paths) await api.addCopy(taskId, path);
+            load();
+          }
+        } else {
+          setDragOverTaskId(null);
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      });
+    return () => unlisten?.();
   }, [load]);
 
   const counts = useMemo(() => {
@@ -90,6 +129,7 @@ function App() {
         <TaskList
           list={selectedList}
           tasks={tasks}
+          dragOverTaskId={dragOverTaskId}
           onCreateTask={createTask}
           onUpdateTask={updateTask}
           onDeleteTask={deleteTask}

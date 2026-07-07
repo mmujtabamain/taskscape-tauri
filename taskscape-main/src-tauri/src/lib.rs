@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{extract::State as AxumState, http::StatusCode, routing::post, Router};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use taskscape_common::{server, Attachment, List, Store, Task, MAIN_PORT};
 
 fn err<E: std::fmt::Display>(e: E) -> String {
@@ -99,6 +99,17 @@ fn delete_attachment(store: State<'_, Arc<Store>>, id: String) -> Result<(), Str
     store.delete_attachment(&id).map_err(err)
 }
 
+#[tauri::command]
+fn set_task_due(store: State<'_, Arc<Store>>, id: String, due: Option<i64>) -> Result<Task, String> {
+    store.set_task_due(&id, due).map_err(err)
+}
+
+/// Remember which list the user last had open, so the tray captures land there.
+#[tauri::command]
+fn set_active_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.set_setting("last_active_list", &id).map_err(err)
+}
+
 /// Open an attachment with the OS default handler. Copies resolve to their file
 /// under `~/.taskscape/`; references (URLs / file / network paths) open as-is.
 #[tauri::command]
@@ -129,7 +140,7 @@ pub fn run() {
         .setup(move |app| {
             // Extra route so the tray process can ask this window to reload live.
             let handle = app.handle().clone();
-            let refresh = Router::new()
+            let app_routes = Router::new()
                 .route(
                     "/refresh",
                     post(|AxumState(app): AxumState<AppHandle>| async move {
@@ -137,8 +148,19 @@ pub fn run() {
                         StatusCode::OK
                     }),
                 )
+                .route(
+                    "/focus",
+                    post(|AxumState(app): AxumState<AppHandle>| async move {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                        StatusCode::OK
+                    }),
+                )
                 .with_state(handle);
-            let router = server::data_router(server_store.clone()).merge(refresh);
+            let router = server::data_router(server_store.clone()).merge(app_routes);
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = server::serve(MAIN_PORT, router).await {
                     eprintln!("[taskscape-main] HTTP server error: {e}");
@@ -161,6 +183,8 @@ pub fn run() {
             add_copy,
             delete_attachment,
             open_attachment,
+            set_task_due,
+            set_active_list,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+/* Let the native vibrancy (window-vibrancy) show through the webview. */
+html,
+body,
+#root {
+  background: transparent;
+}

@@ -17,6 +17,8 @@ pub struct Task {
     pub done: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Optional due date, unix millis at local midnight.
+    pub due_at: Option<i64>,
     #[serde(default)]
     pub attachments: Vec<Attachment>,
 }

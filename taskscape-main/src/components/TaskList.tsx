@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { TaskItem } from "./TaskItem";
+import { Icon } from "./Icon";
 import type { List, Task, TaskPatch } from "../api";
 
 interface Props {
   list: List | null;
   tasks: Task[];
+  dragOverTaskId: string | null;
   onCreateTask: (title: string) => void;
   onUpdateTask: (id: string, patch: TaskPatch) => void;
   onDeleteTask: (id: string) => void;
@@ -14,6 +16,7 @@ interface Props {
 export function TaskList({
   list,
   tasks,
+  dragOverTaskId,
   onCreateTask,
   onUpdateTask,
   onDeleteTask,
@@ -48,7 +51,7 @@ export function TaskList({
 
       <div className="px-8 pt-5">
         <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 focus-within:border-indigo-400 dark:border-zinc-800 dark:bg-zinc-900">
-          <span className="text-zinc-400">＋</span>
+          <Icon name="add" size={18} className="text-zinc-400" />
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -69,6 +72,7 @@ export function TaskList({
             <TaskItem
               key={task.id}
               task={task}
+              dragOver={task.id === dragOverTaskId}
               onUpdate={onUpdateTask}
               onDelete={onDeleteTask}
               onRefresh={onRefresh}

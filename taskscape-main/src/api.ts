@@ -26,6 +26,7 @@ export interface Task {
   done: boolean;
   created_at: number;
   updated_at: number;
+  due_at: number | null;
   attachments: Attachment[];
 }
 
@@ -48,7 +49,11 @@ export const api = {
   createTask: (listId: string, title: string, notes?: string) =>
     invoke<Task>("create_task", { listId, title, notes: notes ?? null }),
   updateTask: (id: string, patch: TaskPatch) => invoke<Task>("update_task", { id, ...patch }),
+  setTaskDue: (id: string, due: number | null) => invoke<Task>("set_task_due", { id, due }),
   deleteTask: (id: string) => invoke<void>("delete_task", { id }),
+
+  // app state
+  setActiveList: (id: string) => invoke<void>("set_active_list", { id }),
 
   // attachments
   listAttachments: (taskId: string) => invoke<Attachment[]>("list_attachments", { taskId }),

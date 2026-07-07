@@ -2,7 +2,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::Result;
-use rusqlite::{params, Connection, Row};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::models::{Attachment, LinkType, List, Task};
 use crate::util::{new_id, now_millis};
@@ -49,7 +49,8 @@ impl Store {
                  notes      TEXT,
                  done       INTEGER NOT NULL DEFAULT 0,
                  created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
+                 updated_at INTEGER NOT NULL,
+                 due_at     INTEGER
              );
              CREATE TABLE IF NOT EXISTS attachments (
                  id         TEXT PRIMARY KEY,
@@ -59,8 +60,38 @@ impl Store {
                  location   TEXT NOT NULL,
                  created_at INTEGER NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS settings (
+                 key   TEXT PRIMARY KEY,
+                 value TEXT NOT NULL
+             );
              CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks(list_id);
              CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);",
+        )?;
+        // Bring older databases (created before due dates) up to date.
+        ensure_column(&conn, "tasks", "due_at", "INTEGER")?;
+        Ok(())
+    }
+
+    // ---- settings (shared key/value, e.g. the last active list) -----------
+
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let value = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                params![key],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        Ok(value)
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = ?2",
+            params![key, value],
         )?;
         Ok(())
     }
@@ -119,6 +150,7 @@ impl Store {
             done: false,
             created_at: now,
             updated_at: now,
+            due_at: None,
             attachments: Vec::new(),
         };
         let conn = self.conn.lock().unwrap();
@@ -141,7 +173,7 @@ impl Store {
     pub fn list_tasks(&self, list_id: &str) -> Result<Vec<Task>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, list_id, title, notes, done, created_at, updated_at
+            "SELECT id, list_id, title, notes, done, created_at, updated_at, due_at
              FROM tasks WHERE list_id = ?1 ORDER BY created_at ASC",
         )?;
         let tasks = stmt
@@ -155,7 +187,7 @@ impl Store {
     pub fn all_tasks(&self) -> Result<Vec<Task>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, list_id, title, notes, done, created_at, updated_at
+            "SELECT id, list_id, title, notes, done, created_at, updated_at, due_at
              FROM tasks ORDER BY created_at ASC",
         )?;
         let tasks = stmt
@@ -200,7 +232,7 @@ impl Store {
     pub fn get_task(&self, id: &str) -> Result<Task> {
         let conn = self.conn.lock().unwrap();
         let task = conn.query_row(
-            "SELECT id, list_id, title, notes, done, created_at, updated_at
+            "SELECT id, list_id, title, notes, done, created_at, updated_at, due_at
              FROM tasks WHERE id = ?1",
             params![id],
             row_to_task,
@@ -213,6 +245,18 @@ impl Store {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    /// Set (or, with `None`, clear) a task's due date.
+    pub fn set_task_due(&self, id: &str, due: Option<i64>) -> Result<Task> {
+        {
+            let conn = self.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE tasks SET due_at = ?2, updated_at = ?3 WHERE id = ?1",
+                params![id, due, now_millis()],
+            )?;
+        }
+        self.get_task(id)
     }
 
     // ---- attachments -----------------------------------------------------
@@ -291,8 +335,22 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
         done: row.get::<_, i64>("done")? != 0,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
+        due_at: row.get("due_at")?,
         attachments: Vec::new(),
     })
+}
+
+fn ensure_column(conn: &Connection, table: &str, column: &str, decl: &str) -> Result<()> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let has_column = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<String>>>()?
+        .iter()
+        .any(|name| name == column);
+    if !has_column {
+        conn.execute(&format!("ALTER TABLE {table} ADD COLUMN {column} {decl}"), [])?;
+    }
+    Ok(())
 }
 
 fn row_to_attachment(row: &Row) -> rusqlite::Result<Attachment> {

@@ -10,18 +10,20 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
         "title": "Taskscape Capture",
-        "width": 460,
-        "height": 320,
+        "width": 480,
+        "height": 84,
         "resizable": false,
         "decorations": false,
+        "transparent": true,
+        "shadow": true,
         "alwaysOnTop": true,
         "visible": false,
-        "skipTaskbar": true,
-        "center": true
+        "skipTaskbar": true
       }
     ],
     "security": {
