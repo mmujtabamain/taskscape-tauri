@@ -8,6 +8,29 @@ fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
+/// In the packaged macOS app the always-on menu-bar agent ships nested inside
+/// this bundle at `Contents/Library/LoginItems/taskscape-tray.app`, so the user
+/// only ever installs and launches one app. `open` (without `-n`) reuses a
+/// running instance, so this never spawns a duplicate tray. In dev the nested
+/// bundle doesn't exist, so this is a no-op and `run-dev.sh` starts the tray.
+#[cfg(target_os = "macos")]
+fn launch_embedded_tray() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    // <bundle>/Contents/MacOS/<exe> → <bundle>/Contents/Library/LoginItems/taskscape-tray.app
+    let Some(tray) = exe
+        .parent()
+        .and_then(|macos| macos.parent())
+        .map(|contents| contents.join("Library/LoginItems/taskscape-tray.app"))
+    else {
+        return;
+    };
+    if tray.exists() {
+        let _ = std::process::Command::new("open").arg(&tray).status();
+    }
+}
+
 #[tauri::command]
 fn list_lists(store: State<'_, Arc<Store>>) -> Result<Vec<List>, String> {
     store.list_lists().map_err(err)
@@ -138,6 +161,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(store)
         .setup(move |app| {
+            #[cfg(target_os = "macos")]
+            launch_embedded_tray();
+
             // Extra route so the tray process can ask this window to reload live.
             let handle = app.handle().clone();
             let app_routes = Router::new()

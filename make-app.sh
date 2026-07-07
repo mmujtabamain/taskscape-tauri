@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 #
 # make-app.sh — build both Taskscape apps for macOS and package them into a
-# single distributable DMG containing both .app bundles.
+# single distributable DMG containing ONE app the user installs.
 #
-# Output: dist/Taskscape.dmg  (Taskscape.app + Taskscape-tray.app + Applications)
+# The always-on menu-bar agent (taskscape-tray) is embedded inside the main app
+# at Taskscape.app/Contents/Library/LoginItems/, so from the user's point of view
+# there is a single "Taskscape" app. The main app launches the embedded tray on
+# startup.
+#
+# Output: dist/Taskscape.dmg  (Taskscape.app + Applications)
 #
 # Note: these bundles are unsigned. On first launch macOS Gatekeeper will require
-# right-click → Open (or `xattr -dr com.apple.quarantine <app>`).
+# right-click → Open (or `xattr -dr com.apple.quarantine <app>`, which also clears
+# the nested tray helper since it recurses).
 
 set -euo pipefail
 
@@ -28,9 +34,10 @@ build_app() {
 }
 
 find_app() {
-  # First .app bundle produced by `tauri build` for the given app dir.
-  find "$ROOT/$1/src-tauri/target/release/bundle/macos" \
-    -maxdepth 1 -name '*.app' -print -quit
+  # Newest .app bundle produced by `tauri build` for the given app dir. Sorting
+  # by mtime avoids grabbing a stale bundle left over from an earlier build under
+  # a different productName.
+  ls -dt "$ROOT/$1/src-tauri/target/release/bundle/macos/"*.app 2>/dev/null | head -1
 }
 
 build_app taskscape-main
@@ -44,11 +51,16 @@ if [ -z "$MAIN_APP" ] || [ -z "$TRAY_APP" ]; then
   exit 1
 fi
 
+echo "==> Embedding tray helper inside main app"
+HELPERS="$MAIN_APP/Contents/Library/LoginItems"
+rm -rf "$HELPERS"
+mkdir -p "$HELPERS"
+cp -R "$TRAY_APP" "$HELPERS/"
+
 echo "==> Assembling DMG"
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 cp -R "$MAIN_APP" "$STAGE/"
-cp -R "$TRAY_APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 
 hdiutil create \

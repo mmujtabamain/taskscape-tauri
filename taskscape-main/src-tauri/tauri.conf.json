@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "taskscape-main",
+  "productName": "Taskscape",
   "version": "0.1.0",
   "identifier": "com.taskscape.main.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "taskscape-main",
+        "title": "Taskscape",
         "width": 800,
         "height": 600
       }
