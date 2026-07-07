@@ -27,3 +27,6 @@ base64 = "0.22"
 window-vibrancy = "0.5"
 taskscape-common = { path = "../../common" }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+

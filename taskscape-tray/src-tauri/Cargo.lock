@@ -3632,6 +3632,7 @@ name = "taskscape-tray"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "objc2 0.6.4",
  "serde",
  "serde_json",
  "taskscape-common",

@@ -1,5 +1,5 @@
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -54,6 +54,150 @@ fn focus_or_launch_main() {
 /// a one-frame show-before-move never flashes at a stale on-screen position.
 const PARK: (i32, i32) = (-10_000, -10_000);
 
+/// macOS: let the capture window appear over another app's *native fullscreen*
+/// Space, floating in front of it. Two things are required, and `alwaysOnTop`
+/// (which only sets the floating window level) provides neither on its own:
+///
+///  - `CanJoinAllSpaces | FullScreenAuxiliary` collection behavior, so the
+///    window is allowed onto the separate Space a full-screen app occupies.
+///    Tauri's `set_visible_on_all_workspaces` sets only `CanJoinAllSpaces`.
+///  - A window level above the floating level — at floating level the window
+///    still draws *behind* the full-screen app — so we raise it to the
+///    pop-up-menu level that native menus and popovers use.
+#[cfg(target_os = "macos")]
+fn allow_over_fullscreen(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    // NSWindowCollectionBehavior bit flags.
+    const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
+    const MOVE_TO_ACTIVE_SPACE: usize = 1 << 1;
+    const MANAGED: usize = 1 << 2;
+    const FULL_SCREEN_PRIMARY: usize = 1 << 7;
+    const FULL_SCREEN_AUXILIARY: usize = 1 << 8;
+    const FULL_SCREEN_NONE: usize = 1 << 9;
+    // NSPopUpMenuWindowLevel — the level native menus/popovers use.
+    const NS_POPUP_MENU_WINDOW_LEVEL: isize = 101;
+
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window as *mut AnyObject;
+    unsafe {
+        let mut behavior: usize = msg_send![ns_window, collectionBehavior];
+        // At most one bit from each mutually-exclusive group may be set, so
+        // clear the space and fullscreen groups before setting our two flags.
+        behavior &= !(CAN_JOIN_ALL_SPACES | MOVE_TO_ACTIVE_SPACE | MANAGED);
+        behavior &= !(FULL_SCREEN_PRIMARY | FULL_SCREEN_AUXILIARY | FULL_SCREEN_NONE);
+        behavior |= CAN_JOIN_ALL_SPACES | FULL_SCREEN_AUXILIARY;
+        let _: () = msg_send![ns_window, setCollectionBehavior: behavior];
+        let _: () = msg_send![ns_window, setLevel: NS_POPUP_MENU_WINDOW_LEVEL];
+    }
+}
+
+/// macOS: force the window to the front of the *currently active* Space without
+/// switching Spaces. `set_focus` activates the app, which — because the window's
+/// home Space is the desktop — can drag focus back to the desktop instead of
+/// leaving the window on a full-screen app's Space. `orderFrontRegardless`
+/// brings it forward on whatever Space is active right now (the full-screen one).
+#[cfg(target_os = "macos")]
+fn order_front_regardless(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window as *mut AnyObject;
+    unsafe {
+        let _: () = msg_send![ns_window, orderFrontRegardless];
+    }
+}
+
+/// macOS: swap the capture window's backing `NSWindow` for a non-activating
+/// `NSPanel`. A regular window can't float above another app's *native
+/// fullscreen* Space — showing it (`makeKeyAndOrderFront:`) makes our app the
+/// key window, which pulls macOS back out of the full-screen Space. A
+/// non-activating panel becomes key (so the field stays typable) and orders
+/// onto the active Space *without* activating our app, so the capture bar
+/// appears in front of full-screen apps.
+///
+/// The swap is done in place with `object_setClass`: `NSPanel` adds no instance
+/// variables over `NSWindow`, so the object keeps Tao's (larger) allocation and
+/// we simply stop using its extra `focusable` ivar. We re-provide
+/// `canBecomeKeyWindow` because a borderless panel answers it `NO` by default,
+/// which would leave the text field unfocusable.
+#[cfg(target_os = "macos")]
+fn convert_to_panel(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    // NSWindowStyleMaskNonactivatingPanel — the bit that lets a panel receive
+    // keyboard input without activating its owning application.
+    const NS_NONACTIVATING_PANEL: usize = 1 << 7;
+
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window as *mut AnyObject;
+    unsafe {
+        // Raw `object_setClass` rather than objc2's `AnyObject::set_class`: the
+        // latter debug-asserts equal instance sizes, which fails because Tao's
+        // window subclass carries an extra `focusable` ivar. Shrinking the class
+        // over a larger allocation is harmless here.
+        objc2::ffi::object_setClass(ns_window, panel_class());
+        let mask: usize = msg_send![ns_window, styleMask];
+        let _: () = msg_send![ns_window, setStyleMask: mask | NS_NONACTIVATING_PANEL];
+        // Panels hide themselves when their app deactivates; ours is *always*
+        // inactive while floating over another app's Space, so opt out.
+        let _: () = msg_send![ns_window, setHidesOnDeactivate: false];
+    }
+}
+
+/// The lazily-registered `NSPanel` subclass used by [`convert_to_panel`], whose
+/// only job is to answer `canBecomeKeyWindow` with `YES` (the borderless panel
+/// default is `NO`). Returned as a raw pointer so it can cross the `OnceLock`.
+#[cfg(target_os = "macos")]
+fn panel_class() -> *const objc2::runtime::AnyClass {
+    use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
+
+    static CLASS: OnceLock<usize> = OnceLock::new();
+
+    extern "C" fn yes(_this: &AnyObject, _cmd: Sel) -> Bool {
+        Bool::YES
+    }
+
+    *CLASS.get_or_init(|| {
+        let superclass = objc2::class!(NSPanel);
+        let mut builder = ClassBuilder::new(c"TaskscapeCapturePanel", superclass)
+            .expect("failed to register TaskscapeCapturePanel");
+        unsafe {
+            builder.add_method(
+                objc2::sel!(canBecomeKeyWindow),
+                yes as extern "C" fn(_, _) -> _,
+            );
+        }
+        builder.register() as *const AnyClass as usize
+    }) as *const AnyClass
+}
+
+/// When the mini window was last revealed. A blur (`Focused(false)`) that arrives
+/// within [`REVEAL_GRACE`] of a reveal is a transient side effect of showing over
+/// a full-screen app's Space, not the user clicking away, so we ignore it —
+/// otherwise the window is parked off-screen one frame after it appears.
+fn last_shown() -> &'static Mutex<Option<Instant>> {
+    static LAST_SHOWN: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
+    LAST_SHOWN.get_or_init(|| Mutex::new(None))
+}
+
+const REVEAL_GRACE: Duration = Duration::from_millis(500);
+
+/// Whether the window was revealed within the last [`REVEAL_GRACE`].
+fn just_revealed() -> bool {
+    last_shown()
+        .lock()
+        .ok()
+        .and_then(|guard| *guard)
+        .is_some_and(|t| t.elapsed() < REVEAL_GRACE)
+}
+
 /// Hide the window and park it off-screen.
 fn dismiss(window: &tauri::Window) {
     let _ = window.hide();
@@ -77,8 +221,19 @@ fn toggle_mini(app: &AppHandle) {
                 (pos.y - 20.0) as i32,
             ));
         }
+        // Re-assert the Space-joining behavior right before showing: it must be
+        // in effect at the moment we reveal/focus, or macOS shows the window on
+        // the desktop Space instead of the active full-screen one.
+        #[cfg(target_os = "macos")]
+        allow_over_fullscreen(&window);
+        if let Ok(mut guard) = last_shown().lock() {
+            *guard = Some(Instant::now());
+        }
         let _ = window.show();
         let _ = window.set_focus();
+        // ...then pin it onto the current (possibly full-screen) Space.
+        #[cfg(target_os = "macos")]
+        order_front_regardless(&window);
         let _ = window.emit("mini-shown", ());
     }
 }
@@ -164,6 +319,13 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // Turn the window into a non-activating NSPanel so it can float over
+            // other apps' native-fullscreen Spaces without pulling us out of them.
+            #[cfg(target_os = "macos")]
+            if let Some(window) = app.get_webview_window("main") {
+                convert_to_panel(&window);
+            }
+
             // Native translucent (vibrancy) background for the frameless window.
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
@@ -179,6 +341,8 @@ pub fn run() {
             // Rest the hidden window off-screen so its first reveal doesn't flash.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
+                #[cfg(target_os = "macos")]
+                allow_over_fullscreen(&window);
             }
 
             // Tray icon with a right-click menu.
@@ -219,9 +383,13 @@ pub fn run() {
                 api.prevent_close();
                 dismiss(window);
             }
-            // Dismiss when the user clicks away.
+            // Dismiss when the user clicks away — but ignore the transient blur
+            // that fires while the window is settling onto a full-screen Space,
+            // which would otherwise hide it one frame after it appears.
             WindowEvent::Focused(false) => {
-                dismiss(window);
+                if !just_revealed() {
+                    dismiss(window);
+                }
             }
             _ => {}
         })
