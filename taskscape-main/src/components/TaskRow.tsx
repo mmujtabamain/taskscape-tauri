@@ -54,7 +54,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
 
   const toggleDone = () => {
     if (!task.done) {
-      // The lamp lights amber for a beat, then settles to the warm-dim done state.
+      // The lamp flashes the accent for a beat, then settles to the dim done state.
       setFlash(true);
       if (flashTimer.current) window.clearTimeout(flashTimer.current);
       flashTimer.current = window.setTimeout(() => setFlash(false), 340);
@@ -153,7 +153,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           e.preventDefault();
           openMenu(e.clientX, e.clientY);
         }}
-        className={`group/row relative flex min-h-9 items-center pr-3 transition-colors duration-100 ${
+        className={`group/row relative flex min-h-10 items-center pr-3 transition-colors duration-75 ${
           selected ? "bg-selection" : "hover:bg-wash"
         } ${nestHighlight ? "rounded-md bg-selection ring-1 ring-accent ring-inset" : ""} ${
           dragging ? "opacity-40" : ""
@@ -166,7 +166,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           style={{ left: depth * INDENT + 44 }}
         />
 
-        {/* Drop indicator: amber line at target depth, with its index-dot terminal. */}
+        {/* Drop indicator: accent line at target depth, with its index-dot terminal. */}
         {drop && drop.zone !== "nest" && (
           <span
             className={`pointer-events-none absolute right-3 z-10 h-[2px] bg-accent ${
@@ -187,16 +187,16 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
                 ctx.toggleCollapsed(task.id);
               }}
               onDoubleClick={(e) => e.stopPropagation()}
-              className={`grid h-4 w-4 place-items-center rounded text-ink-3 transition-opacity hover:text-ink ${
+              className={`grid h-5 w-5 place-items-center rounded text-ink-3 transition-opacity hover:text-ink ${
                 expanded ? "opacity-0 group-hover/row:opacity-100" : "opacity-100"
               }`}
               title={expanded ? "Collapse" : "Expand"}
             >
               <Icon
                 name="chevron_right"
-                size={14}
+                size={16}
                 weight={300}
-                className={`transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
+                className={`transition-transform duration-100 ${expanded ? "rotate-90" : ""}`}
               />
             </button>
           )}
@@ -206,7 +206,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           <Check done={task.done} flashing={flash} onToggle={toggleDone} />
         </span>
 
-        <div className="ml-2 min-w-0 flex-1 py-1.5">
+        <div className="ml-2.5 min-w-0 flex-1 py-2">
           {renaming ? (
             <RenameInput
               initial={task.title}
@@ -217,7 +217,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
             />
           ) : (
             <div
-              className={`truncate text-[13px] leading-[18px] font-medium ${
+              className={`truncate text-[14px] leading-[19px] font-medium ${
                 task.done ? "strike strike-on text-ink-3" : "text-ink"
               }`}
             >
@@ -226,7 +226,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           )}
           {task.notes && (
             <div
-              className={`truncate text-[12px] leading-4 ${
+              className={`truncate text-[12.5px] leading-[17px] ${
                 task.done ? "text-ink-3 opacity-55" : "text-ink-2"
               }`}
             >
@@ -236,29 +236,29 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
         </div>
 
         <div
-          className={`ml-2 flex shrink-0 items-center gap-2.5 ${task.done ? "opacity-55" : ""}`}
+          className={`ml-2.5 flex shrink-0 items-center gap-2.5 ${task.done ? "opacity-55" : ""}`}
         >
           {!expanded && children.length > 0 && (
-            <span className="text-[10.5px] font-semibold text-ink-3 tabular-nums">
+            <span className="text-[11px] font-semibold text-ink-3 tabular-nums">
               ({children.length})
             </span>
           )}
           {expanded && children.length > 0 && (
             <span
-              className="text-[10.5px] font-semibold tracking-[0.02em] text-ink-3 tabular-nums"
+              className="text-[11px] font-semibold tracking-[0.02em] text-ink-3 tabular-nums"
               title={`${doneChildren} of ${children.length} subtasks done`}
             >
               {doneChildren}/{children.length}
             </span>
           )}
           {task.attachments.length > 0 && (
-            <span className="flex h-[18px] items-center gap-1 rounded-[5px] border border-hairline px-1.5 text-[10.5px] font-semibold text-ink-3 tabular-nums">
-              <Icon name="attach_file" size={12} weight={300} />
+            <span className="flex h-5 items-center gap-1 rounded-md border border-hairline px-1.5 text-[11px] font-semibold text-ink-3 tabular-nums">
+              <Icon name="attach_file" size={13} weight={300} />
               {task.attachments.length}
             </span>
           )}
           <span
-            className="text-[11px] tracking-[0.02em] text-ink-3 tabular-nums"
+            className="text-[11.5px] tracking-[0.02em] text-ink-3 tabular-nums"
             title={`Created ${absoluteDateTime(task.created_at)}`}
           >
             {relativeTime(task.created_at)}
@@ -270,10 +270,10 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="grid h-5 w-5 place-items-center rounded text-ink-3 opacity-0 transition-opacity duration-100 group-hover/row:opacity-100 hover:bg-wash-strong hover:text-ink"
+            className="grid h-6 w-6 place-items-center rounded text-ink-3 opacity-0 transition-opacity duration-100 group-hover/row:opacity-100 hover:bg-wash-strong hover:text-ink"
             title="More"
           >
-            <Icon name="more_horiz" size={15} weight={300} />
+            <Icon name="more_horiz" size={17} weight={300} />
           </button>
         </div>
       </div>
@@ -301,7 +301,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
   );
 }
 
-/** The lamp well: ghost check on hover, amber wipe + drawn stroke on check,
+/** The lamp well: ghost check on hover, accent wipe + drawn stroke on check,
  *  instant cheap uncheck (unchecking is error correction, never ceremony). */
 function Check({ done, flashing, onToggle }: { done: boolean; flashing: boolean; onToggle: () => void }) {
   return (
@@ -311,11 +311,11 @@ function Check({ done, flashing, onToggle }: { done: boolean; flashing: boolean;
         onToggle();
       }}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="group/check relative h-4 w-4 shrink-0 overflow-hidden rounded-[4px]"
+      className="group/check relative h-[18px] w-[18px] shrink-0 overflow-hidden rounded-[5px]"
       title={done ? "Mark not done" : "Mark done"}
     >
       <span
-        className={`absolute inset-0 rounded-[4px] border-[1.5px] transition-colors duration-100 ${
+        className={`absolute inset-0 rounded-[5px] border-[1.5px] transition-colors duration-100 ${
           done ? "border-transparent" : "border-hairline-strong group-hover/row:border-ink-3"
         }`}
       />
@@ -328,7 +328,7 @@ function Check({ done, flashing, onToggle }: { done: boolean; flashing: boolean;
             : "clip-path 100ms cubic-bezier(0.3,0,1,1)",
         }}
       />
-      <svg viewBox="0 0 12 12" className="absolute inset-0 m-auto h-3 w-3">
+      <svg viewBox="0 0 12 12" className="absolute inset-0 m-auto h-3.5 w-3.5">
         <path
           d="M2.5 6.5 L5 8.8 L9.5 3.6"
           fill="none"
@@ -348,7 +348,7 @@ function Check({ done, flashing, onToggle }: { done: boolean; flashing: boolean;
       {!done && (
         <svg
           viewBox="0 0 12 12"
-          className="absolute inset-0 m-auto h-3 w-3 opacity-0 transition-opacity duration-100 group-hover/check:opacity-30"
+          className="absolute inset-0 m-auto h-3.5 w-3.5 opacity-0 transition-opacity duration-100 group-hover/check:opacity-30"
         >
           <path
             d="M2.5 6.5 L5 8.8 L9.5 3.6"
@@ -380,7 +380,7 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (title: str
         if (e.key === "Escape") onDone(null);
       }}
       onBlur={() => onDone(ref.current?.value.trim() || null)}
-      className="w-full rounded bg-recessed px-1.5 py-0.5 text-[13px] font-medium text-ink outline-none"
+      className="w-full rounded bg-recessed px-1.5 py-0.5 text-[14px] font-medium text-ink outline-none"
     />
   );
 }
@@ -400,10 +400,10 @@ function SubtaskComposer({
   }, []);
   return (
     <div
-      className="flex h-8 items-center gap-2 pr-3"
+      className="flex h-9 items-center gap-2 pr-3"
       style={{ paddingLeft: depth * INDENT + 6 }}
     >
-      <Icon name="subdirectory_arrow_right" size={14} weight={300} className="text-ink-3" />
+      <Icon name="subdirectory_arrow_right" size={15} weight={300} className="text-ink-3" />
       <input
         ref={ref}
         placeholder="Subtask title — Enter to add"
@@ -419,7 +419,7 @@ function SubtaskComposer({
           if (e.key === "Escape") onDismiss();
         }}
         onBlur={onDismiss}
-        className="h-6 flex-1 rounded bg-recessed px-2 text-[12.5px] text-ink outline-none placeholder:text-ink-3"
+        className="h-7 flex-1 rounded-md bg-recessed px-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3"
       />
     </div>
   );

@@ -7,13 +7,12 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, State, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use taskscape_common::{attachments, screenshot, server, List, Store, MAIN_PORT, TRAY_PORT};
+use taskscape_common::{attachments, names, screenshot, server, List, Store, MAIN_PORT, TRAY_PORT};
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
-const INBOX: &str = "Inbox";
 const ACTIVE_LIST_KEY: &str = "last_active_list";
 
 /// ⌘Return — the global hotkey that toggles the mini capture window.
@@ -39,7 +38,9 @@ fn target_list(store: &Store) -> Result<List, String> {
         return Ok(first);
     }
     let project = store.default_project().map_err(err)?;
-    store.create_list(&project.id, INBOX).map_err(err)
+    store
+        .create_list(&project.id, &names::suggest_name())
+        .map_err(err)
 }
 
 /// Focus the main app if it's running (HTTP), otherwise launch the installed app.

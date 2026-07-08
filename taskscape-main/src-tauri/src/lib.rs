@@ -95,6 +95,11 @@ fn delete_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn reorder_list(store: State<'_, Arc<Store>>, id: String, sort_order: f64) -> Result<(), String> {
+    store.reorder_list(&id, sort_order).map_err(err)
+}
+
+#[tauri::command]
 fn list_tasks(store: State<'_, Arc<Store>>, list_id: String) -> Result<Vec<Task>, String> {
     store.list_tasks(&list_id).map_err(err)
 }
@@ -491,6 +496,7 @@ pub fn run() {
             create_list,
             rename_list,
             delete_list,
+            reorder_list,
             list_tasks,
             all_tasks,
             create_task,

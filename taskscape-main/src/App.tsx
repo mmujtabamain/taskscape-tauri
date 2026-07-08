@@ -40,7 +40,7 @@ function App() {
   const [dropTarget, setDropTarget] = useState<{ taskId: string; zone: DropZone } | null>(null);
 
   const searchRef = useRef<HTMLInputElement | null>(null);
-  const composers = useRef(new Map<string, () => void>());
+  const composers = useRef(new Map<string, (seed?: string) => void>());
 
   // Refs mirror the current selection so `load` (a stable callback) can preserve
   // it across refreshes without going stale.
@@ -280,6 +280,19 @@ function App() {
     await load();
   };
 
+  // Tab reorder: rewrite every tab's sort_order to evenly spaced integers in the
+  // new visual order. Lists are few, so a full rebuild is cheap and collision-free.
+  const reorderList = async (draggedId: string, targetId: string, before: boolean) => {
+    const dragged = listsInProject.find((l) => l.id === draggedId);
+    const rest = listsInProject.filter((l) => l.id !== draggedId);
+    const targetIdx = rest.findIndex((l) => l.id === targetId);
+    if (!dragged || targetIdx < 0) return;
+    const insertIdx = before ? targetIdx : targetIdx + 1;
+    const ordered = [...rest.slice(0, insertIdx), dragged, ...rest.slice(insertIdx)];
+    await Promise.all(ordered.map((l, i) => api.reorderList(l.id, (i + 1) * 1000)));
+    await load();
+  };
+
   const deleteList = async (list: List) => {
     const taskCount = allTasks.filter((t) => t.list_id === list.id).length;
     const ok = await confirmModal({
@@ -474,10 +487,13 @@ function App() {
     [rootsByList, childrenByParent, isVisible, collapsed, query],
   );
 
-  const registerComposer = useCallback((listId: string, focus: (() => void) | null) => {
-    if (focus) composers.current.set(listId, focus);
-    else composers.current.delete(listId);
-  }, []);
+  const registerComposer = useCallback(
+    (listId: string, focus: ((seed?: string) => void) | null) => {
+      if (focus) composers.current.set(listId, focus);
+      else composers.current.delete(listId);
+    },
+    [],
+  );
 
   // ----- keyboard -----
   useEffect(() => {
@@ -551,6 +567,21 @@ function App() {
         // A menu/dropdown is dismissing itself on this same Escape — don't also
         // clear the selection out from under the user.
         if (!overlayOpen()) setSelectedTaskId(null);
+      } else if (
+        e.key.length === 1 &&
+        !e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !overlayOpen()
+      ) {
+        // Type-to-capture: a printable key with nothing else consuming it drops
+        // straight into the pane's composer, seeded with that character.
+        const target = selectedTask?.list_id ?? activeListId;
+        const composer = target ? composers.current.get(target) : undefined;
+        if (composer) {
+          e.preventDefault();
+          composer(e.key);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -586,6 +617,7 @@ function App() {
           onDeleteList={deleteList}
           onToggleSplit={toggleSplit}
           onDropTaskOnTab={(taskId, listId) => moveTask(taskId, null, listId)}
+          onReorderList={reorderList}
           search={search}
           onSearchChange={setSearch}
           searchRef={searchRef}
@@ -637,11 +669,11 @@ function App() {
               )}
             </div>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-content">
-              <p className="font-display text-[15px] font-medium text-ink-2">No lists yet</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-content">
+              <p className="font-display text-[17px] font-medium text-ink-2">No lists yet</p>
               <button
                 onClick={createList}
-                className="rounded-md bg-ink px-3.5 py-1.5 text-[12px] font-semibold tracking-[0.02em] text-content transition-opacity hover:opacity-90 active:scale-[0.98]"
+                className="rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold tracking-[0.01em] text-on-accent transition-colors hover:bg-accent-hover active:bg-accent-active"
               >
                 Create your first list
               </button>

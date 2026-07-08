@@ -14,6 +14,10 @@ pub struct List {
     pub id: String,
     pub project_id: String,
     pub name: String,
+    /// Manual tab ordering key; defaults to `created_at` so pre-migration lists
+    /// keep their chronological order until dragged.
+    #[serde(default)]
+    pub sort_order: f64,
     pub created_at: i64,
     pub updated_at: i64,
 }

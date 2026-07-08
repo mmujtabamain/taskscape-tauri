@@ -3,6 +3,8 @@ import { Icon } from "./Icon";
 import { useContextMenu } from "./ContextMenu";
 import type { List } from "../api";
 
+const TAB_MIME = "application/x-list-tab";
+
 interface Props {
   lists: List[];
   activeListId: string | null;
@@ -14,6 +16,7 @@ interface Props {
   onDelete: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTask: (taskId: string, listId: string) => void;
+  onReorder: (draggedId: string, targetId: string, before: boolean) => void;
 }
 
 export function ListTabs({
@@ -27,11 +30,15 @@ export function ListTabs({
   onDelete,
   onToggleSplit,
   onDropTask,
+  onReorder,
 }: Props) {
   const menu = useContextMenu();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [dropOver, setDropOver] = useState<string | null>(null);
+  const [draggingTab, setDraggingTab] = useState<string | null>(null);
+  const [tabOver, setTabOver] = useState<{ id: string; before: boolean } | null>(null);
   const activeIdx = lists.findIndex((l) => l.id === activeListId);
+  const inSplit = splitListId != null;
 
   const openMenu = (e: React.MouseEvent, list: List) => {
     e.preventDefault();
@@ -66,33 +73,74 @@ export function ListTabs({
         const split = list.id === splitListId;
         const open = counts[list.id] ?? 0;
         const hideSep = i === 0 || i === activeIdx || i - 1 === activeIdx;
+        // The split indicator marks the two panes on screen — shown on BOTH the
+        // active tab and the split tab, and only while split view is on.
+        const paneDot = inSplit && (active || split);
+        const tabDragOver = tabOver?.id === list.id;
         return (
-          <div key={list.id} className="flex items-stretch">
+          <div key={list.id} className="relative flex items-stretch">
             {!hideSep && <span className="my-auto h-4 w-px shrink-0 bg-hairline-faint" />}
+            {tabDragOver && (
+              <span
+                className={`pointer-events-none absolute inset-y-1 z-10 w-[2px] rounded-full bg-accent ${
+                  tabOver!.before ? "left-0" : "right-0"
+                }`}
+              />
+            )}
             <div
-              className={`group relative flex cursor-default items-center gap-1.5 px-3.5 transition-colors ${
+              draggable={renaming !== list.id}
+              className={`group relative flex cursor-default items-center gap-2 px-4 transition-colors ${
                 active ? "bg-content" : "hover:bg-wash"
-              } ${dropOver === list.id ? "bg-selection" : ""}`}
+              } ${dropOver === list.id ? "bg-selection" : ""} ${
+                draggingTab === list.id ? "opacity-40" : ""
+              }`}
               onClick={() => onSelect(list.id)}
               onDoubleClick={() => setRenaming(list.id)}
               onAuxClick={(e) => {
                 if (e.button === 1) onDelete(list);
               }}
               onContextMenu={(e) => openMenu(e, list)}
+              onDragStart={(e) => {
+                e.dataTransfer.setData(TAB_MIME, list.id);
+                e.dataTransfer.effectAllowed = "move";
+                setDraggingTab(list.id);
+              }}
+              onDragEnd={() => {
+                setDraggingTab(null);
+                setTabOver(null);
+              }}
               onDragOver={(e) => {
-                if (e.dataTransfer.types.includes("application/x-task")) {
+                const types = e.dataTransfer.types;
+                if (types.includes("application/x-task")) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   setDropOver(list.id);
+                } else if (types.includes(TAB_MIME) && draggingTab !== list.id) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  const before = e.clientX < r.left + r.width / 2;
+                  setTabOver((v) =>
+                    v?.id === list.id && v.before === before ? v : { id: list.id, before },
+                  );
                 }
               }}
-              onDragLeave={() => setDropOver((v) => (v === list.id ? null : v))}
+              onDragLeave={() => {
+                setDropOver((v) => (v === list.id ? null : v));
+                setTabOver((v) => (v?.id === list.id ? null : v));
+              }}
               onDrop={(e) => {
                 const taskId = e.dataTransfer.getData("application/x-task");
+                const tabId = e.dataTransfer.getData(TAB_MIME);
                 setDropOver(null);
+                const over = tabOver;
+                setTabOver(null);
                 if (taskId) {
                   e.preventDefault();
                   onDropTask(taskId, list.id);
+                } else if (tabId && tabId !== list.id) {
+                  e.preventDefault();
+                  onReorder(tabId, list.id, over?.before ?? true);
                 }
               }}
             >
@@ -105,13 +153,7 @@ export function ListTabs({
                   <span className="absolute inset-x-px -bottom-px h-px bg-content" />
                 </>
               )}
-              {(split) && (
-                <span
-                  className={`size-1 shrink-0 rounded-full ${
-                    active ? "bg-accent" : "border border-accent"
-                  }`}
-                />
-              )}
+              {paneDot && <span className="size-1.5 shrink-0 rounded-full bg-accent" />}
               {renaming === list.id ? (
                 <TabRenameInput
                   initial={list.name}
@@ -122,7 +164,7 @@ export function ListTabs({
                 />
               ) : (
                 <span
-                  className={`max-w-36 truncate text-[12px] tracking-[0.01em] ${
+                  className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
                     active ? "font-semibold text-ink" : "font-medium text-ink-2"
                   }`}
                 >
@@ -130,10 +172,7 @@ export function ListTabs({
                 </span>
               )}
               <span className="relative grid w-4 place-items-center">
-                <span
-                  key={open}
-                  className="animate-rise text-[10.5px] font-semibold tracking-[0.03em] text-ink-3 tabular-nums group-hover:opacity-0"
-                >
+                <span className="text-[11.5px] font-semibold tracking-[0.02em] text-ink-3 tabular-nums group-hover:opacity-0">
                   {open}
                 </span>
                 <button
@@ -144,7 +183,7 @@ export function ListTabs({
                   className="absolute inset-0 grid place-items-center rounded text-ink-3 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:text-ink"
                   title="Delete list"
                 >
-                  <Icon name="close" size={13} weight={300} />
+                  <Icon name="close" size={15} weight={300} />
                 </button>
               </span>
             </div>
@@ -153,10 +192,10 @@ export function ListTabs({
       })}
       <button
         onClick={onCreate}
-        className="my-auto ml-1.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+        className="my-auto ml-2 grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-wash hover:text-ink"
         title="New list"
       >
-        <Icon name="add" size={16} weight={300} />
+        <Icon name="add" size={18} weight={300} />
       </button>
       {/* Trailing empty strip drags the window (the tabs themselves are interactive). */}
       <span data-tauri-drag-region className="min-w-6 flex-1 self-stretch" />
@@ -179,7 +218,7 @@ function TabRenameInput({ initial, onDone }: { initial: string; onDone: (name: s
         if (e.key === "Escape") onDone(null);
       }}
       onBlur={() => onDone(ref.current?.value.trim() || null)}
-      className="w-28 rounded bg-recessed px-1.5 py-0.5 text-[12px] font-medium text-ink outline-none"
+      className="w-32 rounded bg-recessed px-1.5 py-0.5 text-[13px] font-medium text-ink outline-none"
     />
   );
 }

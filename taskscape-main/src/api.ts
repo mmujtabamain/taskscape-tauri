@@ -13,6 +13,7 @@ export interface List {
   id: string;
   project_id: string;
   name: string;
+  sort_order: number;
   created_at: number;
   updated_at: number;
 }
@@ -59,6 +60,8 @@ export const api = {
     invoke<List>("create_list", { projectId, name }),
   renameList: (id: string, name: string) => invoke<void>("rename_list", { id, name }),
   deleteList: (id: string) => invoke<void>("delete_list", { id }),
+  reorderList: (id: string, sortOrder: number) =>
+    invoke<void>("reorder_list", { id, sortOrder }),
 
   // tasks
   listTasks: (listId: string) => invoke<Task[]>("list_tasks", { listId }),

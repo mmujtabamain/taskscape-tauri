@@ -77,12 +77,17 @@ impl Store {
         // Bring older databases up to date. `ensure_column` is a no-op when the
         // column already exists, so this runs safely on every open.
         ensure_column(&conn, "lists", "project_id", "TEXT")?;
+        ensure_column(&conn, "lists", "sort_order", "REAL")?;
         ensure_column(&conn, "tasks", "parent_id", "TEXT")?;
         ensure_column(&conn, "tasks", "sort_order", "REAL")?;
-        // Seed manual ordering from creation time so pre-migration tasks keep
+        // Seed manual ordering from creation time so pre-migration rows keep
         // their chronological order.
         conn.execute(
             "UPDATE tasks SET sort_order = created_at WHERE sort_order IS NULL",
+            [],
+        )?;
+        conn.execute(
+            "UPDATE lists SET sort_order = created_at WHERE sort_order IS NULL",
             [],
         )?;
         // Indexes on the migrated columns — created after `ensure_column` so the
@@ -182,7 +187,7 @@ impl Store {
                 return Ok(project);
             }
         }
-        self.create_project("My Tasks")
+        self.create_project(&crate::names::suggest_name())
     }
 
     // ---- lists -----------------------------------------------------------
@@ -193,17 +198,21 @@ impl Store {
             id: new_id(),
             project_id: project_id.to_string(),
             name: name.to_string(),
+            // New lists land after existing tabs (they keep their created_at
+            // seed), so a fresh list appears last.
+            sort_order: now as f64,
             created_at: now,
             updated_at: now,
         };
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO lists (id, project_id, name, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO lists (id, project_id, name, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 list.id,
                 list.project_id,
                 list.name,
+                list.sort_order,
                 list.created_at,
                 list.updated_at
             ],
@@ -214,11 +223,24 @@ impl Store {
     pub fn list_lists(&self) -> Result<Vec<List>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, name, created_at, updated_at
-             FROM lists ORDER BY created_at ASC",
+            "SELECT id, project_id, name, sort_order, created_at, updated_at
+             FROM lists ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
         )?;
         let rows = stmt.query_map([], row_to_list)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Move a list to a new manual position among its sibling tabs.
+    pub fn reorder_list(&self, id: &str, sort_order: f64) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let updated = conn.execute(
+            "UPDATE lists SET sort_order = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, sort_order, now_millis()],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("list not found: {id}");
+        }
+        Ok(())
     }
 
     pub fn rename_list(&self, id: &str, name: &str) -> Result<()> {
@@ -514,11 +536,15 @@ fn row_to_project(row: &Row) -> rusqlite::Result<Project> {
 }
 
 fn row_to_list(row: &Row) -> rusqlite::Result<List> {
+    let created_at: i64 = row.get("created_at")?;
     Ok(List {
         id: row.get("id")?,
         project_id: row.get::<_, Option<String>>("project_id")?.unwrap_or_default(),
         name: row.get("name")?,
-        created_at: row.get("created_at")?,
+        sort_order: row
+            .get::<_, Option<f64>>("sort_order")?
+            .unwrap_or(created_at as f64),
+        created_at,
         updated_at: row.get("updated_at")?,
     })
 }
@@ -601,7 +627,7 @@ fn backfill_default_project(conn: &Connection) -> Result<()> {
             let id = new_id();
             conn.execute(
                 "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                params![id, "My Tasks", now, now],
+                params![id, crate::names::suggest_name(), now, now],
             )?;
             id
         }

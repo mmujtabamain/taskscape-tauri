@@ -24,6 +24,7 @@ interface Props {
   onDeleteList: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTaskOnTab: (taskId: string, listId: string) => void;
+  onReorderList: (draggedId: string, targetId: string, before: boolean) => void;
 
   search: string;
   onSearchChange: (q: string) => void;
@@ -44,7 +45,7 @@ export function TitleBar(props: Props) {
         if ((e.target as HTMLElement).hasAttribute("data-tauri-drag-region"))
           getCurrentWindow().toggleMaximize();
       }}
-      className="relative flex h-12 shrink-0 items-stretch border-b border-hairline bg-window"
+      className="relative flex h-13 shrink-0 items-stretch border-b border-hairline bg-window"
     >
       {isMac ? <WindowControls /> : <span className="w-3" />}
 
@@ -70,11 +71,12 @@ export function TitleBar(props: Props) {
         onDelete={props.onDeleteList}
         onToggleSplit={props.onToggleSplit}
         onDropTask={props.onDropTaskOnTab}
+        onReorder={props.onReorderList}
       />
 
-      <div className="flex items-center gap-1.5 pr-3 pl-3">
-        <div className="flex h-7 w-44 items-center gap-1.5 rounded-md bg-recessed px-2 transition-shadow focus-within:ring-1 focus-within:ring-focus">
-          <Icon name="search" size={14} weight={300} className="shrink-0 text-ink-3" />
+      <div className="flex items-center gap-2 pr-3 pl-3">
+        <div className="flex h-8 w-56 items-center gap-2 rounded-lg bg-recessed px-2.5 transition-shadow focus-within:ring-1 focus-within:ring-focus">
+          <Icon name="search" size={16} weight={300} className="shrink-0 text-ink-3" />
           <input
             ref={props.searchRef}
             value={props.search}
@@ -86,15 +88,15 @@ export function TitleBar(props: Props) {
               }
             }}
             placeholder={`Search  ${cmd}F`}
-            className="w-full bg-transparent text-[12px] text-ink outline-none placeholder:text-ink-3"
+            className="w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
           />
           {props.search && (
             <button
               onClick={() => props.onSearchChange("")}
-              className="grid h-4 w-4 shrink-0 place-items-center rounded text-ink-3 hover:text-ink"
+              className="grid h-5 w-5 shrink-0 place-items-center rounded text-ink-3 hover:text-ink"
               title="Clear search"
             >
-              <Icon name="close" size={12} />
+              <Icon name="close" size={13} />
             </button>
           )}
         </div>
@@ -138,11 +140,11 @@ function BarButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`grid h-7 w-7 place-items-center rounded-md transition-colors hover:bg-wash ${
+      className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-wash ${
         active ? "text-ink" : "text-ink-2 hover:text-ink"
       } disabled:pointer-events-none disabled:opacity-35`}
     >
-      <Icon name={icon} size={18} weight={300} filled={active} />
+      <Icon name={icon} size={19} weight={300} filled={active} />
     </button>
   );
 }

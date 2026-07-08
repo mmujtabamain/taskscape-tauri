@@ -17,60 +17,62 @@ function useWindowFocused(): boolean {
   return focused;
 }
 
-/** Custom-drawn traffic lights: red/yellow/green wells that gray out when the
- *  window blurs, glyphs on group hover — no private API involved. */
+/* The macOS button geometry, traced from lwouis/macos-traffic-light-buttons-as-SVG:
+   an outer ring + lighter inner disc, with the glyph revealed on hover. */
+const OUTER = "m42.7 85.4c23.6 0 42.7-19.1 42.7-42.7s-19.1-42.7-42.7-42.7-42.7 19.1-42.7 42.7 19.1 42.7 42.7 42.7z";
+const INNER = "m42.7 81.8c21.6 0 39.1-17.5 39.1-39.1s-17.5-39.1-39.1-39.1-39.1 17.5-39.1 39.1 17.5 39.1 39.1 39.1z";
+
+const GLYPHS: Record<string, React.ReactNode> = {
+  close: (
+    <>
+      <path d="m22.5 57.8 35.3-35.3c1.4-1.4 3.6-1.4 5 0l.1.1c1.4 1.4 1.4 3.6 0 5l-35.3 35.3c-1.4 1.4-3.6 1.4-5 0l-.1-.1c-1.3-1.4-1.3-3.6 0-5z" />
+      <path d="m27.6 22.5 35.3 35.3c1.4 1.4 1.4 3.6 0 5l-.1.1c-1.4 1.4-3.6 1.4-5 0l-35.3-35.3c-1.4-1.4-1.4-3.6 0-5l.1-.1c1.4-1.3 3.6-1.3 5 0z" />
+    </>
+  ),
+  minimize: (
+    <path d="m17.8 39.1h49.9c1.9 0 3.5 1.6 3.5 3.5v.1c0 1.9-1.6 3.5-3.5 3.5h-49.9c-1.9 0-3.5-1.6-3.5-3.5v-.1c0-1.9 1.5-3.5 3.5-3.5z" />
+  ),
+  fullscreen: (
+    <>
+      <path d="m31.2 20.8h26.7c3.6 0 6.5 2.9 6.5 6.5v26.7z" />
+      <path d="m54.4 64.5h-26.8c-3.6 0-6.5-2.9-6.5-6.5v-26.8z" />
+    </>
+  ),
+};
+
+/** Custom-drawn traffic lights matching the native macOS geometry: red/yellow/
+ *  green ring+disc that gray out when the window blurs, glyphs on group hover —
+ *  no private API involved. */
 function MacControls() {
   const focused = useWindowFocused();
   const win = getCurrentWindow();
 
-  const lights: Array<{ color: string; glyph: React.ReactNode; label: string; act: () => void }> = [
-    {
-      color: "#ff5f57",
-      label: "Close",
-      act: () => void win.close(),
-      glyph: (
-        <svg viewBox="0 0 8 8" className="size-3">
-          <path d="M1.5 1.5 6.5 6.5 M6.5 1.5 1.5 6.5" stroke="rgba(0,0,0,0.55)" strokeWidth="1.1" strokeLinecap="round" />
-        </svg>
-      ),
-    },
-    {
-      color: "#febc2e",
-      label: "Minimize",
-      act: () => void win.minimize(),
-      glyph: (
-        <svg viewBox="0 0 8 8" className="size-3">
-          <path d="M1.2 4 H6.8" stroke="rgba(0,0,0,0.55)" strokeWidth="1.1" strokeLinecap="round" />
-        </svg>
-      ),
-    },
-    {
-      color: "#28c840",
-      label: "Full Screen",
-      act: () => {
-        win.isFullscreen().then((f) => win.setFullscreen(!f));
-      },
-      glyph: (
-        <svg viewBox="0 0 8 8" className="size-3">
-          <path d="M1.6 4.6 V6.4 H3.4 Z M6.4 3.4 V1.6 H4.6 Z" fill="rgba(0,0,0,0.55)" />
-        </svg>
-      ),
-    },
+  const lights: Array<{
+    ring: string;
+    fill: string;
+    glyph: string;
+    glyphColor: string;
+    label: string;
+    act: () => void;
+  }> = [
+    { ring: "#e24b41", fill: "#ed6a5f", glyph: "close", glyphColor: "#460804", label: "Close", act: () => void win.close() },
+    { ring: "#e1a73e", fill: "#f6be50", glyph: "minimize", glyphColor: "#90591d", label: "Minimize", act: () => void win.minimize() },
+    { ring: "#2dac2f", fill: "#61c555", glyph: "fullscreen", glyphColor: "#2a6218", label: "Full Screen", act: () => void win.isFullscreen().then((f) => win.setFullscreen(!f)) },
   ];
 
   return (
     <div className="group flex items-center gap-2 pr-3 pl-5" data-no-drag>
       {lights.map((l) => (
-        <button
-          key={l.label}
-          onClick={l.act}
-          title={l.label}
-          className="grid size-4.5 place-items-center rounded-full border border-black/10"
-          style={{ backgroundColor: focused ? l.color : "var(--bg-recessed)" }}
-        >
-          <span className="opacity-0 transition-opacity duration-100 group-hover:opacity-100">
-            {l.glyph}
-          </span>
+        <button key={l.label} onClick={l.act} title={l.label} className="block size-[13px]">
+          <svg viewBox="0 0 85.4 85.4" className="size-full" clipRule="evenodd" fillRule="evenodd">
+            <path d={OUTER} fill={focused ? l.ring : "var(--tl-inactive-ring)"} />
+            <path d={INNER} fill={focused ? l.fill : "var(--tl-inactive-fill)"} />
+            {focused && (
+              <g fill={l.glyphColor} className="opacity-0 transition-opacity duration-100 group-hover:opacity-100">
+                {GLYPHS[l.glyph]}
+              </g>
+            )}
+          </svg>
         </button>
       ))}
     </div>

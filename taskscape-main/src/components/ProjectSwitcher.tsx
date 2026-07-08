@@ -47,40 +47,40 @@ export function ProjectSwitcher({
     <div ref={rootRef} className="relative flex items-center" data-no-drag>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-7 items-center gap-1.5 rounded-[7px] bg-recessed py-1.5 pr-2 pl-3 transition-colors hover:bg-wash-strong"
+        className="flex h-8 items-center gap-1.5 rounded-lg bg-recessed py-1.5 pr-2.5 pl-3.5 transition-colors hover:bg-wash-strong"
         title="Switch project"
       >
-        <span className="max-w-40 truncate font-display text-[13px] font-semibold text-ink">
+        <span className="max-w-44 truncate font-display text-[14px] font-semibold text-ink">
           {selected?.name ?? "Taskscape"}
         </span>
-        <Icon name="unfold_more" size={14} weight={300} className="text-ink-3" />
+        <Icon name="unfold_more" size={15} weight={300} className="text-ink-3" />
       </button>
 
       {open && (
-        <div className="absolute top-9 left-0 z-40 min-w-56 rounded-lg border border-hairline bg-raised py-1 shadow-menu">
+        <div className="absolute top-10 left-0 z-40 min-w-60 rounded-xl border border-hairline bg-raised py-1.5 shadow-menu">
           {projects.map((p) => (
             <div
               key={p.id}
-              className="group flex h-8 cursor-default items-center gap-2 px-2.5 hover:bg-wash-strong"
+              className="group flex h-9 cursor-default items-center gap-2 px-3 hover:bg-wash-strong"
               onClick={() => {
                 onSelect(p.id);
                 setOpen(false);
               }}
             >
               <span className="w-4 shrink-0 text-accent">
-                {p.id === selectedId && <Icon name="check" size={14} weight={500} />}
+                {p.id === selectedId && <Icon name="check" size={15} weight={500} />}
               </span>
-              <span className="flex-1 truncate text-[13px] text-ink">{p.name}</span>
+              <span className="flex-1 truncate text-[13.5px] text-ink">{p.name}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
                   onRename(p);
                 }}
-                className="grid h-5 w-5 place-items-center rounded text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-ink"
+                className="grid h-6 w-6 place-items-center rounded text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-ink"
                 title="Rename project"
               >
-                <Icon name="edit" size={13} />
+                <Icon name="edit" size={14} />
               </button>
               <button
                 onClick={(e) => {
@@ -88,10 +88,10 @@ export function ProjectSwitcher({
                   setOpen(false);
                   onDelete(p);
                 }}
-                className="grid h-5 w-5 place-items-center rounded text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                className="grid h-6 w-6 place-items-center rounded text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
                 title="Delete project"
               >
-                <Icon name="delete" size={13} />
+                <Icon name="delete" size={14} />
               </button>
             </div>
           ))}
@@ -101,12 +101,12 @@ export function ProjectSwitcher({
               setOpen(false);
               onCreate();
             }}
-            className="flex h-8 w-full items-center gap-2 px-2.5 text-left hover:bg-wash-strong"
+            className="flex h-9 w-full items-center gap-2 px-3 text-left hover:bg-wash-strong"
           >
             <span className="w-4 shrink-0 text-ink-3">
-              <Icon name="add" size={14} />
+              <Icon name="add" size={15} />
             </span>
-            <span className="text-[13px] text-ink">New project…</span>
+            <span className="text-[13.5px] text-ink">New project…</span>
           </button>
         </div>
       )}

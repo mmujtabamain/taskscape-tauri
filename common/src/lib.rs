@@ -6,6 +6,7 @@
 
 pub mod attachments;
 pub mod models;
+pub mod names;
 pub mod paths;
 pub mod screenshot;
 pub mod server;

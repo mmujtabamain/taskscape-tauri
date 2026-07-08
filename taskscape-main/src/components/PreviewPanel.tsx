@@ -4,7 +4,7 @@ import { api, type Attachment, type Task, type TaskPatch } from "../api";
 import { attachmentSrc, fileKindFor, isRemote } from "../lib/fileKind";
 import { openModal } from "../lib/modal";
 import { absoluteDateTime, relativeTime } from "../time";
-import { AttachmentViewer } from "./AttachmentViewer";
+import { AttachmentLightbox } from "./AttachmentLightbox";
 import { Icon } from "./Icon";
 
 interface PreviewPanelProps {
@@ -52,7 +52,7 @@ function DoneCheckbox({
   size: 14 | 18;
   onToggle: () => void;
 }) {
-  const box = size === 18 ? "h-[18px] w-[18px] rounded-[5px]" : "h-3.5 w-3.5 rounded-[4px]";
+  const box = size === 18 ? "h-5 w-5 rounded-[6px]" : "h-[18px] w-[18px] rounded-[5px]";
   return (
     <button
       onClick={onToggle}
@@ -63,7 +63,7 @@ function DoneCheckbox({
           : "border-hairline-strong hover:border-ink-3"
       }`}
     >
-      {done && <Icon name="check" size={size === 18 ? 12 : 10} weight={700} />}
+      {done && <Icon name="check" size={size === 18 ? 14 : 12} weight={700} />}
     </button>
   );
 }
@@ -84,12 +84,11 @@ function TaskInspector({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [notesDraft, setNotesDraft] = useState(task.notes ?? "");
-  const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
 
   const children = childrenByParent[task.id] ?? [];
   const doneChildren = children.filter((c) => c.done).length;
-  const selectedAttachment = task.attachments.find((a) => a.id === selectedAttachmentId) ?? null;
 
   useEffect(() => {
     let alive = true;
@@ -147,7 +146,7 @@ function TaskInspector({
 
   const openTile = (a: Attachment) => {
     if (isRemote(a.location)) void api.openAttachment(a);
-    else setSelectedAttachmentId(a.id);
+    else setLightboxIndex(task.attachments.findIndex((x) => x.id === a.id));
   };
 
   return (
@@ -173,7 +172,7 @@ function TaskInspector({
                     setEditingTitle(false);
                   }
                 }}
-                className="-mx-1 w-[calc(100%+8px)] rounded bg-recessed px-1 font-display text-[17px] font-semibold leading-[22px] text-ink outline-none"
+                className="-mx-1 w-[calc(100%+8px)] rounded bg-recessed px-1 font-display text-[18px] font-semibold leading-6 text-ink outline-none"
               />
             ) : (
               <button
@@ -182,12 +181,12 @@ function TaskInspector({
                   setEditingTitle(true);
                 }}
                 title="Click to edit"
-                className="block w-full text-left font-display text-[17px] font-semibold leading-[22px] text-ink"
+                className="block w-full text-left font-display text-[18px] font-semibold leading-6 text-ink"
               >
                 {task.title}
               </button>
             )}
-            <div className="mt-1 truncate text-[11px] tabular-nums text-ink-3">
+            <div className="mt-1.5 truncate text-[11.5px] tabular-nums text-ink-3">
               {listName && <>in {listName} · </>}
               <span title={absoluteDateTime(task.created_at)}>
                 created {relativeTime(task.created_at)}
@@ -217,7 +216,7 @@ function TaskInspector({
               onChange={(e) => setNotesDraft(e.target.value)}
               onBlur={commitNotes}
               placeholder="Add notes…"
-              className="block min-h-24 w-full resize-y rounded-md bg-transparent px-2 py-1.5 text-[13px] leading-5 text-ink transition-colors placeholder:text-ink-3 focus:bg-recessed"
+              className="block min-h-28 w-full resize-y rounded-md bg-transparent px-2 py-1.5 text-[14px] leading-[22px] text-ink transition-colors placeholder:text-ink-3 focus:bg-recessed"
             />
           </div>
         </div>
@@ -227,7 +226,7 @@ function TaskInspector({
             <SectionHeader
               label="Subtasks"
               trailing={
-                <span className="text-[11px] tabular-nums text-ink-3">
+                <span className="text-[11.5px] tabular-nums text-ink-3">
                   {doneChildren} done / {children.length}
                 </span>
               }
@@ -235,13 +234,13 @@ function TaskInspector({
             {children.map((child) => (
               <div
                 key={child.id}
-                className="-mx-1.5 flex h-7 items-center gap-2 rounded-md px-1.5 hover:bg-wash"
+                className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-md px-1.5 hover:bg-wash"
               >
                 <DoneCheckbox done={child.done} size={14} onToggle={() => onToggleDone(child)} />
                 <button
                   onClick={() => onSelectTask(child.id)}
                   title={child.title}
-                  className={`min-w-0 flex-1 truncate text-left text-[12.5px] ${
+                  className={`min-w-0 flex-1 truncate text-left text-[13.5px] ${
                     child.done ? "text-ink-3 line-through" : "text-ink"
                   }`}
                 >
@@ -260,45 +259,31 @@ function TaskInspector({
                 <button
                   onClick={addScreenshot}
                   title="Capture the full screen and attach it"
-                  className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
                 >
-                  <Icon name="screenshot_monitor" size={13} />
+                  <Icon name="screenshot_monitor" size={14} />
                   Shot
                 </button>
                 <button
                   onClick={addLink}
-                  className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
                 >
-                  <Icon name="add_link" size={13} />
+                  <Icon name="add_link" size={14} />
                   Link
                 </button>
                 <button
                   onClick={addFile}
-                  className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
                 >
-                  <Icon name="note_add" size={13} />
+                  <Icon name="note_add" size={14} />
                   File
                 </button>
               </div>
             }
           />
 
-          {selectedAttachment && (
-            <div className="mb-3 animate-rise">
-              <AttachmentViewer
-                key={selectedAttachment.id}
-                attachment={selectedAttachment}
-                onClose={() => setSelectedAttachmentId(null)}
-                onDeleted={() => {
-                  setSelectedAttachmentId(null);
-                  onRefresh();
-                }}
-              />
-            </div>
-          )}
-
           {task.attachments.length > 0 && (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2">
               {task.attachments.map((a) => {
                 const thumb = thumbs.get(a.id);
                 return (
@@ -306,7 +291,7 @@ function TaskInspector({
                     <button
                       onClick={() => openTile(a)}
                       title={a.name}
-                      className="group relative block aspect-square w-full overflow-hidden rounded border border-hairline bg-raised transition-colors hover:border-hairline-strong"
+                      className="group relative block aspect-square w-full overflow-hidden rounded-lg border border-hairline bg-raised transition-colors hover:border-hairline-strong"
                     >
                       {thumb ? (
                         <img
@@ -319,7 +304,7 @@ function TaskInspector({
                         <span className="grid h-full w-full place-items-center">
                           <Icon
                             name={fileKindFor(a.name, a.location).icon}
-                            size={20}
+                            size={22}
                             className="text-ink-3"
                           />
                         </span>
@@ -328,7 +313,7 @@ function TaskInspector({
                         <Icon name="open_in_full" size={14} />
                       </span>
                     </button>
-                    <div className="mt-1 truncate text-center text-[10.5px] text-ink-3">
+                    <div className="mt-1 truncate text-center text-[11px] text-ink-3">
                       {a.name}
                     </div>
                   </div>
@@ -341,13 +326,26 @@ function TaskInspector({
         <div className="mt-auto border-t border-hairline-faint p-4">
           <button
             onClick={() => onRequestDelete(task)}
-            className="flex h-7 items-center gap-1.5 rounded-md px-3 text-[12px] font-semibold text-danger transition-colors hover:bg-danger-soft"
+            className="flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold text-danger transition-colors hover:bg-danger-soft"
           >
-            <Icon name="delete" size={14} />
+            <Icon name="delete" size={15} />
             Delete task
           </button>
         </div>
       </div>
+
+      {lightboxIndex !== null && (
+        <AttachmentLightbox
+          attachments={task.attachments}
+          index={lightboxIndex}
+          onIndex={setLightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onDeleted={() => {
+            setLightboxIndex(null);
+            onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -359,10 +357,10 @@ export function PreviewPanel(props: PreviewPanelProps) {
       {task ? (
         <TaskInspector key={task.id} {...props} task={task} />
       ) : (
-        <div className="flex flex-1 animate-rise flex-col items-center justify-center gap-1 px-6 text-center">
-          <Icon name="left_click" size={24} weight={200} className="mb-1 text-ink-3" />
-          <p className="font-display text-[15px] font-medium text-ink-2">No task selected</p>
-          <p className="text-[12px] text-ink-3">Select a task to inspect it</p>
+        <div className="flex flex-1 animate-rise flex-col items-center justify-center gap-1.5 px-6 text-center">
+          <Icon name="left_click" size={28} weight={200} className="mb-1 text-ink-3" />
+          <p className="font-display text-[17px] font-medium text-ink-2">No task selected</p>
+          <p className="text-[13px] text-ink-3">Select a task to inspect it</p>
         </div>
       )}
     </div>
