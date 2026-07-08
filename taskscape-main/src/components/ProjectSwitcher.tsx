@@ -67,8 +67,8 @@ export function ProjectSwitcher({
                 setOpen(false);
               }}
             >
-              <span className="w-4 shrink-0 text-accent">
-                {p.id === selectedId && <Icon name="check" size={15} weight={500} />}
+              <span className="flex items-center w-4 text-accent">
+                {p.id === selectedId && <Icon name="check" size={15} weight={900} />}
               </span>
               <span className="flex-1 truncate text-[13.5px] text-ink">{p.name}</span>
               <button
@@ -80,7 +80,7 @@ export function ProjectSwitcher({
                 className="grid h-6 w-6 place-items-center rounded text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-ink"
                 title="Rename project"
               >
-                <Icon name="edit" size={14} />
+                <Icon name="edit" size={16} weight={500} />
               </button>
               <button
                 onClick={(e) => {
@@ -91,7 +91,7 @@ export function ProjectSwitcher({
                 className="grid h-6 w-6 place-items-center rounded text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
                 title="Delete project"
               >
-                <Icon name="delete" size={14} />
+                <Icon name="delete" size={16} weight={500} />
               </button>
             </div>
           ))}
@@ -103,8 +103,8 @@ export function ProjectSwitcher({
             }}
             className="flex h-9 w-full items-center gap-2 px-3 text-left hover:bg-wash-strong"
           >
-            <span className="w-4 shrink-0 text-ink-3">
-              <Icon name="add" size={15} />
+            <span className="w-4 flex items-center text-ink-3">
+              <Icon name="add" size={15} weight={900} />
             </span>
             <span className="text-[13.5px] text-ink">New project…</span>
           </button>
