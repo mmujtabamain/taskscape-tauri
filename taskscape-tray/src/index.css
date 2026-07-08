@@ -6,3 +6,9 @@ body,
 #root {
   background: transparent;
 }
+
+/* Follow the system light/dark appearance (drives Tailwind's `dark:` variant
+   and any native control rendering). */
+:root {
+  color-scheme: light dark;
+}

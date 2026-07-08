@@ -26,10 +26,11 @@ All are thin wrappers over the shared `Store` (see [common-crate.md](common-crat
 
 ## HTTP: what main serves that the tray calls
 
-Main mounts the shared `data_router` on **:7420** and `.merge()`s two extra app-specific routes:
+Main mounts the shared `data_router` on **:7420** and `.merge()`s these extra app-specific routes:
 
 - `POST /refresh` → emits a `refresh` event to the webview so the open window live-reloads after the tray writes data.
 - `POST /focus` → unminimize + show + focus the window (used by the tray's "Open Taskscape").
+- `POST /quit` → `app.exit(0)`, so the tray's "Quit Taskscape" closes this window too.
 
 ## `launch_embedded_tray()`
 

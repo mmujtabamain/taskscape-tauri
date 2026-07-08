@@ -2,15 +2,15 @@
 
 ## Tray Window
 
-- [ ] `cmd + shift + return` to attach screenshot automatically
-- [ ] The screenshot shouldn't include the tray window in it
-- [ ] The screenshot button is not a toggle button, clicking once takes a screenshots and attaches with the task, clicking again takes another screenshots and attaches another
-- [ ] Quitting Closes Main Window too
-- [ ] Allow adding Task Notes from Mini Window as well
-  - [ ] Open using Hotkey
-  - [ ] Task Name Field focused currently
-  - [ ] Field below with text "Press Tab to add notes"
-- [ ] Dark and Light Mode Theme handling
+- [x] `cmd + shift + return` to attach screenshot automatically
+- [x] The screenshot shouldn't include the tray window in it
+- [x] The screenshot button is not a toggle button, clicking once takes a screenshots and attaches with the task, clicking again takes another screenshots and attaches another
+- [x] Quitting Closes Main Window too
+- [x] Allow adding Task Notes from Mini Window as well
+  - [x] Open using Hotkey
+  - [x] Task Name Field focused currently
+  - [x] Field below with text "Press Tab to add notes"
+- [x] Dark and Light Mode Theme handling
 
 ## Main Window
 

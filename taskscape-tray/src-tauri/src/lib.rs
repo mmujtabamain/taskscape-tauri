@@ -21,6 +21,11 @@ fn hotkey() -> Shortcut {
     Shortcut::new(Some(Modifiers::SUPER), Code::Enter)
 }
 
+/// ⌘⇧Return — capture a screenshot and attach it, summoning the bar if hidden.
+fn screenshot_hotkey() -> Shortcut {
+    Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Enter)
+}
+
 /// The list captures should land in: the last active list if it still exists,
 /// otherwise the first list, otherwise a freshly created Inbox.
 fn target_list(store: &Store) -> Result<List, String> {
@@ -48,6 +53,15 @@ fn focus_or_launch_main() {
                 .status();
         }
     });
+}
+
+/// Quit everything: ask the main app's process to exit too (best effort, it may
+/// not be running), then exit this agent.
+fn quit_all(app: &AppHandle) {
+    tauri::async_runtime::block_on(async {
+        let _ = server::client::post_json(MAIN_PORT, "/quit", &serde_json::json!({})).await;
+    });
+    app.exit(0);
 }
 
 /// Somewhere no display can reach — the window "rests" here while hidden so that
@@ -198,10 +212,38 @@ fn just_revealed() -> bool {
         .is_some_and(|t| t.elapsed() < REVEAL_GRACE)
 }
 
-/// Hide the window and park it off-screen.
+/// Hide the window, park it off-screen, and clear the (now-cancelled) draft.
 fn dismiss(window: &tauri::Window) {
     let _ = window.hide();
     let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
+    let _ = window.emit("mini-reset", ());
+}
+
+/// Reveal the mini window at the cursor, focused and pinned onto the current
+/// (possibly full-screen) Space.
+fn show_mini(app: &AppHandle, window: &tauri::WebviewWindow) {
+    // Move to the cursor first, THEN reveal. Because the window rests off-screen
+    // while hidden, there is no old on-screen frame to flash.
+    if let Ok(pos) = app.cursor_position() {
+        let _ = window.set_position(PhysicalPosition::new(
+            (pos.x - 24.0) as i32,
+            (pos.y - 20.0) as i32,
+        ));
+    }
+    // Re-assert the Space-joining behavior right before showing: it must be in
+    // effect at the moment we reveal/focus, or macOS shows the window on the
+    // desktop Space instead of the active full-screen one.
+    #[cfg(target_os = "macos")]
+    allow_over_fullscreen(window);
+    if let Ok(mut guard) = last_shown().lock() {
+        *guard = Some(Instant::now());
+    }
+    let _ = window.show();
+    let _ = window.set_focus();
+    // ...then pin it onto the current (possibly full-screen) Space.
+    #[cfg(target_os = "macos")]
+    order_front_regardless(window);
+    let _ = window.emit("mini-shown", ());
 }
 
 /// Toggle the mini window: hide if visible, otherwise show it at the cursor.
@@ -212,29 +254,9 @@ fn toggle_mini(app: &AppHandle) {
     if window.is_visible().unwrap_or(false) {
         let _ = window.hide();
         let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
+        let _ = window.emit("mini-reset", ());
     } else {
-        // Move to the cursor first, THEN reveal. Because the window rests
-        // off-screen while hidden, there is no old on-screen frame to flash.
-        if let Ok(pos) = app.cursor_position() {
-            let _ = window.set_position(PhysicalPosition::new(
-                (pos.x - 24.0) as i32,
-                (pos.y - 20.0) as i32,
-            ));
-        }
-        // Re-assert the Space-joining behavior right before showing: it must be
-        // in effect at the moment we reveal/focus, or macOS shows the window on
-        // the desktop Space instead of the active full-screen one.
-        #[cfg(target_os = "macos")]
-        allow_over_fullscreen(&window);
-        if let Ok(mut guard) = last_shown().lock() {
-            *guard = Some(Instant::now());
-        }
-        let _ = window.show();
-        let _ = window.set_focus();
-        // ...then pin it onto the current (possibly full-screen) Space.
-        #[cfg(target_os = "macos")]
-        order_front_regardless(&window);
-        let _ = window.emit("mini-shown", ());
+        show_mini(app, &window);
     }
 }
 
@@ -256,19 +278,48 @@ fn open_main(window: tauri::Window) {
     focus_or_launch_main();
 }
 
-/// Slide the window off-screen (keeping it focused so the blur auto-hide doesn't
-/// fire), grab the screen without the bar in it, then move it back.
-#[tauri::command]
-fn capture_and_attach(window: tauri::Window) -> Result<String, String> {
-    let restore = window.outer_position().ok();
-    let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
-    std::thread::sleep(Duration::from_millis(120));
+/// Grab the full screen *without the bar in the shot*. If the bar is visible it's
+/// slid off-screen first (staying focused so the blur auto-hide doesn't fire),
+/// captured, then restored; if it's already hidden the screen is grabbed as-is.
+fn capture_no_bar(window: &tauri::WebviewWindow) -> Result<std::path::PathBuf, String> {
+    let visible = window.is_visible().unwrap_or(false);
+    let restore = if visible { window.outer_position().ok() } else { None };
+    if visible {
+        let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
+        std::thread::sleep(Duration::from_millis(120));
+    }
     let path = screenshot::capture_fullscreen().map_err(err)?;
     if let Some(pos) = restore {
         let _ = window.set_position(pos);
+        let _ = window.set_focus();
     }
-    let _ = window.set_focus();
-    Ok(path.to_string_lossy().into_owned())
+    Ok(path)
+}
+
+/// Screenshot button: capture the screen and return the PNG path for the
+/// frontend to hold until submit. Each click adds another screenshot.
+#[tauri::command]
+fn capture_and_attach(window: tauri::WebviewWindow) -> Result<String, String> {
+    Ok(capture_no_bar(&window)?.to_string_lossy().into_owned())
+}
+
+/// ⌘⇧Return handler: capture a screenshot, summon the bar if it's hidden, and
+/// tell the frontend to attach the new capture.
+fn capture_and_show(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let path = match capture_no_bar(&window) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[taskscape-tray] screenshot failed: {e}");
+            return;
+        }
+    };
+    if !window.is_visible().unwrap_or(false) {
+        show_mini(app, &window);
+    }
+    let _ = window.emit("screenshot-captured", path.to_string_lossy().into_owned());
 }
 
 /// Create the task in the active list, attach the screenshot if present, and hide.
@@ -278,15 +329,21 @@ fn submit_capture(
     window: tauri::Window,
     title: String,
     notes: Option<String>,
-    screenshot_path: Option<String>,
+    screenshot_paths: Vec<String>,
 ) -> Result<(), String> {
     let list = target_list(&store)?;
     let task = store
         .create_task(&list.id, &title, notes.as_deref())
         .map_err(err)?;
 
-    if let Some(path) = screenshot_path {
-        attachments::attach_copy(&store, &task.id, &path, Some("screenshot.png")).map_err(err)?;
+    let multiple = screenshot_paths.len() > 1;
+    for (i, path) in screenshot_paths.iter().enumerate() {
+        let name = if multiple {
+            format!("screenshot-{}.png", i + 1)
+        } else {
+            "screenshot.png".to_string()
+        };
+        attachments::attach_copy(&store, &task.id, path, Some(&name)).map_err(err)?;
     }
 
     tauri::async_runtime::spawn(async {
@@ -307,8 +364,13 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    if shortcut == &hotkey() && event.state() == ShortcutState::Pressed {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    if shortcut == &hotkey() {
                         toggle_mini(app);
+                    } else if shortcut == &screenshot_hotkey() {
+                        capture_and_show(app);
                     }
                 })
                 .build(),
@@ -327,12 +389,14 @@ pub fn run() {
             }
 
             // Native translucent (vibrancy) background for the frameless window.
+            // `Popover` follows the system appearance (frosted-light in Light Mode,
+            // frosted-dark in Dark Mode); `HudWindow` would force a dark bar always.
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
                 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
                 let _ = apply_vibrancy(
                     &window,
-                    NSVisualEffectMaterial::HudWindow,
+                    NSVisualEffectMaterial::Popover,
                     Some(NSVisualEffectState::Active),
                     Some(16.0),
                 );
@@ -348,8 +412,7 @@ pub fn run() {
             // Tray icon with a right-click menu.
             let open_item =
                 MenuItem::with_id(app, "open_main", "Open Taskscape", true, None::<&str>)?;
-            let quit_item =
-                MenuItem::with_id(app, "quit", "Quit Taskscape Mini", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit Taskscape", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open_item, &quit_item])?;
 
             TrayIconBuilder::new()
@@ -358,7 +421,7 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "quit" => app.exit(0),
+                    "quit" => quit_all(app),
                     "open_main" => focus_or_launch_main(),
                     _ => {}
                 })
@@ -366,6 +429,9 @@ pub fn run() {
 
             if let Err(e) = app.global_shortcut().register(hotkey()) {
                 eprintln!("[taskscape-tray] failed to register hotkey: {e}");
+            }
+            if let Err(e) = app.global_shortcut().register(screenshot_hotkey()) {
+                eprintln!("[taskscape-tray] failed to register screenshot hotkey: {e}");
             }
 
             let router = server::data_router(server_store.clone());

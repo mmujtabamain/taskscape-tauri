@@ -185,6 +185,14 @@ pub fn run() {
                         StatusCode::OK
                     }),
                 )
+                // Let the tray's "Quit Taskscape" close this window too.
+                .route(
+                    "/quit",
+                    post(|AxumState(app): AxumState<AppHandle>| async move {
+                        app.exit(0);
+                        StatusCode::OK
+                    }),
+                )
                 .with_state(handle);
             let router = server::data_router(server_store.clone()).merge(app_routes);
             tauri::async_runtime::spawn(async move {

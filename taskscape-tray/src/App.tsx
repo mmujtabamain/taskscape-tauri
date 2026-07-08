@@ -3,46 +3,70 @@ import { listen } from "@tauri-apps/api/event";
 import { Icon } from "./components/Icon";
 import { api } from "./api";
 
+const fieldClasses =
+  "rounded-lg border px-3 py-2 text-sm outline-none " +
+  "border-black/15 bg-black/5 text-neutral-900 placeholder:text-neutral-500 focus:border-black/40 " +
+  "dark:border-white/40 dark:bg-white/10 dark:text-white dark:placeholder:text-white/40 dark:focus:border-white/30";
+
+const iconButtonClasses =
+  "grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition " +
+  "border-black/10 bg-black/5 text-neutral-600 hover:text-neutral-900 " +
+  "dark:border-white/10 dark:bg-white/10 dark:text-white/70 dark:hover:text-white";
+
 function App() {
   const [title, setTitle] = useState("");
-  const [screenshotPath, setScreenshotPath] = useState<string | null>(null);
-  const [listName, setListName] = useState("");
+  const [notes, setNotes] = useState("");
+  const [screenshots, setScreenshots] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [listName, setListName] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
 
   const refreshListName = () => {
     api.activeListName().then(setListName).catch(() => {});
   };
+  const focusTitle = () => requestAnimationFrame(() => titleRef.current?.focus());
 
-  // Focus the input and refresh the target-list name each time we're summoned.
   useEffect(() => {
     refreshListName();
-    const unlisten = listen("mini-shown", () => {
-      refreshListName();
-      requestAnimationFrame(() => inputRef.current?.focus());
-    });
+    const subs = [
+      // Summoned: refocus the title field and refresh the target-list name.
+      listen("mini-shown", () => {
+        refreshListName();
+        focusTitle();
+      }),
+      // Dismissed/submitted: the draft is gone, so reset the form.
+      listen("mini-reset", () => {
+        setTitle("");
+        setNotes("");
+        setScreenshots([]);
+      }),
+      // ⌘⇧Return captured a screenshot in the background — attach it.
+      listen<string>("screenshot-captured", (e) => {
+        setScreenshots((prev) => [...prev, e.payload]);
+        focusTitle();
+      }),
+    ];
     return () => {
-      unlisten.then((fn) => fn());
+      subs.forEach((s) => s.then((fn) => fn()));
     };
   }, []);
 
   const save = async () => {
     const t = title.trim();
     if (!t) return;
-    await api.submitCapture({ title: t, screenshotPath });
+    await api.submitCapture({ title: t, notes: notes.trim() || null, screenshotPaths: screenshots });
     setTitle("");
-    setScreenshotPath(null);
+    setNotes("");
+    setScreenshots([]);
   };
 
-  const toggleScreenshot = async () => {
-    if (screenshotPath) {
-      setScreenshotPath(null);
-      return;
-    }
+  // Not a toggle: every click captures and attaches another screenshot.
+  const addScreenshot = async () => {
     setBusy(true);
     try {
-      setScreenshotPath(await api.captureAndAttach());
-      requestAnimationFrame(() => inputRef.current?.focus());
+      const path = await api.captureAndAttach();
+      setScreenshots((prev) => [...prev, path]);
+      focusTitle();
     } finally {
       setBusy(false);
     }
@@ -58,48 +82,62 @@ function App() {
     }
   };
 
+  const count = screenshots.length;
+
   return (
     <div
       data-tauri-drag-region
-      className="flex h-screen w-screen flex-col justify-center gap-2 p-2.5 text-white"
+      className="flex h-screen w-screen flex-col justify-center gap-2 rounded-2xl p-2.5 text-neutral-900 dark:text-white"
       onKeyDown={onKeyDown}
     >
       <div className="flex items-center gap-2">
+        <button
+          onClick={addScreenshot}
+          disabled={busy}
+          tabIndex={-1}
+          className={`relative ${
+            count
+              ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-indigo-400 bg-indigo-500 text-white transition disabled:opacity-50"
+              : `${iconButtonClasses} disabled:opacity-50`
+          }`}
+          title={
+            count
+              ? `${count} screenshot${count > 1 ? "s" : ""} attached — click to add another (⌘⇧⏎)`
+              : "Attach a full-screen screenshot (⌘⇧⏎)"
+          }
+        >
+          <Icon name="screenshot_monitor" size={18} filled={count > 0} />
+          {count > 0 && (
+            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-indigo-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white/70 dark:ring-black/40">
+              {count}
+            </span>
+          )}
+        </button>
+
         <input
-          ref={inputRef}
+          ref={titleRef}
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Capture a task…"
-          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-white/30"
+          placeholder="Capture a task ..."
+          className={`min-w-0 flex-1 ${fieldClasses}`}
         />
-        <button
-          onClick={toggleScreenshot}
-          disabled={busy}
-          className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition disabled:opacity-50 ${
-            screenshotPath
-              ? "border-indigo-400 bg-indigo-500 text-white"
-              : "border-white/10 bg-white/10 text-white/70 hover:text-white"
-          }`}
-          title={screenshotPath ? "Screenshot attached — click to remove" : "Attach a full-screen screenshot"}
-        >
-          <Icon name="screenshot_monitor" size={18} filled={!!screenshotPath} />
-        </button>
-        <button
-          onClick={() => api.openMain()}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/10 text-white/70 transition hover:text-white"
-          title="Open the main Taskscape window"
-        >
-          <Icon name="arrow_forward" size={18} />
-        </button>
       </div>
+
+      <input
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Press Tab to add notes"
+        className={`w-full ${fieldClasses}`}
+      />
 
       <button
         onClick={() => api.openMain()}
-        className="flex w-fit items-center gap-1 pl-1 text-xs text-white/55 transition hover:text-white"
+        tabIndex={-1}
+        className="flex w-full items-center gap-1 pl-1 text-xs text-neutral-500 transition hover:text-neutral-900 dark:text-white/55 dark:hover:text-white"
         title="Open the main Taskscape window"
       >
-        <Icon name="folder_open" size={13} />
+        <Icon name="open_in_new" size={13} />
         <span className="max-w-95 truncate">{listName || "Taskscape"}</span>
         <Icon name="chevron_right" size={13} />
       </button>
