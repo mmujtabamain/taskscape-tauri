@@ -2,22 +2,22 @@
 // "Taskscape". Purely cosmetic defaults the user can overwrite.
 
 const ADJECTIVES = [
-  "amber", "arctic", "autumn", "breezy", "bright", "calm", "cedar", "clear",
-  "cloudy", "coastal", "cosmic", "crimson", "crisp", "dappled", "dewy", "dusky",
-  "emerald", "fabled", "faded", "fern", "frosty", "gilded", "golden", "hazy",
-  "hidden", "hollow", "indigo", "ivory", "jade", "lively", "lunar", "misty",
-  "mossy", "noble", "northern", "opal", "pale", "quiet", "rustic", "sable",
-  "sandy", "silent", "silver", "solar", "sunny", "swift", "tidal", "velvet",
-  "verdant", "wild",
+  "Amber", "Arctic", "Autumn", "Breezy", "Bright", "Calm", "Cedar", "Clear",
+  "Cloudy", "Coastal", "Cosmic", "Crimson", "Crisp", "Dappled", "Dewy", "Dusky",
+  "Emerald", "Fabled", "Faded", "Fern", "Frosty", "Gilded", "Golden", "Hazy",
+  "Hidden", "Hollow", "Indigo", "Ivory", "Jade", "Lively", "Lunar", "Misty",
+  "Mossy", "Noble", "Northern", "Opal", "Pale", "Quiet", "Rustic", "Sable",
+  "Sandy", "Silent", "Silver", "Solar", "Sunny", "Swift", "Tidal", "Velvet",
+  "Verdant", "Wild",
 ];
 
 const NOUNS = [
-  "atlas", "basin", "bay", "bluff", "brook", "canyon", "cape", "cavern",
-  "cliff", "cove", "creek", "delta", "dune", "fjord", "forest", "gap",
-  "glacier", "glade", "grove", "harbor", "heath", "hill", "hollow", "isle",
-  "knoll", "lagoon", "lake", "meadow", "mesa", "moor", "oasis", "orchard",
-  "pass", "peak", "pine", "plain", "prairie", "range", "reef", "ridge",
-  "river", "shore", "summit", "thicket", "trail", "tundra", "vale", "valley",
+  "Atlas", "Basin", "Bay", "Bluff", "Brook", "Canyon", "Cape", "Cavern",
+  "Cliff", "Cove", "Creek", "Delta", "Dune", "Fjord", "Forest", "Gap",
+  "Glacier", "Glade", "Grove", "Harbor", "Heath", "Hill", "Hollow", "Isle",
+  "knoll", "Lagoon", "Lake", "Meadow", "Mesa", "Moor", "Oasis", "Orchard",
+  "Pass", "Peak", "Pine", "Plain", "Prairie", "Range", "Reef", "Ridge",
+  "River", "Shore", "Summit", "Thicket", "Trail", "Tundra", "Vale", "Valley",
 ];
 
 function pick<T>(arr: T[]): T {
@@ -25,5 +25,5 @@ function pick<T>(arr: T[]): T {
 }
 
 export function suggestName(): string {
-  return `${pick(ADJECTIVES)}-${pick(NOUNS)}`;
+  return `${pick(ADJECTIVES)} ${pick(NOUNS)}`;
 }

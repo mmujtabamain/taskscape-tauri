@@ -44,7 +44,7 @@ export function TitleBar(props: Props) {
         if ((e.target as HTMLElement).hasAttribute("data-tauri-drag-region"))
           getCurrentWindow().toggleMaximize();
       }}
-      className="relative flex h-11 shrink-0 items-stretch border-b border-hairline bg-window"
+      className="relative flex h-12 shrink-0 items-stretch border-b border-hairline bg-window"
     >
       {isMac ? <WindowControls /> : <span className="w-3" />}
 

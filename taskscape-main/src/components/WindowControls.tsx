@@ -29,7 +29,7 @@ function MacControls() {
       label: "Close",
       act: () => void win.close(),
       glyph: (
-        <svg viewBox="0 0 8 8" className="h-2 w-2">
+        <svg viewBox="0 0 8 8" className="size-3">
           <path d="M1.5 1.5 6.5 6.5 M6.5 1.5 1.5 6.5" stroke="rgba(0,0,0,0.55)" strokeWidth="1.1" strokeLinecap="round" />
         </svg>
       ),
@@ -39,7 +39,7 @@ function MacControls() {
       label: "Minimize",
       act: () => void win.minimize(),
       glyph: (
-        <svg viewBox="0 0 8 8" className="h-2 w-2">
+        <svg viewBox="0 0 8 8" className="size-3">
           <path d="M1.2 4 H6.8" stroke="rgba(0,0,0,0.55)" strokeWidth="1.1" strokeLinecap="round" />
         </svg>
       ),
@@ -51,7 +51,7 @@ function MacControls() {
         win.isFullscreen().then((f) => win.setFullscreen(!f));
       },
       glyph: (
-        <svg viewBox="0 0 8 8" className="h-2 w-2">
+        <svg viewBox="0 0 8 8" className="size-3">
           <path d="M1.6 4.6 V6.4 H3.4 Z M6.4 3.4 V1.6 H4.6 Z" fill="rgba(0,0,0,0.55)" />
         </svg>
       ),
@@ -65,7 +65,7 @@ function MacControls() {
           key={l.label}
           onClick={l.act}
           title={l.label}
-          className="grid h-3 w-3 place-items-center rounded-full border border-black/10"
+          className="grid size-4.5 place-items-center rounded-full border border-black/10"
           style={{ backgroundColor: focused ? l.color : "var(--bg-recessed)" }}
         >
           <span className="opacity-0 transition-opacity duration-100 group-hover:opacity-100">
@@ -96,7 +96,7 @@ function WinControls() {
   return (
     <div className="flex h-full items-stretch" data-no-drag>
       <button className={`${base} hover:bg-wash-strong`} onClick={() => win.minimize()} title="Minimize">
-        <Icon name="remove" size={16} />
+        <Icon name="remove" size={20} />
       </button>
       <button
         className={`${base} hover:bg-wash-strong`}
@@ -110,7 +110,7 @@ function WinControls() {
         onClick={() => win.close()}
         title="Close"
       >
-        <Icon name="close" size={16} />
+        <Icon name="close" size={20} />
       </button>
     </div>
   );

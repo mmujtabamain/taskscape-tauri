@@ -148,7 +148,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
       <div
         ref={contentRef}
         data-tauri-drag-region
-        className="w-84.5 p-5"
+        className="w-full p-5"
         style={
           presented
             ? { animation: "modal-in 180ms cubic-bezier(0.2, 0, 0, 1) both" }

@@ -105,9 +105,9 @@ export function ListTabs({
                   <span className="absolute inset-x-px -bottom-px h-px bg-content" />
                 </>
               )}
-              {(active || split) && (
+              {(split) && (
                 <span
-                  className={`h-[3px] w-[3px] shrink-0 rounded-full ${
+                  className={`size-1 shrink-0 rounded-full ${
                     active ? "bg-accent" : "border border-accent"
                   }`}
                 />

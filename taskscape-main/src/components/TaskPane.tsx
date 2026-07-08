@@ -75,9 +75,6 @@ export function TaskPane({
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col bg-content">
       <div className="flex h-9 shrink-0 items-center gap-2 px-4">
-        <h2 className="truncate font-display text-[12px] font-semibold tracking-[0.01em] text-ink-2">
-          {list.name}
-        </h2>
         <span className="text-[11px] tracking-[0.02em] text-ink-3 tabular-nums">
           <span key={open} className="inline-block animate-rise">
             {open}
