@@ -1,0 +1,38 @@
+import { emit, listen } from "@tauri-apps/api/event";
+import { api } from "../api";
+
+export type ThemePref = "system" | "light" | "dark";
+
+const media = window.matchMedia("(prefers-color-scheme: dark)");
+let pref: ThemePref = "system";
+
+function apply() {
+  const dark = pref === "dark" || (pref === "system" && media.matches);
+  document.documentElement.classList.toggle("dark", dark);
+  document.documentElement.style.colorScheme = pref === "system" ? "light dark" : pref;
+}
+
+/** Resolve the saved preference, apply it, and follow live changes
+ *  (system appearance flips + `theme-changed` from other windows). */
+export async function initTheme(): Promise<ThemePref> {
+  const saved = await api.getSetting("theme").catch(() => null);
+  if (saved === "light" || saved === "dark" || saved === "system") pref = saved;
+  apply();
+  media.addEventListener("change", apply);
+  listen<ThemePref>("theme-changed", (e) => {
+    pref = e.payload;
+    apply();
+  });
+  return pref;
+}
+
+export function themePref(): ThemePref {
+  return pref;
+}
+
+export async function setTheme(next: ThemePref) {
+  pref = next;
+  apply();
+  await api.setSetting("theme", next);
+  await emit("theme-changed", next);
+}

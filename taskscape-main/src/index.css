@@ -1,17 +1,228 @@
 @import "tailwindcss";
 
-/* macOS rubber-band overscroll reveals the document background behind the app.
-   Disable the bounce and paint that background to match the app's own surface
-   (white / zinc-950) so no white edge flashes when scrolling hard. */
+@font-face {
+  font-family: "Montserrat";
+  src: url("./assets/fonts/Montserrat-VariableFont_wght.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("./assets/fonts/Outfit-VariableFont_wght.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Theme is driven by a `.dark` class on <html> (set in lib/theme.ts from the
+   saved preference or the system appearance), so a manual override always wins. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- "Datum" palette: warm machined neutrals, signal-amber spent only on
+   data state (checks, selection, drag targets) — never decoration. ---- */
+:root {
+  --bg-window: oklch(0.955 0.005 75);
+  --bg-content: oklch(0.976 0.004 80);
+  --bg-raised: oklch(0.99 0.003 85);
+  --bg-recessed: oklch(0.938 0.006 73);
+
+  --hairline: oklch(0.35 0.02 70 / 0.16);
+  --hairline-faint: oklch(0.35 0.02 70 / 0.09);
+  --hairline-strong: oklch(0.35 0.02 70 / 0.32);
+
+  --ink: oklch(0.26 0.015 65);
+  --ink-2: oklch(0.45 0.015 65);
+  --ink-3: oklch(0.6 0.012 68);
+
+  --accent: oklch(0.62 0.155 55);
+  --accent-hover: oklch(0.57 0.16 53);
+  --accent-active: oklch(0.53 0.16 52);
+  --on-accent: oklch(0.985 0.01 80);
+
+  --selection: oklch(0.62 0.155 55 / 0.08);
+  --wash: oklch(0.35 0.02 70 / 0.04);
+  --wash-strong: oklch(0.35 0.02 70 / 0.07);
+
+  --danger: oklch(0.55 0.19 27);
+  --danger-hover: oklch(0.5 0.19 27);
+  --danger-soft: oklch(0.55 0.19 27 / 0.09);
+  --success: oklch(0.55 0.115 150);
+
+  --done-lamp: oklch(0.78 0.045 65);
+  --focus-ring: oklch(0.62 0.155 55 / 0.55);
+
+  --icon-wght: 350;
+}
+
+.dark {
+  --bg-window: oklch(0.215 0.008 65);
+  --bg-content: oklch(0.25 0.009 65);
+  --bg-raised: oklch(0.295 0.01 65);
+  --bg-recessed: oklch(0.185 0.008 65);
+
+  --hairline: oklch(0.95 0.02 70 / 0.11);
+  --hairline-faint: oklch(0.95 0.02 70 / 0.06);
+  --hairline-strong: oklch(0.95 0.02 70 / 0.24);
+
+  --ink: oklch(0.92 0.008 80);
+  --ink-2: oklch(0.74 0.012 75);
+  --ink-3: oklch(0.575 0.012 70);
+
+  --accent: oklch(0.74 0.14 60);
+  --accent-hover: oklch(0.78 0.135 62);
+  --accent-active: oklch(0.7 0.145 58);
+  --on-accent: oklch(0.22 0.03 60);
+
+  --selection: oklch(0.74 0.14 60 / 0.11);
+  --wash: oklch(0.95 0.02 70 / 0.04);
+  --wash-strong: oklch(0.95 0.02 70 / 0.07);
+
+  --danger: oklch(0.68 0.17 25);
+  --danger-hover: oklch(0.72 0.165 25);
+  --danger-soft: oklch(0.68 0.17 25 / 0.13);
+  --success: oklch(0.72 0.115 150);
+
+  --done-lamp: oklch(0.48 0.045 62);
+  --focus-ring: oklch(0.74 0.14 60 / 0.6);
+
+  --icon-wght: 300;
+}
+
+@theme inline {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", "Montserrat", ui-sans-serif, system-ui, sans-serif;
+
+  --color-window: var(--bg-window);
+  --color-content: var(--bg-content);
+  --color-raised: var(--bg-raised);
+  --color-recessed: var(--bg-recessed);
+  --color-hairline: var(--hairline);
+  --color-hairline-faint: var(--hairline-faint);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-on-accent: var(--on-accent);
+  --color-selection: var(--selection);
+  --color-wash: var(--wash);
+  --color-wash-strong: var(--wash-strong);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-done-lamp: var(--done-lamp);
+  --color-focus: var(--focus-ring);
+
+  --shadow-menu: 0 8px 24px oklch(0.2 0.02 65 / 0.16), 0 1px 3px oklch(0.2 0.02 65 / 0.1);
+  --shadow-lift: 0 2px 8px oklch(0.2 0.02 65 / 0.18);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+
+  --animate-rise: rise 160ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-panel-in: panel-in 200ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Desktop-app feel: no rubber-band flash, no stray text selection or I-beams
+   outside editable fields. */
 html,
 body {
   overscroll-behavior: none;
-  background-color: #ffffff;
+  background-color: var(--bg-window);
+  color: var(--ink);
+  font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
 }
 
-@media (prefers-color-scheme: dark) {
-  html,
-  body {
-    background-color: #09090b;
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  cursor: text;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hairline-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(5px);
+    opacity: 0;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+}
+
+/* Auto-dismiss drain inside a modal's default button (duration set inline). */
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Done-task strikethrough draws left→right (animated background-size). */
+.strike {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0% 1px;
+  transition: background-size 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+.strike-on {
+  background-size: 100% 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

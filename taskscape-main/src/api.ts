@@ -33,6 +33,7 @@ export interface Task {
   title: string;
   notes: string | null;
   done: boolean;
+  sort_order: number;
   created_at: number;
   updated_at: number;
   attachments: Attachment[];
@@ -71,11 +72,24 @@ export const api = {
     }),
   updateTask: (id: string, patch: TaskPatch) => invoke<Task>("update_task", { id, ...patch }),
   deleteTask: (id: string) => invoke<void>("delete_task", { id }),
+  moveTask: (id: string, parentId: string | null, listId: string | null, sortOrder?: number) =>
+    invoke<Task>("move_task", { id, parentId, listId, sortOrder: sortOrder ?? null }),
+  reorderTask: (id: string, sortOrder: number) =>
+    invoke<Task>("reorder_task", { id, sortOrder }),
 
   // app state
   setActiveList: (id: string) => invoke<void>("set_active_list", { id }),
   setActiveProject: (id: string) => invoke<void>("set_active_project", { id }),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
+  setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
+
+  // windows (modals, settings)
+  openModal: (id: string, props: unknown) => invoke<void>("open_modal", { id, props }),
+  modalCurrent: () => invoke<unknown>("modal_current"),
+  closeModal: (id: string, result: unknown) => invoke<void>("close_modal", { id, result }),
+  presentWindow: (width: number, height: number) =>
+    invoke<void>("present_window", { width, height }),
+  openSettings: () => invoke<void>("open_settings"),
 
   // attachments
   listAttachments: (taskId: string) => invoke<Attachment[]>("list_attachments", { taskId }),
@@ -83,7 +97,10 @@ export const api = {
     invoke<Attachment>("add_reference", { taskId, name, location }),
   addCopy: (taskId: string, sourcePath: string, name?: string) =>
     invoke<Attachment>("add_copy", { taskId, sourcePath, name: name ?? null }),
+  attachScreenshot: (taskId: string) => invoke<Attachment>("attach_screenshot", { taskId }),
   deleteAttachment: (id: string) => invoke<void>("delete_attachment", { id }),
   openAttachment: (a: Attachment) =>
     invoke<void>("open_attachment", { linkType: a.link_type, location: a.location }),
+  revealAttachment: (a: Attachment) =>
+    invoke<void>("reveal_attachment", { linkType: a.link_type, location: a.location }),
 };

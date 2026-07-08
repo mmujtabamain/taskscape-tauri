@@ -78,6 +78,13 @@ impl Store {
         // column already exists, so this runs safely on every open.
         ensure_column(&conn, "lists", "project_id", "TEXT")?;
         ensure_column(&conn, "tasks", "parent_id", "TEXT")?;
+        ensure_column(&conn, "tasks", "sort_order", "REAL")?;
+        // Seed manual ordering from creation time so pre-migration tasks keep
+        // their chronological order.
+        conn.execute(
+            "UPDATE tasks SET sort_order = created_at WHERE sort_order IS NULL",
+            [],
+        )?;
         // Indexes on the migrated columns — created after `ensure_column` so the
         // column is guaranteed to exist on databases that predate it.
         conn.execute_batch(
@@ -245,6 +252,7 @@ impl Store {
             title: title.to_string(),
             notes: notes.map(|s| s.to_string()),
             done: false,
+            sort_order: now as f64,
             created_at: now,
             updated_at: now,
             parent_id: parent_id.map(|s| s.to_string()),
@@ -252,8 +260,8 @@ impl Store {
         };
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO tasks (id, list_id, parent_id, title, notes, done, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO tasks (id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 task.id,
                 task.list_id,
@@ -261,6 +269,7 @@ impl Store {
                 task.title,
                 task.notes,
                 task.done as i64,
+                task.sort_order,
                 task.created_at,
                 task.updated_at
             ],
@@ -271,8 +280,9 @@ impl Store {
     pub fn list_tasks(&self, list_id: &str) -> Result<Vec<Task>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, list_id, parent_id, title, notes, done, created_at, updated_at
-             FROM tasks WHERE list_id = ?1 ORDER BY created_at ASC",
+            "SELECT id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at
+             FROM tasks WHERE list_id = ?1
+             ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
         )?;
         let tasks = stmt
             .query_map(params![list_id], row_to_task)?
@@ -285,8 +295,8 @@ impl Store {
     pub fn all_tasks(&self) -> Result<Vec<Task>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, list_id, parent_id, title, notes, done, created_at, updated_at
-             FROM tasks ORDER BY created_at ASC",
+            "SELECT id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at
+             FROM tasks ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
         )?;
         let tasks = stmt
             .query_map([], row_to_task)?
@@ -330,7 +340,7 @@ impl Store {
     pub fn get_task(&self, id: &str) -> Result<Task> {
         let conn = self.conn.lock().unwrap();
         let task = conn.query_row(
-            "SELECT id, list_id, parent_id, title, notes, done, created_at, updated_at
+            "SELECT id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at
              FROM tasks WHERE id = ?1",
             params![id],
             row_to_task,
@@ -347,6 +357,93 @@ impl Store {
         let conn = self.conn.lock().unwrap();
         delete_task_tree(&conn, id)?;
         Ok(())
+    }
+
+    /// Re-home a task: place it under `parent_id` (`None` = top level) in
+    /// `list_id` (`None` = keep current / derive from parent). Descendants
+    /// follow across lists.
+    pub fn move_task(
+        &self,
+        id: &str,
+        parent_id: Option<&str>,
+        list_id: Option<&str>,
+        sort_order: Option<f64>,
+    ) -> Result<Task> {
+        {
+            let conn = self.conn.lock().unwrap();
+            let current_list: String = conn
+                .query_row(
+                    "SELECT list_id FROM tasks WHERE id = ?1",
+                    params![id],
+                    |r| r.get(0),
+                )
+                .optional()?
+                .ok_or_else(|| anyhow::anyhow!("task not found: {id}"))?;
+
+            let target_list = match parent_id {
+                Some(parent) => {
+                    if parent == id {
+                        anyhow::bail!("cannot move a task under itself");
+                    }
+                    let (parent_list, mut ancestor): (String, Option<String>) = conn
+                        .query_row(
+                            "SELECT list_id, parent_id FROM tasks WHERE id = ?1",
+                            params![parent],
+                            |r| Ok((r.get(0)?, r.get(1)?)),
+                        )
+                        .optional()?
+                        .ok_or_else(|| anyhow::anyhow!("parent task not found: {parent}"))?;
+                    // Walk the parent chain up from the target parent; reaching
+                    // `id` means the parent lives inside this task's subtree.
+                    while let Some(above) = ancestor {
+                        if above == id {
+                            anyhow::bail!("cannot move a task under its own subtask");
+                        }
+                        ancestor = conn
+                            .query_row(
+                                "SELECT parent_id FROM tasks WHERE id = ?1",
+                                params![above],
+                                |r| r.get(0),
+                            )
+                            .optional()?
+                            .flatten();
+                    }
+                    parent_list
+                }
+                None => list_id.map(str::to_string).unwrap_or(current_list.clone()),
+            };
+
+            let now = now_millis();
+            conn.execute(
+                "UPDATE tasks SET parent_id = ?2, list_id = ?3, sort_order = ?4, updated_at = ?5
+                 WHERE id = ?1",
+                params![
+                    id,
+                    parent_id,
+                    target_list,
+                    sort_order.unwrap_or(now as f64),
+                    now
+                ],
+            )?;
+            if target_list != current_list {
+                relist_task_tree(&conn, id, &target_list, now)?;
+            }
+        }
+        self.get_task(id)
+    }
+
+    pub fn reorder_task(&self, id: &str, sort_order: f64) -> Result<Task> {
+        {
+            let conn = self.conn.lock().unwrap();
+            let updated = conn.execute(
+                "UPDATE tasks SET sort_order = ?2, updated_at = ?3 WHERE id = ?1",
+                params![id, sort_order, now_millis()],
+            )?;
+            if updated == 0 {
+                anyhow::bail!("task not found: {id}");
+            }
+        }
+        self.get_task(id)
     }
 
     // ---- attachments -----------------------------------------------------
@@ -427,6 +524,7 @@ fn row_to_list(row: &Row) -> rusqlite::Result<List> {
 }
 
 fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
+    let created_at: i64 = row.get("created_at")?;
     Ok(Task {
         id: row.get("id")?,
         list_id: row.get("list_id")?,
@@ -434,7 +532,10 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
         title: row.get("title")?,
         notes: row.get("notes")?,
         done: row.get::<_, i64>("done")? != 0,
-        created_at: row.get("created_at")?,
+        sort_order: row
+            .get::<_, Option<f64>>("sort_order")?
+            .unwrap_or(created_at as f64),
+        created_at,
         updated_at: row.get("updated_at")?,
         attachments: Vec::new(),
     })
@@ -453,6 +554,26 @@ fn delete_task_tree(conn: &Connection, id: &str) -> Result<()> {
         delete_task_tree(conn, &child)?;
     }
     conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+/// Depth-first move of every descendant subtask into `list_id`, mirroring
+/// [`delete_task_tree`]: a task's subtree always lives in its list.
+fn relist_task_tree(conn: &Connection, id: &str, list_id: &str, now: i64) -> Result<()> {
+    let children: Vec<String> = {
+        let mut stmt = conn.prepare("SELECT id FROM tasks WHERE parent_id = ?1")?;
+        let ids = stmt
+            .query_map(params![id], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        ids
+    };
+    for child in children {
+        conn.execute(
+            "UPDATE tasks SET list_id = ?2, updated_at = ?3 WHERE id = ?1",
+            params![child, list_id, now],
+        )?;
+        relist_task_tree(conn, &child, list_id, now)?;
+    }
     Ok(())
 }
 

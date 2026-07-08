@@ -25,6 +25,10 @@ pub struct Task {
     pub title: String,
     pub notes: Option<String>,
     pub done: bool,
+    /// Manual ordering key within a list level; defaults to `created_at` so
+    /// older tasks keep their chronological order until dragged.
+    #[serde(default)]
+    pub sort_order: f64,
     pub created_at: i64,
     pub updated_at: i64,
     /// Parent task id when this is a subtask; `None` for a top-level task.

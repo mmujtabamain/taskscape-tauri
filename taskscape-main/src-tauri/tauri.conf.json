@@ -13,12 +13,21 @@
     "windows": [
       {
         "title": "Taskscape",
-        "width": 800,
-        "height": 600
+        "width": 1180,
+        "height": 760,
+        "minWidth": 880,
+        "minHeight": 560,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$HOME/**", "$HOME/.taskscape/**"]
+      }
     }
   },
   "bundle": {

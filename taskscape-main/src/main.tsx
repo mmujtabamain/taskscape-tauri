@@ -1,11 +1,22 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { ModalWindow } from "./windows/ModalWindow";
+import { SettingsWindow } from "./windows/SettingsWindow";
+import { initTheme } from "./lib/theme";
 import "material-symbols/outlined.css";
 import "./index.css";
 
+// One bundle serves every window; the hash decides which surface this one is.
+function route(): React.ReactElement {
+  const hash = window.location.hash;
+  if (hash.startsWith("#modal")) return <ModalWindow />;
+  if (hash === "#settings") return <SettingsWindow />;
+  return <App />;
+}
+
+initTheme();
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <React.StrictMode>{route()}</React.StrictMode>,
 );
