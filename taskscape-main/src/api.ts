@@ -111,6 +111,7 @@ export const api = {
   presentWindow: (width: number, height: number) =>
     invoke<void>("present_window", { width, height }),
   openSettings: () => invoke<void>("open_settings"),
+  setWindowTheme: (dark: boolean) => invoke<void>("set_window_theme", { dark }),
 
   // attachments
   listAttachments: (taskId: string) => invoke<Attachment[]>("list_attachments", { taskId }),

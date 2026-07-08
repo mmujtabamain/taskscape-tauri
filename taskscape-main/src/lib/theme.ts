@@ -10,6 +10,9 @@ function apply() {
   const dark = pref === "dark" || (pref === "system" && media.matches);
   document.documentElement.classList.toggle("dark", dark);
   document.documentElement.style.colorScheme = pref === "system" ? "light dark" : pref;
+  // Keep the native window background matched (main window only; the command
+  // no-ops for panels), so a resize never flashes a stale-theme edge.
+  api.setWindowTheme(dark).catch(() => {});
 }
 
 /** Resolve the saved preference, apply it, and follow live changes

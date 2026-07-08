@@ -13,6 +13,19 @@ fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
+/// Whether the main window should paint dark: the saved `theme` preference wins
+/// ("light"/"dark"), otherwise follow the current system appearance.
+fn resolve_dark(store: &Store, window: &tauri::WebviewWindow) -> bool {
+    match store.get_setting("theme").ok().flatten().as_deref() {
+        Some("dark") => true,
+        Some("light") => false,
+        _ => window
+            .theme()
+            .map(|t| t == tauri::Theme::Dark)
+            .unwrap_or(false),
+    }
+}
+
 /// The pending modal (id + props), if any. One reusable panel window serves
 /// every modal: destroying a class-swapped NSPanel raises an Objective-C
 /// exception during teardown (fatal across the FFI boundary), so — like the
@@ -434,6 +447,22 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Keep the main window's native background in sync with the live theme — a
+/// system light/dark flip or a manual override from Settings — so a later
+/// resize never reveals a stale white/wrong-mode edge. Called from the frontend
+/// theme `apply()` in every window, but only the opaque main window is painted;
+/// the transparent panels are skipped so their rounded mask stays clear.
+#[tauri::command]
+fn set_window_theme(window: tauri::WebviewWindow, dark: bool) -> Result<(), String> {
+    if window.label() == "main" {
+        let w = window.clone();
+        window
+            .run_on_main_thread(move || panels::set_window_background(&w, dark))
+            .map_err(err)?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let store = Arc::new(Store::open().expect("failed to open taskscape store"));
@@ -453,6 +482,13 @@ pub fn run() {
             // the native rounded corners, shadow, and resize behavior.
             if let Some(window) = app.get_webview_window("main") {
                 panels::hide_traffic_lights(&window);
+                // Paint the native background to match the theme so no white
+                // frame flashes on launch before the webview has painted...
+                let dark = resolve_dark(&server_store, &window);
+                panels::set_window_background(&window, dark);
+                // ...and make the webview itself transparent while it loads, so
+                // its default white doesn't cover that themed background.
+                panels::disable_webview_white_background(&window);
             }
 
             // Extra route so the tray process can ask this window to reload live.
@@ -554,6 +590,7 @@ pub fn run() {
             present_window,
             close_modal,
             open_settings,
+            set_window_theme,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
