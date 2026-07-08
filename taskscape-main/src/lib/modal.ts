@@ -13,6 +13,9 @@ export interface ModalInput {
   initialValue?: string;
   /** Show a "suggest another name" dice button that fills GitHub-style names. */
   suggest?: boolean;
+  /** A locked, greyed suffix (e.g. a file extension `.png`) shown after the
+   *  field. The user can't type `.` and the suffix is appended to the result. */
+  suffix?: string;
 }
 
 export interface ModalProps {
@@ -82,6 +85,8 @@ export async function promptName(opts: {
   initialValue?: string;
   placeholder?: string;
   confirmLabel?: string;
+  /** Locked, greyed suffix appended to the returned name (e.g. `.png`). */
+  suffix?: string;
 }): Promise<string | null> {
   const res = await openModal({
     icon: opts.icon ?? "edit",
@@ -90,6 +95,7 @@ export async function promptName(opts: {
     input: {
       placeholder: opts.placeholder,
       initialValue: opts.initialValue,
+      suffix: opts.suffix,
       suggest: !opts.initialValue,
     },
     buttons: [

@@ -1,16 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { api, type Attachment, type Task, type TaskPatch } from "../api";
-import { attachmentSrc, fileKindFor, isRemote } from "../lib/fileKind";
-import { openModal } from "../lib/modal";
+import { api, type Attachment, type Note, type Task, type TaskPatch } from "../api";
+import { attachmentSrc, fileKindFor, isRemote, splitFileName } from "../lib/fileKind";
+import { confirmModal, openModal, promptName } from "../lib/modal";
+import { propagateAttachmentRename } from "../lib/mentions";
 import { absoluteDateTime, relativeTime } from "../time";
 import { AttachmentLightbox } from "./AttachmentLightbox";
+import { useContextMenu } from "./ContextMenu";
+import { RichTextEditor, ATTACHMENT_MIME, type RichTextHandle } from "./RichTextEditor";
 import { Icon } from "./Icon";
 
 interface PreviewPanelProps {
   task: Task | null;
   childrenByParent: Record<string, Task[]>;
   listName: string | null;
+  projectName: string | null;
   onUpdateTask: (id: string, patch: TaskPatch) => void;
   onToggleDone: (task: Task) => void;
   onSelectTask: (id: string) => void;
@@ -39,6 +43,43 @@ function SectionHeader({ label, trailing }: { label: string; trailing?: ReactNod
       </span>
       <span className="flex-1 border-t border-hairline-faint" />
       {trailing}
+    </div>
+  );
+}
+
+/** A saved note: its own rich-text editor that commits on blur (empty → delete),
+ *  with a hover delete affordance. */
+function NoteCard({
+  note,
+  attachments,
+  onOpenMention,
+  onCommit,
+  onDelete,
+}: {
+  note: Note;
+  attachments: Attachment[];
+  onOpenMention: (name: string) => void;
+  onCommit: (html: string) => void;
+  onDelete: () => void;
+}) {
+  const ref = useRef<RichTextHandle>(null);
+  return (
+    <div className="group/note relative">
+      <RichTextEditor
+        ref={ref}
+        initialHtml={note.content}
+        minHeightClass="min-h-14"
+        attachments={attachments}
+        onOpenMention={onOpenMention}
+        onBlur={() => onCommit(ref.current?.getHtml() ?? "")}
+      />
+      <button
+        onClick={onDelete}
+        title="Delete note"
+        className="absolute -top-2 -right-2 z-10 grid h-6 w-6 place-items-center rounded-full border border-hairline bg-raised text-ink-3 opacity-0 shadow-lift transition-opacity hover:text-danger group-hover/note:opacity-100"
+      >
+        <Icon name="close" size={14} weight={400} />
+      </button>
     </div>
   );
 }
@@ -74,6 +115,7 @@ function TaskInspector({
   task,
   childrenByParent,
   listName,
+  projectName,
   onUpdateTask,
   onToggleDone,
   onSelectTask,
@@ -83,12 +125,53 @@ function TaskInspector({
 }: InspectorProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task.title);
-  const [notesDraft, setNotesDraft] = useState(task.notes ?? "");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
+  const addNoteRef = useRef<RichTextHandle>(null);
+  const menu = useContextMenu();
 
   const children = childrenByParent[task.id] ?? [];
   const doneChildren = children.filter((c) => c.done).length;
+  const notes = task.note_items;
+
+  const openMention = (name: string) => {
+    const idx = task.attachments.findIndex((a) => a.name === name);
+    if (idx >= 0) setLightboxIndex(idx);
+    else {
+      const remote = task.attachments.find((a) => a.name === name);
+      if (remote) void api.openAttachment(remote);
+    }
+  };
+
+  const addNote = async () => {
+    const html = addNoteRef.current?.getHtml() ?? "";
+    if (!html || addNoteRef.current?.isEmpty()) return;
+    await api.createNote(task.id, html);
+    addNoteRef.current?.clear();
+    onRefresh();
+  };
+
+  const commitNote = async (note: Note, html: string) => {
+    if (html === note.content) return;
+    if (!html) {
+      await api.deleteNote(note.id);
+    } else {
+      await api.updateNote(note.id, html);
+    }
+    onRefresh();
+  };
+
+  const removeNote = async (note: Note) => {
+    const ok = await confirmModal({
+      danger: true,
+      title: "Delete note?",
+      message: "This note will be permanently removed.",
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    await api.deleteNote(note.id);
+    onRefresh();
+  };
 
   useEffect(() => {
     let alive = true;
@@ -109,10 +192,6 @@ function TaskInspector({
     if (t && t !== task.title) onUpdateTask(task.id, { title: t });
     else setTitleDraft(task.title);
     setEditingTitle(false);
-  };
-
-  const commitNotes = () => {
-    if (notesDraft !== (task.notes ?? "")) onUpdateTask(task.id, { notes: notesDraft });
   };
 
   const addFile = async () => {
@@ -147,6 +226,59 @@ function TaskInspector({
   const openTile = (a: Attachment) => {
     if (isRemote(a.location)) void api.openAttachment(a);
     else setLightboxIndex(task.attachments.findIndex((x) => x.id === a.id));
+  };
+
+  const renameAttachment = async (a: Attachment) => {
+    const { base, ext } = splitFileName(a.name);
+    const name = await promptName({
+      title: "Rename attachment",
+      icon: "drive_file_rename_outline",
+      message:
+        a.link_type === "copy"
+          ? "The stored file is renamed to match."
+          : "Renames the reference label; the linked file is untouched.",
+      initialValue: base,
+      suffix: ext ? `.${ext}` : undefined,
+      confirmLabel: "Rename",
+    });
+    if (!name || name === a.name) return;
+    const updated = await api.renameAttachment(a.id, name);
+    await propagateAttachmentRename(a.task_id, a.name, updated.name);
+    onRefresh();
+  };
+
+  const removeAttachment = async (a: Attachment) => {
+    const ok = await confirmModal({
+      danger: true,
+      title: "Remove attachment?",
+      message: a.name,
+      confirmLabel: "Remove",
+    });
+    if (!ok) return;
+    await api.deleteAttachment(a.id);
+    onRefresh();
+  };
+
+  const openTileMenu = (e: React.MouseEvent, a: Attachment) => {
+    e.preventDefault();
+    menu.open({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        { id: "rename", label: "Rename…", icon: "drive_file_rename_outline" },
+        { id: "open", label: "Open", icon: "open_in_new" },
+        ...(isRemote(a.location)
+          ? []
+          : [{ id: "reveal", label: "Reveal in Finder", icon: "folder_open" }]),
+        { id: "remove", label: "Remove", icon: "delete", danger: true, dividerAbove: true },
+      ],
+      onPick: (id) => {
+        if (id === "rename") renameAttachment(a);
+        if (id === "open") api.openAttachment(a);
+        if (id === "reveal") api.revealAttachment(a);
+        if (id === "remove") removeAttachment(a);
+      },
+    });
   };
 
   return (
@@ -186,14 +318,19 @@ function TaskInspector({
                 {task.title}
               </button>
             )}
-            <div className="mt-1.5 truncate text-[11.5px] tabular-nums text-ink-3">
-              {listName && <>in {listName} · </>}
-              <span title={absoluteDateTime(task.created_at)}>
-                created {relativeTime(task.created_at)}
+            <div className="mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums text-ink-3">
+              <span className="flex items-center gap-1.5">
+                <Icon name="folder_open" size={13} weight={300} className="shrink-0 text-ink-3" />
+                <span className="truncate text-ink-2">{projectName ?? "—"}</span>
+                {listName && <span className="shrink-0 text-ink-3">/ {listName}</span>}
               </span>
-              {" · "}
-              <span title={absoluteDateTime(task.updated_at)}>
-                updated {relativeTime(task.updated_at)}
+              <span className="flex items-center gap-1.5" title={absoluteDateTime(task.created_at)}>
+                <Icon name="schedule" size={13} weight={300} className="shrink-0 text-ink-3" />
+                Created {relativeTime(task.created_at)}
+              </span>
+              <span className="flex items-center gap-1.5" title={absoluteDateTime(task.updated_at)}>
+                <Icon name="update" size={13} weight={300} className="shrink-0 text-ink-3" />
+                Updated {relativeTime(task.updated_at)}
               </span>
             </div>
           </div>
@@ -209,15 +346,43 @@ function TaskInspector({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="p-4">
-          <SectionHeader label="Notes" />
-          <div className="-mx-2">
-            <textarea
-              value={notesDraft}
-              onChange={(e) => setNotesDraft(e.target.value)}
-              onBlur={commitNotes}
-              placeholder="Add notes…"
-              className="block min-h-28 w-full resize-y rounded-md bg-transparent px-2 py-1.5 text-[14px] leading-[22px] text-ink transition-colors placeholder:text-ink-3 focus:bg-recessed"
+          <SectionHeader
+            label="Notes"
+            trailing={
+              notes.length > 0 ? (
+                <span className="text-[11px] tabular-nums text-ink-3">{notes.length}</span>
+              ) : undefined
+            }
+          />
+
+          <div className="flex flex-col gap-2.5">
+            {notes.map((note) => (
+              <NoteCard
+                key={`${note.id}:${note.updated_at}`}
+                note={note}
+                attachments={task.attachments}
+                onOpenMention={openMention}
+                onCommit={(html) => commitNote(note, html)}
+                onDelete={() => removeNote(note)}
+              />
+            ))}
+
+            <RichTextEditor
+              ref={addNoteRef}
+              placeholder="Write a note…  (drop an attachment to @mention it)"
+              minHeightClass="min-h-24"
+              attachments={task.attachments}
+              onOpenMention={openMention}
+              onSubmit={addNote}
             />
+            <button
+              onClick={addNote}
+              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-accent text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-hover active:bg-accent-active"
+            >
+              <Icon name="add" size={16} />
+              Add note
+              <span className="text-[11px] font-medium opacity-70">⌘⏎</span>
+            </button>
           </div>
         </div>
 
@@ -290,7 +455,13 @@ function TaskInspector({
                   <div key={a.id} className="min-w-0">
                     <button
                       onClick={() => openTile(a)}
-                      title={a.name}
+                      onContextMenu={(e) => openTileMenu(e, a)}
+                      title={`${a.name}\nRight-click to rename · drag onto a note to @mention`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(ATTACHMENT_MIME, a.name);
+                        e.dataTransfer.effectAllowed = "copy";
+                      }}
                       className="group relative block aspect-square w-full overflow-hidden rounded-lg border border-hairline bg-raised transition-colors hover:border-hairline-strong"
                     >
                       {thumb ? (
@@ -344,6 +515,7 @@ function TaskInspector({
             setLightboxIndex(null);
             onRefresh();
           }}
+          onRenamed={onRefresh}
         />
       )}
     </div>

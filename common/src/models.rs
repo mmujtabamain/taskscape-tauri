@@ -41,6 +41,22 @@ pub struct Task {
     pub parent_id: Option<String>,
     #[serde(default)]
     pub attachments: Vec<Attachment>,
+    /// Rich-text note blocks. `notes` above is the derived plaintext of these,
+    /// kept for the list-row preview and search.
+    #[serde(default)]
+    pub note_items: Vec<Note>,
+}
+
+/// A rich-text note block attached to a task. `content` is sanitized HTML.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Note {
+    pub id: String,
+    pub task_id: String,
+    pub content: String,
+    #[serde(default)]
+    pub sort_order: f64,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 /// How an attachment points at its underlying file.

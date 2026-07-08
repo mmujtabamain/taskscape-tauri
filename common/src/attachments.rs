@@ -39,3 +39,72 @@ pub fn attach_copy(
     let location = format!("attachments/{stored_name}");
     store.add_attachment(task_id, &file_name, LinkType::Copy, &location)
 }
+
+/// Rename an attachment. For a **copy**, the real file on disk is renamed (its
+/// unique id prefix and original extension are preserved) and both the display
+/// name and stored location are updated. For a **reference**, only the display
+/// name is stored — the underlying URL/path is left untouched.
+pub fn rename_attachment(store: &Store, id: &str, new_name: &str) -> Result<Attachment> {
+    let att = store.get_attachment(id)?;
+    let new_name = new_name.trim();
+    if new_name.is_empty() {
+        anyhow::bail!("attachment name cannot be empty");
+    }
+
+    match att.link_type {
+        LinkType::Reference => store.update_attachment(id, new_name, &att.location),
+        LinkType::Copy => {
+            let old_abs = crate::paths::resolve(&att.location);
+            let old_ext = Path::new(&att.location)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_string();
+
+            // Keep the original extension so the file stays openable (Finder-style).
+            let mut base = sanitize_filename(new_name);
+            if !old_ext.is_empty() {
+                let has_ext = Path::new(&base)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| e.eq_ignore_ascii_case(&old_ext))
+                    .unwrap_or(false);
+                if !has_ext {
+                    base = format!("{base}.{old_ext}");
+                }
+            }
+
+            let stored_name = format!("{}-{}", crate::util::new_id(), base);
+            let new_location = format!("attachments/{stored_name}");
+            if old_abs.exists() {
+                crate::paths::ensure_dirs()?;
+                let new_abs = crate::paths::attachments_dir().join(&stored_name);
+                std::fs::rename(&old_abs, &new_abs).with_context(|| {
+                    format!("renaming {} -> {}", old_abs.display(), new_abs.display())
+                })?;
+                store.update_attachment(id, &base, &new_location)
+            } else {
+                // The backing file is missing — keep the pointer, update the name only.
+                store.update_attachment(id, &base, &att.location)
+            }
+        }
+    }
+}
+
+/// Make a display name safe to use as an on-disk file name.
+fn sanitize_filename(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '\0' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_matches('.').trim();
+    if trimmed.is_empty() {
+        "attachment".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}

@@ -7,7 +7,7 @@ use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl,
     WebviewWindowBuilder, WindowEvent,
 };
-use taskscape_common::{server, Attachment, List, Project, Store, Task, MAIN_PORT};
+use taskscape_common::{server, Attachment, List, Note, Project, Store, Task, MAIN_PORT};
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
@@ -159,6 +159,26 @@ fn reorder_task(store: State<'_, Arc<Store>>, id: String, sort_order: f64) -> Re
 }
 
 #[tauri::command]
+fn list_notes(store: State<'_, Arc<Store>>, task_id: String) -> Result<Vec<Note>, String> {
+    store.list_notes(&task_id).map_err(err)
+}
+
+#[tauri::command]
+fn create_note(store: State<'_, Arc<Store>>, task_id: String, content: String) -> Result<Note, String> {
+    store.create_note(&task_id, &content).map_err(err)
+}
+
+#[tauri::command]
+fn update_note(store: State<'_, Arc<Store>>, id: String, content: String) -> Result<Note, String> {
+    store.update_note(&id, &content).map_err(err)
+}
+
+#[tauri::command]
+fn delete_note(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.delete_note(&id).map_err(err)
+}
+
+#[tauri::command]
 fn list_attachments(store: State<'_, Arc<Store>>, task_id: String) -> Result<Vec<Attachment>, String> {
     store.list_attachments(&task_id).map_err(err)
 }
@@ -187,6 +207,15 @@ fn add_copy(
 #[tauri::command]
 fn delete_attachment(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
     store.delete_attachment(&id).map_err(err)
+}
+
+#[tauri::command]
+fn rename_attachment(
+    store: State<'_, Arc<Store>>,
+    id: String,
+    name: String,
+) -> Result<Attachment, String> {
+    taskscape_common::attachments::rename_attachment(&store, &id, &name).map_err(err)
 }
 
 /// Capture the full screen and attach it to a task as a copy. macOS prompts for
@@ -504,10 +533,15 @@ pub fn run() {
             delete_task,
             move_task,
             reorder_task,
+            list_notes,
+            create_note,
+            update_note,
+            delete_note,
             list_attachments,
             add_reference,
             add_copy,
             delete_attachment,
+            rename_attachment,
             attach_screenshot,
             open_attachment,
             reveal_attachment,

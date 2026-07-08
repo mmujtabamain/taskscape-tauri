@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type Attachment } from "../api";
-import { attachmentSrc, fileKindFor, isRemote, previewKindFor } from "../lib/fileKind";
-import { confirmModal } from "../lib/modal";
+import { attachmentSrc, fileKindFor, isRemote, previewKindFor, splitFileName } from "../lib/fileKind";
+import { confirmModal, promptName } from "../lib/modal";
+import { propagateAttachmentRename } from "../lib/mentions";
 import { setOverlay } from "../lib/overlays";
 import { Icon } from "./Icon";
 
@@ -13,6 +14,7 @@ interface Props {
   onIndex: (i: number) => void;
   onClose: () => void;
   onDeleted: () => void;
+  onRenamed: () => void;
 }
 
 function BarButton({
@@ -42,7 +44,7 @@ function BarButton({
 /** Full-window lightbox for inspecting an attachment. Arrow keys / on-screen
  *  chevrons step through the task's attachments; Escape or a backdrop click
  *  dismisses it. */
-export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDeleted }: Props) {
+export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDeleted, onRenamed }: Props) {
   const attachment = attachments[index];
   const count = attachments.length;
   const [src, setSrc] = useState<string | null>(null);
@@ -128,6 +130,24 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
     if (!ok) return;
     await api.deleteAttachment(attachment.id);
     onDeleted();
+  };
+
+  const rename = async () => {
+    const { base, ext } = splitFileName(attachment.name);
+    const name = await promptName({
+      title: "Rename attachment",
+      icon: "drive_file_rename_outline",
+      message: remote
+        ? "Renames the reference label; the linked file is untouched."
+        : "The stored file is renamed to match.",
+      initialValue: base,
+      suffix: ext ? `.${ext}` : undefined,
+      confirmLabel: "Rename",
+    });
+    if (!name || name === attachment.name) return;
+    const updated = await api.renameAttachment(attachment.id, name);
+    await propagateAttachmentRename(attachment.task_id, attachment.name, updated.name);
+    onRenamed();
   };
 
   const card = (label: string) => (
@@ -217,6 +237,7 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
             onClick={() => api.revealAttachment(attachment)}
           />
         )}
+        <BarButton name="drive_file_rename_outline" title="Rename" onClick={rename} />
         <BarButton name="delete" title="Remove attachment" danger onClick={remove} />
         <BarButton name="close" title="Close  Esc" onClick={onClose} />
       </div>

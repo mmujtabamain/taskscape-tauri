@@ -55,6 +55,19 @@ export function extensionOf(name: string): string {
   return dot >= 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
 
+/** Split a display name into its base and a real file extension (case
+ *  preserved). Only a short alphanumeric suffix after a non-leading dot counts,
+ *  so labels like `example.com/page` or dotfiles stay whole. */
+export function splitFileName(name: string): { base: string; ext: string } {
+  const n = name ?? "";
+  const dot = n.lastIndexOf(".");
+  if (dot > 0 && dot < n.length - 1) {
+    const ext = n.slice(dot + 1);
+    if (/^[A-Za-z0-9]{1,10}$/.test(ext)) return { base: n.slice(0, dot), ext };
+  }
+  return { base: n, ext: "" };
+}
+
 export function isRemote(location: string): boolean {
   return /^https?:\/\//i.test(location.trim());
 }

@@ -70,7 +70,9 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
   function resolve(buttonId: string | null, timedOut = false) {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
-    const result: ModalResult = { buttonId, value: valueRef.current.trim() || undefined };
+    const trimmed = valueRef.current.trim();
+    const value = trimmed ? trimmed + (props.input?.suffix ?? "") : undefined;
+    const result: ModalResult = { buttonId, value };
     if (timedOut) result.timedOut = true;
     void api.closeModal(id, result);
   }
@@ -186,22 +188,67 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
               </label>
             )}
             <div className="relative">
-              <input
-                id="modal-input"
-                ref={inputRef}
-                autoFocus
-                value={value}
-                spellCheck={false}
-                placeholder={props.input.placeholder}
-                onChange={(e) => setInputValue(e.target.value)}
-                onFocus={(e) => {
-                  cancelDrain();
-                  if (props.input?.initialValue) e.currentTarget.select();
-                }}
-                className={`h-8 w-full rounded-md bg-recessed pl-2.5 text-[13px] text-ink placeholder:text-ink-3 focus:ring-2 focus:ring-focus ${
-                  props.input.suggest ? "pr-8" : "pr-2.5"
-                }`}
-              />
+              {props.input.suffix ? (
+                // Locked-extension field: the name grows to fit and the greyed
+                // extension stays glued to its right; `.` is stripped as typed.
+                <div className="flex h-8 w-full items-center overflow-hidden rounded-md bg-recessed px-2.5 text-[13px] focus-within:ring-2 focus-within:ring-focus">
+                  <span className="relative inline-flex min-w-[1ch] max-w-full flex-none">
+                    <span aria-hidden className="invisible overflow-hidden whitespace-pre">
+                      {value || props.input.placeholder || "​"}
+                    </span>
+                    <input
+                      id="modal-input"
+                      ref={inputRef}
+                      autoFocus
+                      value={value}
+                      spellCheck={false}
+                      placeholder={props.input.placeholder}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        // Block new periods so the locked extension can't be
+                        // redefined; dots already in the base are left alone.
+                        if (e.key === ".") e.preventDefault();
+                      }}
+                      onPaste={(e) => {
+                        const text = e.clipboardData.getData("text");
+                        if (!text.includes(".")) return;
+                        e.preventDefault();
+                        const el = e.currentTarget;
+                        const start = el.selectionStart ?? el.value.length;
+                        const end = el.selectionEnd ?? el.value.length;
+                        setInputValue(
+                          el.value.slice(0, start) + text.replace(/\./g, "") + el.value.slice(end),
+                        );
+                      }}
+                      onFocus={(e) => {
+                        cancelDrain();
+                        if (props.input?.initialValue) e.currentTarget.select();
+                      }}
+                      className="absolute inset-0 w-full bg-transparent text-[13px] text-ink placeholder:text-ink-3 outline-none"
+                    />
+                  </span>
+                  <span className="flex-none whitespace-pre text-ink-3 select-none">
+                    {props.input.suffix}
+                  </span>
+                </div>
+              ) : (
+                <input
+                  id="modal-input"
+                  ref={inputRef}
+                  autoFocus
+                  value={value}
+                  spellCheck={false}
+                  placeholder={props.input.placeholder}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onFocus={(e) => {
+                    cancelDrain();
+                    if (props.input?.initialValue) e.currentTarget.select();
+                  }}
+                  className={`h-8 w-full rounded-md bg-recessed pl-2.5 text-[13px] text-ink placeholder:text-ink-3 focus:ring-2 focus:ring-focus ${
+                    props.input.suggest ? "pr-8" : "pr-2.5"
+                  }`}
+                />
+              )}
               {props.input.suggest && (
                 <button
                   type="button"

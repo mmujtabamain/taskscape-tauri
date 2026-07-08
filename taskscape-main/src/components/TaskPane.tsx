@@ -56,8 +56,8 @@ export function TaskPane({
     return () => registerComposer(list.id, null);
   }, [list.id, registerComposer]);
 
-  // The traveling index: one accent tick that glides along the datum rail to
-  // the selected row instead of blinking between rows. Runs every render (row
+  // The traveling index: one accent tick in the left gutter that glides to the
+  // selected row instead of blinking between rows. Runs every render (row
   // heights shift with notes/expansion), so it must bail out on equal values
   // or the setState → render → measure cycle never terminates.
   useLayoutEffect(() => {
@@ -137,10 +137,6 @@ export function TaskPane({
         }}
       >
         <div ref={contentRef} className="relative pb-6">
-          {visibleRoots.length > 0 && (
-            /* The datum rail — the reference edge every checkbox registers against. */
-            <span className="pointer-events-none absolute inset-y-0 left-[22px] w-px bg-hairline" />
-          )}
           {tick && (
             <span
               className="pointer-events-none absolute z-10 h-5 w-[2px] rounded-full bg-accent transition-[top,left] duration-100 ease-[cubic-bezier(0.2,0,0,1)]"

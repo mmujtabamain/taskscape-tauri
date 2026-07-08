@@ -27,6 +27,16 @@ export interface Attachment {
   created_at: number;
 }
 
+export interface Note {
+  id: string;
+  task_id: string;
+  /** Sanitized rich-text HTML. */
+  content: string;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface Task {
   id: string;
   list_id: string;
@@ -38,6 +48,7 @@ export interface Task {
   created_at: number;
   updated_at: number;
   attachments: Attachment[];
+  note_items: Note[];
 }
 
 export interface TaskPatch {
@@ -80,6 +91,13 @@ export const api = {
   reorderTask: (id: string, sortOrder: number) =>
     invoke<Task>("reorder_task", { id, sortOrder }),
 
+  // notes (rich-text blocks per task)
+  listNotes: (taskId: string) => invoke<Note[]>("list_notes", { taskId }),
+  createNote: (taskId: string, content: string) =>
+    invoke<Note>("create_note", { taskId, content }),
+  updateNote: (id: string, content: string) => invoke<Note>("update_note", { id, content }),
+  deleteNote: (id: string) => invoke<void>("delete_note", { id }),
+
   // app state
   setActiveList: (id: string) => invoke<void>("set_active_list", { id }),
   setActiveProject: (id: string) => invoke<void>("set_active_project", { id }),
@@ -102,6 +120,8 @@ export const api = {
     invoke<Attachment>("add_copy", { taskId, sourcePath, name: name ?? null }),
   attachScreenshot: (taskId: string) => invoke<Attachment>("attach_screenshot", { taskId }),
   deleteAttachment: (id: string) => invoke<void>("delete_attachment", { id }),
+  renameAttachment: (id: string, name: string) =>
+    invoke<Attachment>("rename_attachment", { id, name }),
   openAttachment: (a: Attachment) =>
     invoke<void>("open_attachment", { linkType: a.link_type, location: a.location }),
   revealAttachment: (a: Attachment) =>

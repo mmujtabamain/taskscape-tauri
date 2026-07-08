@@ -227,6 +227,63 @@ textarea:focus-visible {
   background-size: 100% 1px;
 }
 
+/* Rich-text note content (authored in a contenteditable, stored as HTML). These
+   are plain CSS rules because the markup is injected, so Tailwind's JIT never
+   sees the classes. */
+.note-rt p {
+  margin: 0 0 0.4em;
+}
+.note-rt p:last-child {
+  margin-bottom: 0;
+}
+.note-rt ul,
+.note-rt ol {
+  margin: 0.25em 0;
+  padding-left: 1.4em;
+}
+.note-rt ul {
+  list-style: disc;
+}
+.note-rt ol {
+  list-style: decimal;
+}
+.note-rt li {
+  margin: 0.1em 0;
+}
+.note-rt a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.note-rt b,
+.note-rt strong {
+  font-weight: 700;
+}
+.note-rt u {
+  text-decoration: underline;
+}
+.note-rt s,
+.note-rt strike,
+.note-rt del {
+  text-decoration: line-through;
+}
+
+.att-chip {
+  display: inline;
+  border-radius: 4px;
+  padding: 0 4px;
+  background: var(--selection);
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.att-chip:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

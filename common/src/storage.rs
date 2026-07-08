@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
-use crate::models::{Attachment, LinkType, List, Project, Task};
+use crate::models::{Attachment, LinkType, List, Note, Project, Task};
 use crate::util::{new_id, now_millis};
 
 /// A handle to the Taskscape SQLite database.
@@ -67,12 +67,21 @@ impl Store {
                  location   TEXT NOT NULL,
                  created_at INTEGER NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS task_notes (
+                 id         TEXT PRIMARY KEY,
+                 task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                 content    TEXT NOT NULL,
+                 sort_order REAL NOT NULL,
+                 created_at INTEGER NOT NULL,
+                 updated_at INTEGER NOT NULL
+             );
              CREATE TABLE IF NOT EXISTS settings (
                  key   TEXT PRIMARY KEY,
                  value TEXT NOT NULL
              );
              CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks(list_id);
-             CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);",
+             CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
+             CREATE INDEX IF NOT EXISTS idx_task_notes_task ON task_notes(task_id);",
         )?;
         // Bring older databases up to date. `ensure_column` is a no-op when the
         // column already exists, so this runs safely on every open.
@@ -98,6 +107,8 @@ impl Store {
         )?;
         // Adopt any project-less lists (pre-projects databases) into a default project.
         backfill_default_project(&conn)?;
+        // Wrap each task's legacy single note into an initial rich note block.
+        backfill_task_notes(&conn)?;
         Ok(())
     }
 
@@ -279,6 +290,7 @@ impl Store {
             updated_at: now,
             parent_id: parent_id.map(|s| s.to_string()),
             attachments: Vec::new(),
+            note_items: Vec::new(),
         };
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -296,6 +308,15 @@ impl Store {
                 task.updated_at
             ],
         )?;
+        // A capture that arrives with note text (e.g. from the tray) becomes the
+        // task's first rich note.
+        if let Some(text) = notes.filter(|s| !s.trim().is_empty()) {
+            conn.execute(
+                "INSERT INTO task_notes (id, task_id, content, sort_order, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![new_id(), task.id, plaintext_to_html(text), now as f64, now, now],
+            )?;
+        }
         Ok(task)
     }
 
@@ -511,16 +532,112 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    pub fn get_attachment(&self, id: &str) -> Result<Attachment> {
+        let conn = self.conn.lock().unwrap();
+        Ok(conn.query_row(
+            "SELECT id, task_id, name, link_type, location, created_at
+             FROM attachments WHERE id = ?1",
+            params![id],
+            row_to_attachment,
+        )?)
+    }
+
+    /// Update an attachment's display name and stored location (the latter
+    /// changes only when a copy's on-disk file is renamed).
+    pub fn update_attachment(&self, id: &str, name: &str, location: &str) -> Result<Attachment> {
+        {
+            let conn = self.conn.lock().unwrap();
+            let updated = conn.execute(
+                "UPDATE attachments SET name = ?2, location = ?3 WHERE id = ?1",
+                params![id, name, location],
+            )?;
+            if updated == 0 {
+                anyhow::bail!("attachment not found: {id}");
+            }
+        }
+        self.get_attachment(id)
+    }
+
     pub fn delete_attachment(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM attachments WHERE id = ?1", params![id])?;
         Ok(())
     }
 
-    /// Populate the `attachments` field of each task.
+    // ---- notes -----------------------------------------------------------
+
+    pub fn list_notes(&self, task_id: &str) -> Result<Vec<Note>> {
+        let conn = self.conn.lock().unwrap();
+        list_notes_conn(&conn, task_id)
+    }
+
+    /// Append a rich-text note to a task (`content` is sanitized HTML from the
+    /// caller). Refreshes the task's derived plaintext.
+    pub fn create_note(&self, task_id: &str, content: &str) -> Result<Note> {
+        let now = now_millis();
+        let note = Note {
+            id: new_id(),
+            task_id: task_id.to_string(),
+            content: content.to_string(),
+            sort_order: now as f64,
+            created_at: now,
+            updated_at: now,
+        };
+        {
+            let conn = self.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO task_notes (id, task_id, content, sort_order, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![note.id, note.task_id, note.content, note.sort_order, note.created_at, note.updated_at],
+            )?;
+            recompute_task_notes(&conn, task_id)?;
+        }
+        Ok(note)
+    }
+
+    pub fn update_note(&self, id: &str, content: &str) -> Result<Note> {
+        {
+            let conn = self.conn.lock().unwrap();
+            let task_id: String = conn
+                .query_row("SELECT task_id FROM task_notes WHERE id = ?1", params![id], |r| r.get(0))
+                .optional()?
+                .ok_or_else(|| anyhow::anyhow!("note not found: {id}"))?;
+            conn.execute(
+                "UPDATE task_notes SET content = ?2, updated_at = ?3 WHERE id = ?1",
+                params![id, content, now_millis()],
+            )?;
+            recompute_task_notes(&conn, &task_id)?;
+        }
+        self.get_note(id)
+    }
+
+    pub fn delete_note(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let task_id: Option<String> = conn
+            .query_row("SELECT task_id FROM task_notes WHERE id = ?1", params![id], |r| r.get(0))
+            .optional()?;
+        conn.execute("DELETE FROM task_notes WHERE id = ?1", params![id])?;
+        if let Some(task_id) = task_id {
+            recompute_task_notes(&conn, &task_id)?;
+        }
+        Ok(())
+    }
+
+    fn get_note(&self, id: &str) -> Result<Note> {
+        let conn = self.conn.lock().unwrap();
+        Ok(conn.query_row(
+            "SELECT id, task_id, content, sort_order, created_at, updated_at
+             FROM task_notes WHERE id = ?1",
+            params![id],
+            row_to_note,
+        )?)
+    }
+
+    /// Populate the `attachments` and `note_items` fields of each task.
     fn attach_all(&self, mut tasks: Vec<Task>) -> Result<Vec<Task>> {
         for task in &mut tasks {
             task.attachments = self.list_attachments(&task.id)?;
+            task.note_items = self.list_notes(&task.id)?;
         }
         Ok(tasks)
     }
@@ -564,7 +681,128 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
         created_at,
         updated_at: row.get("updated_at")?,
         attachments: Vec::new(),
+        note_items: Vec::new(),
     })
+}
+
+fn row_to_note(row: &Row) -> rusqlite::Result<Note> {
+    let created_at: i64 = row.get("created_at")?;
+    Ok(Note {
+        id: row.get("id")?,
+        task_id: row.get("task_id")?,
+        content: row.get("content")?,
+        sort_order: row
+            .get::<_, Option<f64>>("sort_order")?
+            .unwrap_or(created_at as f64),
+        created_at,
+        updated_at: row.get("updated_at")?,
+    })
+}
+
+fn list_notes_conn(conn: &Connection, task_id: &str) -> Result<Vec<Note>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, task_id, content, sort_order, created_at, updated_at
+         FROM task_notes WHERE task_id = ?1
+         ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
+    )?;
+    let rows = stmt.query_map(params![task_id], row_to_note)?;
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Rebuild a task's `notes` column (its list-row preview + search text) from the
+/// plaintext of all its note blocks.
+fn recompute_task_notes(conn: &Connection, task_id: &str) -> Result<()> {
+    let notes = list_notes_conn(conn, task_id)?;
+    let plain = notes
+        .iter()
+        .map(|n| strip_html(&n.content))
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("  ·  ");
+    let value: Option<String> = if plain.trim().is_empty() { None } else { Some(plain) };
+    conn.execute(
+        "UPDATE tasks SET notes = ?2, updated_at = ?3 WHERE id = ?1",
+        params![task_id, value, now_millis()],
+    )?;
+    Ok(())
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+/// Wrap a legacy plaintext note into a minimal HTML paragraph.
+fn plaintext_to_html(s: &str) -> String {
+    format!("<p>{}</p>", escape_html(s).replace('\n', "<br>"))
+}
+
+/// Crude tag-strip for deriving searchable plaintext from note HTML. Every tag
+/// boundary becomes whitespace so adjacent blocks don't run together.
+fn strip_html(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => {
+                in_tag = false;
+                out.push(' ');
+            }
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+    let out = out
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'");
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// One-time: wrap each task's pre-existing plaintext note into an initial rich
+/// note block. Guarded by a settings flag so it runs only once.
+fn backfill_task_notes(conn: &Connection) -> Result<()> {
+    let done: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'task_notes_backfilled'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if done.is_some() {
+        return Ok(());
+    }
+    let rows: Vec<(String, String, i64)> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, notes, created_at FROM tasks
+             WHERE notes IS NOT NULL AND TRIM(notes) != ''
+               AND id NOT IN (SELECT task_id FROM task_notes)",
+        )?;
+        let collected = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        collected
+    };
+    let now = now_millis();
+    for (task_id, notes, created) in rows {
+        conn.execute(
+            "INSERT INTO task_notes (id, task_id, content, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![new_id(), task_id, plaintext_to_html(&notes), created as f64, created, now],
+        )?;
+    }
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES ('task_notes_backfilled', '1')",
+        [],
+    )?;
+    Ok(())
 }
 
 /// Depth-first delete of a task and all of its descendant subtasks.

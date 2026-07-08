@@ -13,7 +13,7 @@ pub mod server;
 pub mod storage;
 pub mod util;
 
-pub use models::{Attachment, LinkType, List, Project, Task};
+pub use models::{Attachment, LinkType, List, Note, Project, Task};
 pub use storage::Store;
 
 /// Fixed localhost ports used for cross-process HTTP IPC.

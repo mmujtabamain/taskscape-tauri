@@ -690,6 +690,14 @@ function App() {
                   task={selectedTask}
                   childrenByParent={childrenByParent}
                   listName={selectedTask ? (allLists.find((l) => l.id === selectedTask.list_id)?.name ?? null) : null}
+                  projectName={
+                    selectedTask
+                      ? (projects.find(
+                          (p) =>
+                            p.id === allLists.find((l) => l.id === selectedTask.list_id)?.project_id,
+                        )?.name ?? null)
+                      : null
+                  }
                   onUpdateTask={updateTask}
                   onToggleDone={toggleDone}
                   onSelectTask={setSelectedTaskId}

@@ -280,11 +280,6 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
 
       {(children.length > 0 || ctx.composeFor === task.id) && expanded && (
         <div className="relative">
-          {/* Branch rail dropping from the parent's checkbox through its children. */}
-          <span
-            className="pointer-events-none absolute inset-y-0 w-px bg-hairline-faint"
-            style={{ left: depth * INDENT + 42 }}
-          />
           {children.map((child) => (
             <TaskRow key={child.id} task={child} depth={depth + 1} ctx={ctx} />
           ))}
