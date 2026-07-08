@@ -14,18 +14,20 @@
 
 ## Main Window
 
-- [ ] MINOR: Show a loading indicator while loading
-- [ ] Bugs
-  - [ ] MINOR: Fix White outline when scrolling very hard horizontally or vertically
-- [ ] Tasks
-  - [ ] Allow sub tasks
-  - [ ] Allow Projects with multiple Lists
-  - [ ] Tasks are timestamped
+- [x] MINOR: Show a loading indicator while loading
+- [x] Bugs
+  - [x] MINOR: Fix White outline when scrolling very hard horizontally or vertically
+- [x] Tasks
+  - [x] Allow sub tasks
+  - [x] Allow Projects with multiple Lists
+  - [x] Tasks are timestamped
+  - [x] Remove Task Due Date from model
 - [ ] UI
   - [ ] Searching Tasks
   - [ ] Dragging Tasks to become subtasks of each other
   - [ ] Remove Sidebar
   - [ ] Add Settings Window
-  - [ ] Remove Due
+  - [ ] Remove Task Due Date mention
   - [ ] Add Browse File Option
   - [ ] Dark and Light Mode Theme handling
+  - [ ] View attachments inside the app

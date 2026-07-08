@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TaskItem } from "./TaskItem";
 import { Icon } from "./Icon";
+import { Spinner } from "./Spinner";
 import type { List, Task, TaskPatch } from "../api";
 
 interface Props {
   list: List | null;
   tasks: Task[];
+  loading: boolean;
   dragOverTaskId: string | null;
   onCreateTask: (title: string) => void;
+  onCreateSubtask: (parentId: string, title: string) => void;
   onUpdateTask: (id: string, patch: TaskPatch) => void;
   onDeleteTask: (id: string) => void;
   onRefresh: () => void;
@@ -16,13 +19,26 @@ interface Props {
 export function TaskList({
   list,
   tasks,
+  loading,
   dragOverTaskId,
   onCreateTask,
+  onCreateSubtask,
   onUpdateTask,
   onDeleteTask,
   onRefresh,
 }: Props) {
   const [draft, setDraft] = useState("");
+
+  // Group every task under its parent so each level can render its own subtasks.
+  const childrenByParent = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    for (const t of tasks) {
+      if (t.parent_id) (map[t.parent_id] ??= []).push(t);
+    }
+    return map;
+  }, [tasks]);
+
+  const roots = useMemo(() => tasks.filter((t) => t.parent_id == null), [tasks]);
 
   if (!list) {
     return (
@@ -38,15 +54,20 @@ export function TaskList({
     setDraft("");
   };
 
-  const remaining = tasks.filter((t) => !t.done).length;
+  const remaining = roots.filter((t) => !t.done).length;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <header className="flex items-baseline gap-3 border-b border-zinc-200 px-8 py-5 dark:border-zinc-800">
         <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{list.name}</h2>
         <span className="text-sm text-zinc-400">
-          {remaining} open · {tasks.length} total
+          {remaining} open · {roots.length} total
         </span>
+        {loading && (
+          <span className="ml-auto">
+            <Spinner size={16} />
+          </span>
+        )}
       </header>
 
       <div className="px-8 pt-5">
@@ -62,19 +83,19 @@ export function TaskList({
         </div>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto px-8 py-5">
-        {tasks.length === 0 ? (
-          <p className="py-16 text-center text-sm text-zinc-400">
-            No tasks in this list yet.
-          </p>
+      <div className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-8 py-5">
+        {roots.length === 0 ? (
+          <p className="py-16 text-center text-sm text-zinc-400">No tasks in this list yet.</p>
         ) : (
-          tasks.map((task) => (
+          roots.map((task) => (
             <TaskItem
               key={task.id}
               task={task}
-              dragOver={task.id === dragOverTaskId}
+              childrenByParent={childrenByParent}
+              dragOverTaskId={dragOverTaskId}
               onUpdate={onUpdateTask}
               onDelete={onDeleteTask}
+              onCreateSubtask={onCreateSubtask}
               onRefresh={onRefresh}
             />
           ))

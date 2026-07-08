@@ -64,7 +64,11 @@ async fn create_list(
     State(store): State<Arc<Store>>,
     Json(body): Json<CreateList>,
 ) -> ApiResult<List> {
-    Ok(Json(store.create_list(&body.name)?))
+    let project_id = match body.project_id {
+        Some(id) => id,
+        None => store.default_project()?.id,
+    };
+    Ok(Json(store.create_list(&project_id, &body.name)?))
 }
 
 async fn get_list_tasks(
@@ -86,6 +90,7 @@ async fn create_task(
         &body.list_id,
         &body.title,
         body.notes.as_deref(),
+        body.parent_id.as_deref(),
     )?))
 }
 
@@ -148,6 +153,9 @@ async fn add_copy(
 #[derive(Deserialize)]
 pub struct CreateList {
     pub name: String,
+    /// Omit to fall into the default project.
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -156,6 +164,9 @@ pub struct CreateTask {
     pub title: String,
     #[serde(default)]
     pub notes: Option<String>,
+    /// Set to create the task as a subtask of an existing task.
+    #[serde(default)]
+    pub parent_id: Option<String>,
 }
 
 #[derive(Deserialize)]

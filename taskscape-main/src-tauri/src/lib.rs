@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{extract::State as AxumState, http::StatusCode, routing::post, Router};
 use tauri::{AppHandle, Emitter, Manager, State};
-use taskscape_common::{server, Attachment, List, Store, Task, MAIN_PORT};
+use taskscape_common::{server, Attachment, List, Project, Store, Task, MAIN_PORT};
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
@@ -32,13 +32,44 @@ fn launch_embedded_tray() {
 }
 
 #[tauri::command]
+fn list_projects(store: State<'_, Arc<Store>>) -> Result<Vec<Project>, String> {
+    store.list_projects().map_err(err)
+}
+
+#[tauri::command]
+fn create_project(store: State<'_, Arc<Store>>, name: String) -> Result<Project, String> {
+    store.create_project(&name).map_err(err)
+}
+
+#[tauri::command]
+fn rename_project(store: State<'_, Arc<Store>>, id: String, name: String) -> Result<(), String> {
+    store.rename_project(&id, &name).map_err(err)
+}
+
+#[tauri::command]
+fn delete_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.delete_project(&id).map_err(err)
+}
+
+/// The default project (created on demand). Used to seed a first project when
+/// the database has none yet.
+#[tauri::command]
+fn default_project(store: State<'_, Arc<Store>>) -> Result<Project, String> {
+    store.default_project().map_err(err)
+}
+
+#[tauri::command]
 fn list_lists(store: State<'_, Arc<Store>>) -> Result<Vec<List>, String> {
     store.list_lists().map_err(err)
 }
 
 #[tauri::command]
-fn create_list(store: State<'_, Arc<Store>>, name: String) -> Result<List, String> {
-    store.create_list(&name).map_err(err)
+fn create_list(
+    store: State<'_, Arc<Store>>,
+    project_id: String,
+    name: String,
+) -> Result<List, String> {
+    store.create_list(&project_id, &name).map_err(err)
 }
 
 #[tauri::command]
@@ -67,9 +98,10 @@ fn create_task(
     list_id: String,
     title: String,
     notes: Option<String>,
+    parent_id: Option<String>,
 ) -> Result<Task, String> {
     store
-        .create_task(&list_id, &title, notes.as_deref())
+        .create_task(&list_id, &title, notes.as_deref(), parent_id.as_deref())
         .map_err(err)
 }
 
@@ -122,15 +154,22 @@ fn delete_attachment(store: State<'_, Arc<Store>>, id: String) -> Result<(), Str
     store.delete_attachment(&id).map_err(err)
 }
 
-#[tauri::command]
-fn set_task_due(store: State<'_, Arc<Store>>, id: String, due: Option<i64>) -> Result<Task, String> {
-    store.set_task_due(&id, due).map_err(err)
-}
-
 /// Remember which list the user last had open, so the tray captures land there.
 #[tauri::command]
 fn set_active_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
     store.set_setting("last_active_list", &id).map_err(err)
+}
+
+/// Remember which project the user last had open, so we can restore it on launch.
+#[tauri::command]
+fn set_active_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.set_setting("last_active_project", &id).map_err(err)
+}
+
+/// Read a persisted setting (e.g. `last_active_project`).
+#[tauri::command]
+fn get_setting(store: State<'_, Arc<Store>>, key: String) -> Result<Option<String>, String> {
+    store.get_setting(&key).map_err(err)
 }
 
 /// Open an attachment with the OS default handler. Copies resolve to their file
@@ -203,6 +242,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_projects,
+            create_project,
+            rename_project,
+            delete_project,
+            default_project,
             list_lists,
             create_list,
             rename_list,
@@ -217,8 +261,9 @@ pub fn run() {
             add_copy,
             delete_attachment,
             open_attachment,
-            set_task_due,
             set_active_list,
+            set_active_project,
+            get_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

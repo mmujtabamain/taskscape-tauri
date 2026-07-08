@@ -2,8 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type LinkType = "reference" | "copy";
 
+export interface Project {
+  id: string;
+  name: string;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface List {
   id: string;
+  project_id: string;
   name: string;
   created_at: number;
   updated_at: number;
@@ -21,12 +29,12 @@ export interface Attachment {
 export interface Task {
   id: string;
   list_id: string;
+  parent_id: string | null;
   title: string;
   notes: string | null;
   done: boolean;
   created_at: number;
   updated_at: number;
-  due_at: number | null;
   attachments: Attachment[];
 }
 
@@ -37,23 +45,37 @@ export interface TaskPatch {
 }
 
 export const api = {
+  // projects
+  listProjects: () => invoke<Project[]>("list_projects"),
+  createProject: (name: string) => invoke<Project>("create_project", { name }),
+  renameProject: (id: string, name: string) => invoke<void>("rename_project", { id, name }),
+  deleteProject: (id: string) => invoke<void>("delete_project", { id }),
+  defaultProject: () => invoke<Project>("default_project"),
+
   // lists
   listLists: () => invoke<List[]>("list_lists"),
-  createList: (name: string) => invoke<List>("create_list", { name }),
+  createList: (projectId: string, name: string) =>
+    invoke<List>("create_list", { projectId, name }),
   renameList: (id: string, name: string) => invoke<void>("rename_list", { id, name }),
   deleteList: (id: string) => invoke<void>("delete_list", { id }),
 
   // tasks
   listTasks: (listId: string) => invoke<Task[]>("list_tasks", { listId }),
   allTasks: () => invoke<Task[]>("all_tasks"),
-  createTask: (listId: string, title: string, notes?: string) =>
-    invoke<Task>("create_task", { listId, title, notes: notes ?? null }),
+  createTask: (listId: string, title: string, notes?: string, parentId?: string) =>
+    invoke<Task>("create_task", {
+      listId,
+      title,
+      notes: notes ?? null,
+      parentId: parentId ?? null,
+    }),
   updateTask: (id: string, patch: TaskPatch) => invoke<Task>("update_task", { id, ...patch }),
-  setTaskDue: (id: string, due: number | null) => invoke<Task>("set_task_due", { id, due }),
   deleteTask: (id: string) => invoke<void>("delete_task", { id }),
 
   // app state
   setActiveList: (id: string) => invoke<void>("set_active_list", { id }),
+  setActiveProject: (id: string) => invoke<void>("set_active_project", { id }),
+  getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
 
   // attachments
   listAttachments: (taskId: string) => invoke<Attachment[]>("list_attachments", { taskId }),

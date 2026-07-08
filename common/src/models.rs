@@ -1,8 +1,18 @@
 use serde::{Deserialize, Serialize};
 
+/// A top-level container grouping several [`List`]s (e.g. "Work", "Personal").
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct List {
     pub id: String,
+    pub project_id: String,
     pub name: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -17,8 +27,10 @@ pub struct Task {
     pub done: bool,
     pub created_at: i64,
     pub updated_at: i64,
-    /// Optional due date, unix millis at local midnight.
-    pub due_at: Option<i64>,
+    /// Parent task id when this is a subtask; `None` for a top-level task.
+    /// Subtasks may nest arbitrarily deep.
+    #[serde(default)]
+    pub parent_id: Option<String>,
     #[serde(default)]
     pub attachments: Vec<Attachment>,
 }

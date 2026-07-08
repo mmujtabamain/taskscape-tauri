@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
-use crate::models::{Attachment, LinkType, List, Task};
+use crate::models::{Attachment, LinkType, List, Project, Task};
 use crate::util::{new_id, now_millis};
 
 /// A handle to the Taskscape SQLite database.
@@ -36,8 +36,15 @@ impl Store {
     fn migrate(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS lists (
+            "CREATE TABLE IF NOT EXISTS projects (
                  id         TEXT PRIMARY KEY,
+                 name       TEXT NOT NULL,
+                 created_at INTEGER NOT NULL,
+                 updated_at INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS lists (
+                 id         TEXT PRIMARY KEY,
+                 project_id TEXT,
                  name       TEXT NOT NULL,
                  created_at INTEGER NOT NULL,
                  updated_at INTEGER NOT NULL
@@ -45,12 +52,12 @@ impl Store {
              CREATE TABLE IF NOT EXISTS tasks (
                  id         TEXT PRIMARY KEY,
                  list_id    TEXT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+                 parent_id  TEXT,
                  title      TEXT NOT NULL,
                  notes      TEXT,
                  done       INTEGER NOT NULL DEFAULT 0,
                  created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL,
-                 due_at     INTEGER
+                 updated_at INTEGER NOT NULL
              );
              CREATE TABLE IF NOT EXISTS attachments (
                  id         TEXT PRIMARY KEY,
@@ -67,8 +74,18 @@ impl Store {
              CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks(list_id);
              CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);",
         )?;
-        // Bring older databases (created before due dates) up to date.
-        ensure_column(&conn, "tasks", "due_at", "INTEGER")?;
+        // Bring older databases up to date. `ensure_column` is a no-op when the
+        // column already exists, so this runs safely on every open.
+        ensure_column(&conn, "lists", "project_id", "TEXT")?;
+        ensure_column(&conn, "tasks", "parent_id", "TEXT")?;
+        // Indexes on the migrated columns — created after `ensure_column` so the
+        // column is guaranteed to exist on databases that predate it.
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_lists_project ON lists(project_id);
+             CREATE INDEX IF NOT EXISTS idx_tasks_parent  ON tasks(parent_id);",
+        )?;
+        // Adopt any project-less lists (pre-projects databases) into a default project.
+        backfill_default_project(&conn)?;
         Ok(())
     }
 
@@ -96,11 +113,11 @@ impl Store {
         Ok(())
     }
 
-    // ---- lists -----------------------------------------------------------
+    // ---- projects --------------------------------------------------------
 
-    pub fn create_list(&self, name: &str) -> Result<List> {
+    pub fn create_project(&self, name: &str) -> Result<Project> {
         let now = now_millis();
-        let list = List {
+        let project = Project {
             id: new_id(),
             name: name.to_string(),
             created_at: now,
@@ -108,8 +125,81 @@ impl Store {
         };
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO lists (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-            params![list.id, list.name, list.created_at, list.updated_at],
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+            params![project.id, project.name, project.created_at, project.updated_at],
+        )?;
+        Ok(project)
+    }
+
+    pub fn list_projects(&self) -> Result<Vec<Project>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, created_at, updated_at FROM projects ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map([], row_to_project)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn rename_project(&self, id: &str, name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE projects SET name = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, name, now_millis()],
+        )?;
+        Ok(())
+    }
+
+    /// Delete a project and everything under it. Its lists are removed first so
+    /// their tasks (and attachments) cascade via the existing foreign keys.
+    pub fn delete_project(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM lists WHERE project_id = ?1", params![id])?;
+        conn.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    /// The project new lists/captures fall into when none is specified: the
+    /// oldest existing project, created on demand if the database has none.
+    pub fn default_project(&self) -> Result<Project> {
+        {
+            let conn = self.conn.lock().unwrap();
+            let existing = conn
+                .query_row(
+                    "SELECT id, name, created_at, updated_at FROM projects
+                     ORDER BY created_at ASC LIMIT 1",
+                    [],
+                    row_to_project,
+                )
+                .optional()?;
+            if let Some(project) = existing {
+                return Ok(project);
+            }
+        }
+        self.create_project("My Tasks")
+    }
+
+    // ---- lists -----------------------------------------------------------
+
+    pub fn create_list(&self, project_id: &str, name: &str) -> Result<List> {
+        let now = now_millis();
+        let list = List {
+            id: new_id(),
+            project_id: project_id.to_string(),
+            name: name.to_string(),
+            created_at: now,
+            updated_at: now,
+        };
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO lists (id, project_id, name, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                list.id,
+                list.project_id,
+                list.name,
+                list.created_at,
+                list.updated_at
+            ],
         )?;
         Ok(list)
     }
@@ -117,7 +207,8 @@ impl Store {
     pub fn list_lists(&self) -> Result<Vec<List>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, created_at, updated_at FROM lists ORDER BY created_at ASC",
+            "SELECT id, project_id, name, created_at, updated_at
+             FROM lists ORDER BY created_at ASC",
         )?;
         let rows = stmt.query_map([], row_to_list)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -140,7 +231,13 @@ impl Store {
 
     // ---- tasks -----------------------------------------------------------
 
-    pub fn create_task(&self, list_id: &str, title: &str, notes: Option<&str>) -> Result<Task> {
+    pub fn create_task(
+        &self,
+        list_id: &str,
+        title: &str,
+        notes: Option<&str>,
+        parent_id: Option<&str>,
+    ) -> Result<Task> {
         let now = now_millis();
         let task = Task {
             id: new_id(),
@@ -150,16 +247,17 @@ impl Store {
             done: false,
             created_at: now,
             updated_at: now,
-            due_at: None,
+            parent_id: parent_id.map(|s| s.to_string()),
             attachments: Vec::new(),
         };
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO tasks (id, list_id, title, notes, done, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO tasks (id, list_id, parent_id, title, notes, done, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 task.id,
                 task.list_id,
+                task.parent_id,
                 task.title,
                 task.notes,
                 task.done as i64,
@@ -173,7 +271,7 @@ impl Store {
     pub fn list_tasks(&self, list_id: &str) -> Result<Vec<Task>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, list_id, title, notes, done, created_at, updated_at, due_at
+            "SELECT id, list_id, parent_id, title, notes, done, created_at, updated_at
              FROM tasks WHERE list_id = ?1 ORDER BY created_at ASC",
         )?;
         let tasks = stmt
@@ -187,7 +285,7 @@ impl Store {
     pub fn all_tasks(&self) -> Result<Vec<Task>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, list_id, title, notes, done, created_at, updated_at, due_at
+            "SELECT id, list_id, parent_id, title, notes, done, created_at, updated_at
              FROM tasks ORDER BY created_at ASC",
         )?;
         let tasks = stmt
@@ -232,7 +330,7 @@ impl Store {
     pub fn get_task(&self, id: &str) -> Result<Task> {
         let conn = self.conn.lock().unwrap();
         let task = conn.query_row(
-            "SELECT id, list_id, title, notes, done, created_at, updated_at, due_at
+            "SELECT id, list_id, parent_id, title, notes, done, created_at, updated_at
              FROM tasks WHERE id = ?1",
             params![id],
             row_to_task,
@@ -241,22 +339,14 @@ impl Store {
         Ok(self.attach_all(vec![task])?.pop().unwrap())
     }
 
+    /// Delete a task and, recursively, every subtask beneath it. Subtask
+    /// cascade is done in code rather than via a self-referential foreign key so
+    /// the `parent_id` column can be added to older databases with a plain
+    /// `ALTER TABLE`.
     pub fn delete_task(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
+        delete_task_tree(&conn, id)?;
         Ok(())
-    }
-
-    /// Set (or, with `None`, clear) a task's due date.
-    pub fn set_task_due(&self, id: &str, due: Option<i64>) -> Result<Task> {
-        {
-            let conn = self.conn.lock().unwrap();
-            conn.execute(
-                "UPDATE tasks SET due_at = ?2, updated_at = ?3 WHERE id = ?1",
-                params![id, due, now_millis()],
-            )?;
-        }
-        self.get_task(id)
     }
 
     // ---- attachments -----------------------------------------------------
@@ -317,9 +407,19 @@ impl Store {
     }
 }
 
+fn row_to_project(row: &Row) -> rusqlite::Result<Project> {
+    Ok(Project {
+        id: row.get("id")?,
+        name: row.get("name")?,
+        created_at: row.get("created_at")?,
+        updated_at: row.get("updated_at")?,
+    })
+}
+
 fn row_to_list(row: &Row) -> rusqlite::Result<List> {
     Ok(List {
         id: row.get("id")?,
+        project_id: row.get::<_, Option<String>>("project_id")?.unwrap_or_default(),
         name: row.get("name")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
@@ -330,14 +430,66 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
     Ok(Task {
         id: row.get("id")?,
         list_id: row.get("list_id")?,
+        parent_id: row.get("parent_id")?,
         title: row.get("title")?,
         notes: row.get("notes")?,
         done: row.get::<_, i64>("done")? != 0,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
-        due_at: row.get("due_at")?,
         attachments: Vec::new(),
     })
+}
+
+/// Depth-first delete of a task and all of its descendant subtasks.
+fn delete_task_tree(conn: &Connection, id: &str) -> Result<()> {
+    let children: Vec<String> = {
+        let mut stmt = conn.prepare("SELECT id FROM tasks WHERE parent_id = ?1")?;
+        let ids = stmt
+            .query_map(params![id], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        ids
+    };
+    for child in children {
+        delete_task_tree(conn, &child)?;
+    }
+    conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+/// Assign any project-less lists (created before projects existed) to a default
+/// project, creating that project only if some orphan list needs one.
+fn backfill_default_project(conn: &Connection) -> Result<()> {
+    let orphans: i64 =
+        conn.query_row("SELECT COUNT(*) FROM lists WHERE project_id IS NULL", [], |r| {
+            r.get(0)
+        })?;
+    if orphans == 0 {
+        return Ok(());
+    }
+    let existing: Option<String> = conn
+        .query_row(
+            "SELECT id FROM projects ORDER BY created_at ASC LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let project_id = match existing {
+        Some(id) => id,
+        None => {
+            let now = now_millis();
+            let id = new_id();
+            conn.execute(
+                "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                params![id, "My Tasks", now, now],
+            )?;
+            id
+        }
+    };
+    conn.execute(
+        "UPDATE lists SET project_id = ?1 WHERE project_id IS NULL",
+        params![project_id],
+    )?;
+    Ok(())
 }
 
 fn ensure_column(conn: &Connection, table: &str, column: &str, decl: &str) -> Result<()> {

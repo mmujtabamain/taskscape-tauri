@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+/* macOS rubber-band overscroll reveals the document background behind the app.
+   Disable the bounce and paint that background to match the app's own surface
+   (white / zinc-950) so no white edge flashes when scrolling hard. */
+html,
+body {
+  overscroll-behavior: none;
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html,
+  body {
+    background-color: #09090b;
+  }
+}

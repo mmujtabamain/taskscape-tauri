@@ -38,7 +38,8 @@ fn target_list(store: &Store) -> Result<List, String> {
     if let Some(first) = lists.into_iter().next() {
         return Ok(first);
     }
-    store.create_list(INBOX).map_err(err)
+    let project = store.default_project().map_err(err)?;
+    store.create_list(&project.id, INBOX).map_err(err)
 }
 
 /// Focus the main app if it's running (HTTP), otherwise launch the installed app.
@@ -333,7 +334,7 @@ fn submit_capture(
 ) -> Result<(), String> {
     let list = target_list(&store)?;
     let task = store
-        .create_task(&list.id, &title, notes.as_deref())
+        .create_task(&list.id, &title, notes.as_deref(), None)
         .map_err(err)?;
 
     let multiple = screenshot_paths.len() > 1;
