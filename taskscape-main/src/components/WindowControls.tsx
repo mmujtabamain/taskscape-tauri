@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Icon } from "./Icon";
-import { isMac } from "../lib/platform";
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useEffect, useState } from 'react';
+import { isMac } from '../lib/platform';
+import { Icon } from './Icon';
 
 function useWindowFocused(): boolean {
   const [focused, setFocused] = useState(true);
@@ -19,8 +19,10 @@ function useWindowFocused(): boolean {
 
 /* The macOS button geometry, traced from lwouis/macos-traffic-light-buttons-as-SVG:
    an outer ring + lighter inner disc, with the glyph revealed on hover. */
-const OUTER = "m42.7 85.4c23.6 0 42.7-19.1 42.7-42.7s-19.1-42.7-42.7-42.7-42.7 19.1-42.7 42.7 19.1 42.7 42.7 42.7z";
-const INNER = "m42.7 81.8c21.6 0 39.1-17.5 39.1-39.1s-17.5-39.1-39.1-39.1-39.1 17.5-39.1 39.1 17.5 39.1 39.1 39.1z";
+const OUTER =
+  'm42.7 85.4c23.6 0 42.7-19.1 42.7-42.7s-19.1-42.7-42.7-42.7-42.7 19.1-42.7 42.7 19.1 42.7 42.7 42.7z';
+const INNER =
+  'm42.7 81.8c21.6 0 39.1-17.5 39.1-39.1s-17.5-39.1-39.1-39.1-39.1 17.5-39.1 39.1 17.5 39.1 39.1 39.1z';
 
 const GLYPHS: Record<string, React.ReactNode> = {
   close: (
@@ -55,20 +57,60 @@ function MacControls() {
     label: string;
     act: () => void;
   }> = [
-    { ring: "#e24b41", fill: "#ed6a5f", glyph: "close", glyphColor: "#460804", label: "Close", act: () => void win.close() },
-    { ring: "#e1a73e", fill: "#f6be50", glyph: "minimize", glyphColor: "#90591d", label: "Minimize", act: () => void win.minimize() },
-    { ring: "#2dac2f", fill: "#61c555", glyph: "fullscreen", glyphColor: "#2a6218", label: "Full Screen", act: () => void win.isFullscreen().then((f) => win.setFullscreen(!f)) },
+    {
+      ring: '#e24b41',
+      fill: '#ed6a5f',
+      glyph: 'close',
+      glyphColor: '#460804',
+      label: 'Close',
+      act: () => void win.close(),
+    },
+    {
+      ring: '#e1a73e',
+      fill: '#f6be50',
+      glyph: 'minimize',
+      glyphColor: '#90591d',
+      label: 'Minimize',
+      act: () => void win.minimize(),
+    },
+    {
+      ring: '#2dac2f',
+      fill: '#61c555',
+      glyph: 'fullscreen',
+      glyphColor: '#2a6218',
+      label: 'Full Screen',
+      act: () => void win.isFullscreen().then((f) => win.setFullscreen(!f)),
+    },
   ];
 
   return (
     <div className="group flex items-center gap-2 pr-3 pl-5" data-no-drag>
       {lights.map((l) => (
-        <button key={l.label} onClick={l.act} title={l.label} className="block size-[13px]">
-          <svg viewBox="0 0 85.4 85.4" className="size-full" clipRule="evenodd" fillRule="evenodd">
-            <path d={OUTER} fill={focused ? l.ring : "var(--tl-inactive-ring)"} />
-            <path d={INNER} fill={focused ? l.fill : "var(--tl-inactive-fill)"} />
+        <button
+          key={l.label}
+          onClick={l.act}
+          title={l.label}
+          className="block size-[13px]"
+        >
+          <svg
+            viewBox="0 0 85.4 85.4"
+            className="size-full"
+            clipRule="evenodd"
+            fillRule="evenodd"
+          >
+            <path
+              d={OUTER}
+              fill={focused ? l.ring : 'var(--tl-inactive-ring)'}
+            />
+            <path
+              d={INNER}
+              fill={focused ? l.fill : 'var(--tl-inactive-fill)'}
+            />
             {focused && (
-              <g fill={l.glyphColor} className="opacity-0 transition-opacity duration-100 group-hover:opacity-100">
+              <g
+                fill={l.glyphColor}
+                className="opacity-0 transition-opacity duration-100 group-hover:opacity-100"
+              >
                 {GLYPHS[l.glyph]}
               </g>
             )}
@@ -94,18 +136,22 @@ function WinControls() {
   }, [win]);
 
   const base =
-    "flex h-full w-[46px] items-center justify-center text-content-2l dark:text-content-2d transition-colors duration-100";
+    'flex h-full w-[46px] items-center justify-center text-content-2l dark:text-content-2d transition-colors duration-100';
   return (
     <div className="flex h-full items-stretch" data-no-drag>
-      <button className={`${base} hover:bg-wash-2l dark:hover:bg-wash-2d`} onClick={() => win.minimize()} title="Minimize">
+      <button
+        className={`${base} hover:bg-wash-2l dark:hover:bg-wash-2d`}
+        onClick={() => win.minimize()}
+        title="Minimize"
+      >
         <Icon name="remove" size={20} />
       </button>
       <button
         className={`${base} hover:bg-wash-2l dark:hover:bg-wash-2d`}
         onClick={() => win.toggleMaximize()}
-        title={maximized ? "Restore" : "Maximize"}
+        title={maximized ? 'Restore' : 'Maximize'}
       >
-        <Icon name={maximized ? "filter_none" : "crop_square"} size={14} />
+        <Icon name={maximized ? 'filter_none' : 'crop_square'} size={14} />
       </button>
       <button
         className={`${base} hover:bg-[#e81123] hover:text-white`}

@@ -1,29 +1,29 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open } from '@tauri-apps/plugin-dialog';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   api,
   type Attachment,
   type Note,
   type Task,
   type TaskPatch,
-} from "../api";
+} from '../api';
 import {
   attachmentSrc,
   fileKindFor,
   isRemote,
   splitFileName,
-} from "../lib/fileKind";
-import { confirmModal, openModal, promptName } from "../lib/modal";
-import { propagateAttachmentRename } from "../lib/mentions";
-import { absoluteDateTime, relativeTime } from "../time";
-import { AttachmentLightbox } from "./AttachmentLightbox";
-import { useContextMenu } from "./ContextMenu";
+} from '../lib/fileKind';
+import { propagateAttachmentRename } from '../lib/mentions';
+import { confirmModal, openModal, promptName } from '../lib/modal';
+import { absoluteDateTime, relativeTime } from '../time';
+import { AttachmentLightbox } from './AttachmentLightbox';
+import { useContextMenu } from './ContextMenu';
+import { Icon } from './Icon';
 import {
-  RichTextEditor,
   ATTACHMENT_MIME,
+  RichTextEditor,
   type RichTextHandle,
-} from "./RichTextEditor";
-import { Icon } from "./Icon";
+} from './RichTextEditor';
 
 interface PreviewPanelProps {
   task: Task | null;
@@ -42,7 +42,7 @@ function referenceName(location: string): string {
   if (isRemote(location)) {
     try {
       const url = new URL(location);
-      return url.pathname.split("/").filter(Boolean).pop() || url.host;
+      return url.pathname.split('/').filter(Boolean).pop() || url.host;
     } catch {
       return location;
     }
@@ -59,10 +59,10 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-2 flex items-center gap-3">
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-content-3l dark:text-content-3d">
+      <span className="text-content-3l dark:text-content-3d text-[11px] font-semibold tracking-widest uppercase">
         {label}
       </span>
-      <span className="flex-1 border-t border-edge-1l dark:border-edge-1d" />
+      <span className="border-edge-1l dark:border-edge-1d flex-1 border-t" />
       {trailing}
     </div>
   );
@@ -92,12 +92,12 @@ function NoteCard({
         minHeightClass="min-h-14"
         attachments={attachments}
         onOpenMention={onOpenMention}
-        onBlur={() => onCommit(ref.current?.getHtml() ?? "")}
+        onBlur={() => onCommit(ref.current?.getHtml() ?? '')}
       />
       <button
         onClick={onDelete}
         title="Delete note"
-        className="absolute -top-2 -right-2 z-raised grid h-6 w-6 place-items-center rounded-full border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-3l dark:text-content-3d opacity-0 shadow-lift transition-opacity hover:text-danger-500l dark:hover:text-danger-500d group-hover/note:opacity-100"
+        className="z-raised border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-3l dark:text-content-3d shadow-lift hover:text-danger-500l dark:hover:text-danger-500d absolute -top-2 -right-2 grid h-6 w-6 place-items-center rounded-full border opacity-0 transition-opacity group-hover/note:opacity-100"
       >
         <Icon name="close" size={14} weight={400} />
       </button>
@@ -115,15 +115,15 @@ function DoneCheckbox({
   onToggle: () => void;
 }) {
   const box =
-    size === 18 ? "h-5 w-5 rounded-field" : "h-[18px] w-[18px] rounded-field";
+    size === 18 ? 'h-5 w-5 rounded-field' : 'h-[18px] w-[18px] rounded-field';
   return (
     <button
       onClick={onToggle}
-      title={done ? "Mark not done" : "Mark done"}
+      title={done ? 'Mark not done' : 'Mark done'}
       className={`grid shrink-0 place-items-center border-[1.5px] transition-colors ${box} ${
         done
-          ? "border-transparent bg-done-lamp-1l dark:bg-done-lamp-1d text-on-accent"
-          : "border-edge-3l dark:border-edge-3d hover:border-content-3l dark:hover:border-content-3d"
+          ? 'bg-done-lamp-1l dark:bg-done-lamp-1d text-on-accent border-transparent'
+          : 'border-edge-3l dark:border-edge-3d hover:border-content-3l dark:hover:border-content-3d'
       }`}
     >
       {done && <Icon name="check" size={size === 18 ? 14 : 12} weight={700} />}
@@ -131,7 +131,7 @@ function DoneCheckbox({
   );
 }
 
-type InspectorProps = Omit<PreviewPanelProps, "task"> & { task: Task };
+type InspectorProps = Omit<PreviewPanelProps, 'task'> & { task: Task };
 
 function TaskInspector({
   task,
@@ -173,7 +173,7 @@ function TaskInspector({
       setAddingNote(false);
       return;
     }
-    const html = addNoteRef.current?.getHtml() ?? "";
+    const html = addNoteRef.current?.getHtml() ?? '';
     savingNote.current = true;
     try {
       await api.createNote(task.id, html);
@@ -197,9 +197,9 @@ function TaskInspector({
   const removeNote = async (note: Note) => {
     const ok = await confirmModal({
       danger: true,
-      title: "Delete note?",
-      message: "This note will be permanently removed.",
-      confirmLabel: "Delete",
+      title: 'Delete note?',
+      message: 'This note will be permanently removed.',
+      confirmLabel: 'Delete',
     });
     if (!ok) return;
     await api.deleteNote(note.id);
@@ -209,7 +209,7 @@ function TaskInspector({
   useEffect(() => {
     let alive = true;
     for (const a of task.attachments) {
-      if (fileKindFor(a.name, a.location).label !== "image") continue;
+      if (fileKindFor(a.name, a.location).label !== 'image') continue;
       attachmentSrc(a).then((src) => {
         if (!alive || !src) return;
         setThumbs((m) => (m.get(a.id) === src ? m : new Map(m).set(a.id, src)));
@@ -230,9 +230,9 @@ function TaskInspector({
   const addFile = async () => {
     const picked = await open({
       multiple: false,
-      title: "Choose a file to copy",
+      title: 'Choose a file to copy',
     });
-    if (typeof picked === "string") {
+    if (typeof picked === 'string') {
       await api.addCopy(task.id, picked);
       onRefresh();
     }
@@ -245,16 +245,16 @@ function TaskInspector({
 
   const addLink = async () => {
     const res = await openModal({
-      icon: "add_link",
-      title: "Add link",
-      input: { placeholder: "https:// or /absolute/path" },
+      icon: 'add_link',
+      title: 'Add link',
+      input: { placeholder: 'https:// or /absolute/path' },
       buttons: [
-        { id: "cancel", label: "Cancel", variant: "ghost" },
-        { id: "add", label: "Add", variant: "primary" },
+        { id: 'cancel', label: 'Cancel', variant: 'ghost' },
+        { id: 'add', label: 'Add', variant: 'primary' },
       ],
     });
     const value = res.value?.trim();
-    if (res.buttonId !== "add" || !value) return;
+    if (res.buttonId !== 'add' || !value) return;
     await api.addReference(task.id, referenceName(value), value);
     onRefresh();
   };
@@ -267,15 +267,15 @@ function TaskInspector({
   const renameAttachment = async (a: Attachment) => {
     const { base, ext } = splitFileName(a.name);
     const name = await promptName({
-      title: "Rename attachment",
-      icon: "drive_file_rename_outline",
+      title: 'Rename attachment',
+      icon: 'drive_file_rename_outline',
       message:
-        a.link_type === "copy"
-          ? "The stored file is renamed to match."
-          : "Renames the reference label; the linked file is untouched.",
+        a.link_type === 'copy'
+          ? 'The stored file is renamed to match.'
+          : 'Renames the reference label; the linked file is untouched.',
       initialValue: base,
       suffix: ext ? `.${ext}` : undefined,
-      confirmLabel: "Rename",
+      confirmLabel: 'Rename',
     });
     if (!name || name === a.name) return;
     const updated = await api.renameAttachment(a.id, name);
@@ -286,9 +286,9 @@ function TaskInspector({
   const removeAttachment = async (a: Attachment) => {
     const ok = await confirmModal({
       danger: true,
-      title: "Remove attachment?",
+      title: 'Remove attachment?',
       message: a.name,
-      confirmLabel: "Remove",
+      confirmLabel: 'Remove',
     });
     if (!ok) return;
     await api.deleteAttachment(a.id);
@@ -301,33 +301,33 @@ function TaskInspector({
       x: e.clientX,
       y: e.clientY,
       items: [
-        { id: "rename", label: "Rename…", icon: "drive_file_rename_outline" },
-        { id: "open", label: "Open", icon: "open_in_new" },
+        { id: 'rename', label: 'Rename…', icon: 'drive_file_rename_outline' },
+        { id: 'open', label: 'Open', icon: 'open_in_new' },
         ...(isRemote(a.location)
           ? []
-          : [{ id: "reveal", label: "Reveal in Finder", icon: "folder_open" }]),
+          : [{ id: 'reveal', label: 'Reveal in Finder', icon: 'folder_open' }]),
         {
-          id: "remove",
-          label: "Remove",
-          icon: "delete",
+          id: 'remove',
+          label: 'Remove',
+          icon: 'delete',
           danger: true,
           dividerAbove: true,
         },
       ],
       onPick: (id) => {
-        if (id === "rename") renameAttachment(a);
-        if (id === "open") api.openAttachment(a);
-        if (id === "reveal") api.revealAttachment(a);
-        if (id === "remove") removeAttachment(a);
+        if (id === 'rename') renameAttachment(a);
+        if (id === 'open') api.openAttachment(a);
+        if (id === 'reveal') api.revealAttachment(a);
+        if (id === 'remove') removeAttachment(a);
       },
     });
   };
 
   return (
-    <div className="flex min-h-0 flex-1 animate-rise flex-col">
+    <div className="animate-rise flex min-h-0 flex-1 flex-col">
       <div className="relative shrink-0 p-4">
         {/* Index tick: the panel "receives" the selection. */}
-        <span className="absolute left-0 top-4.75 h-4 w-0.5 bg-accent-500l dark:bg-accent-500d" />
+        <span className="bg-accent-500l dark:bg-accent-500d absolute top-4.75 left-0 h-4 w-0.5" />
         <div className="flex items-start gap-2.5">
           <div className="mt-0.5">
             <DoneCheckbox
@@ -344,13 +344,13 @@ function TaskInspector({
                 onChange={(e) => setTitleDraft(e.target.value)}
                 onBlur={commitTitle}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") commitTitle();
-                  if (e.key === "Escape") {
+                  if (e.key === 'Enter') commitTitle();
+                  if (e.key === 'Escape') {
                     setTitleDraft(task.title);
                     setEditingTitle(false);
                   }
                 }}
-                className="-mx-1 w-[calc(100%+8px)] rounded-field bg-surface-0l dark:bg-surface-0d px-1 font-display text-[18px] font-semibold leading-6 text-content-1l dark:text-content-1d outline-none"
+                className="rounded-field bg-surface-0l dark:bg-surface-0d font-display text-content-1l dark:text-content-1d -mx-1 w-[calc(100%+8px)] px-1 text-[18px] leading-6 font-semibold outline-none"
               />
             ) : (
               <button
@@ -359,24 +359,26 @@ function TaskInspector({
                   setEditingTitle(true);
                 }}
                 title="Click to edit"
-                className="block w-full text-left font-display text-[18px] font-semibold leading-6 text-content-1l dark:text-content-1d"
+                className="font-display text-content-1l dark:text-content-1d block w-full text-left text-[18px] leading-6 font-semibold"
               >
                 {task.title}
               </button>
             )}
-            <div className="mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums text-content-3l dark:text-content-3d">
+            <div className="text-content-3l dark:text-content-3d mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums">
               <span className="flex items-center gap-1.5">
                 <Icon
                   name="folder_open"
                   size={13}
                   weight={300}
-                  className="shrink-0 text-content-3l dark:text-content-3d"
+                  className="text-content-3l dark:text-content-3d shrink-0"
                 />
-                <span className="truncate text-content-2l dark:text-content-2d">
-                  {projectName ?? "—"}
+                <span className="text-content-2l dark:text-content-2d truncate">
+                  {projectName ?? '—'}
                 </span>
                 {listName && (
-                  <span className="shrink-0 text-content-3l dark:text-content-3d">/ {listName}</span>
+                  <span className="text-content-3l dark:text-content-3d shrink-0">
+                    / {listName}
+                  </span>
                 )}
               </span>
               <span
@@ -387,7 +389,7 @@ function TaskInspector({
                   name="schedule"
                   size={13}
                   weight={300}
-                  className="shrink-0 text-content-3l dark:text-content-3d"
+                  className="text-content-3l dark:text-content-3d shrink-0"
                 />
                 Created {relativeTime(task.created_at)}
               </span>
@@ -399,7 +401,7 @@ function TaskInspector({
                   name="update"
                   size={13}
                   weight={300}
-                  className="shrink-0 text-content-3l dark:text-content-3d"
+                  className="text-content-3l dark:text-content-3d shrink-0"
                 />
                 Updated {relativeTime(task.updated_at)}
               </span>
@@ -408,7 +410,7 @@ function TaskInspector({
           <button
             onClick={onClose}
             title="Close panel"
-            className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-field text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d -mt-1 -mr-1 grid h-6 w-6 shrink-0 place-items-center transition-colors"
           >
             <Icon name="last_page" size={16} />
           </button>
@@ -421,7 +423,7 @@ function TaskInspector({
             label="Notes"
             trailing={
               notes.length > 0 ? (
-                <span className="text-[11px] tabular-nums text-content-3l dark:text-content-3d">
+                <span className="text-content-3l dark:text-content-3d text-[11px] tabular-nums">
                   {notes.length}
                 </span>
               ) : undefined
@@ -460,7 +462,7 @@ function TaskInspector({
             ) : (
               <button
                 onClick={() => setAddingNote(true)}
-                className="flex h-24 w-full items-center justify-center gap-1.5 rounded-control bg-surface-3l dark:bg-surface-3d border border-dashed border-edge-3l dark:border-edge-3d font-semibold text-content-3l dark:text-content-3d transition-colors hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d"
+                className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-3l dark:text-content-3d hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d flex h-24 w-full items-center justify-center gap-1.5 border border-dashed font-semibold transition-colors"
               >
                 <Icon name="add" size={16} />
                 Add note
@@ -474,7 +476,7 @@ function TaskInspector({
             <SectionHeader
               label="Subtasks"
               trailing={
-                <span className="text-[11.5px] tabular-nums text-content-3l dark:text-content-3d">
+                <span className="text-content-3l dark:text-content-3d text-[11.5px] tabular-nums">
                   {doneChildren} done / {children.length}
                 </span>
               }
@@ -483,7 +485,7 @@ function TaskInspector({
               {children.map((child) => (
                 <div
                   key={child.id}
-                  className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-field px-1.5 hover:bg-wash-1l dark:hover:bg-wash-1d"
+                  className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d -mx-1.5 flex h-8 items-center gap-2.5 px-1.5"
                 >
                   <DoneCheckbox
                     done={child.done}
@@ -494,7 +496,9 @@ function TaskInspector({
                     onClick={() => onSelectTask(child.id)}
                     title={child.title}
                     className={`min-w-0 flex-1 truncate text-left text-[13.5px] ${
-                      child.done ? "text-content-3l dark:text-content-3d line-through" : "text-content-1l dark:text-content-1d"
+                      child.done
+                        ? 'text-content-3l dark:text-content-3d line-through'
+                        : 'text-content-1l dark:text-content-1d'
                     }`}
                   >
                     {child.title}
@@ -513,21 +517,21 @@ function TaskInspector({
                 <button
                   onClick={addScreenshot}
                   title="Capture the full screen and attach it"
-                  className="flex h-7 items-center gap-1 rounded-field px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
                 >
                   <Icon name="screenshot_monitor" size={14} />
                   Shot
                 </button>
                 <button
                   onClick={addLink}
-                  className="flex h-7 items-center gap-1 rounded-field px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
                 >
                   <Icon name="add_link" size={14} />
                   Link
                 </button>
                 <button
                   onClick={addFile}
-                  className="flex h-7 items-center gap-1 rounded-field px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
                 >
                   <Icon name="note_add" size={14} />
                   File
@@ -549,9 +553,9 @@ function TaskInspector({
                       draggable
                       onDragStart={(e) => {
                         e.dataTransfer.setData(ATTACHMENT_MIME, a.name);
-                        e.dataTransfer.effectAllowed = "copy";
+                        e.dataTransfer.effectAllowed = 'copy';
                       }}
-                      className="group relative block aspect-square w-full overflow-hidden rounded-control border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d transition-colors hover:border-edge-3l dark:hover:border-edge-3d"
+                      className="group rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d hover:border-edge-3l dark:hover:border-edge-3d relative block aspect-square w-full overflow-hidden border transition-colors"
                     >
                       {thumb ? (
                         <img
@@ -569,11 +573,11 @@ function TaskInspector({
                           />
                         </span>
                       )}
-                      <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-surface-3l dark:bg-surface-3d text-content-2l dark:text-content-2d opacity-0 transition-opacity group-hover:opacity-100">
+                      <span className="bg-surface-3l dark:bg-surface-3d text-content-2l dark:text-content-2d absolute top-1 right-1 grid h-5 w-5 place-items-center rounded-full opacity-0 transition-opacity group-hover:opacity-100">
                         <Icon name="open_in_full" size={14} />
                       </span>
                     </button>
-                    <div className="mt-1 truncate text-center text-[11px] text-content-3l dark:text-content-3d">
+                    <div className="text-content-3l dark:text-content-3d mt-1 truncate text-center text-[11px]">
                       {a.name}
                     </div>
                   </div>
@@ -583,10 +587,10 @@ function TaskInspector({
           )}
         </div>
 
-        <div className="mt-auto border-t border-edge-1l dark:border-edge-1d p-4">
+        <div className="border-edge-1l dark:border-edge-1d mt-auto border-t p-4">
           <button
             onClick={() => onRequestDelete(task)}
-            className="flex h-8 items-center gap-1.5 rounded-field px-3 text-[13px] font-semibold text-danger-500l dark:text-danger-500d transition-colors hover:bg-danger-100l dark:hover:bg-danger-100d"
+            className="rounded-field text-danger-500l dark:text-danger-500d hover:bg-danger-100l dark:hover:bg-danger-100d flex h-8 items-center gap-1.5 px-3 text-[13px] font-semibold transition-colors"
           >
             <Icon name="delete" size={15} />
             Delete task
@@ -614,7 +618,7 @@ function TaskInspector({
 export function PreviewPanel(props: PreviewPanelProps) {
   const { task } = props;
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-surface-1l dark:bg-surface-1d">
+    <div className="bg-surface-1l dark:bg-surface-1d flex h-full flex-col overflow-hidden">
       {task ? (
         <TaskInspector key={task.id} {...props} task={task} />
       ) : (
@@ -623,12 +627,14 @@ export function PreviewPanel(props: PreviewPanelProps) {
             name="left_click"
             size={28}
             weight={200}
-            className="mb-1 text-content-3l dark:text-content-3d"
+            className="text-content-3l dark:text-content-3d mb-1"
           />
-          <p className="font-display text-[17px] font-medium text-content-2l dark:text-content-2d">
+          <p className="font-display text-content-2l dark:text-content-2d text-[17px] font-medium">
             No task selected
           </p>
-          <p className="text-[13px] text-content-3l dark:text-content-3d">Select a task to inspect it</p>
+          <p className="text-content-3l dark:text-content-3d text-[13px]">
+            Select a task to inspect it
+          </p>
         </div>
       )}
     </div>

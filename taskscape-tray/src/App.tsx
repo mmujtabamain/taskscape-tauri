@@ -22,9 +22,13 @@ function App() {
   const titleRef = useRef<HTMLInputElement>(null);
 
   const refreshListName = () => {
-    api.activeListName().then(setListName).catch(() => {});
+    api
+      .activeListName()
+      .then(setListName)
+      .catch(() => {});
   };
-  const focusTitle = () => requestAnimationFrame(() => titleRef.current?.focus());
+  const focusTitle = () =>
+    requestAnimationFrame(() => titleRef.current?.focus());
 
   useEffect(() => {
     refreshListName();
@@ -54,7 +58,11 @@ function App() {
   const save = async () => {
     const t = title.trim();
     if (!t) return;
-    await api.submitCapture({ title: t, notes: notes.trim() || null, screenshotPaths: screenshots });
+    await api.submitCapture({
+      title: t,
+      notes: notes.trim() || null,
+      screenshotPaths: screenshots,
+    });
     setTitle("");
     setNotes("");
     setScreenshots([]);

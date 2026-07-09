@@ -2,7 +2,8 @@
 
 @font-face {
   font-family: "Montserrat";
-  src: url("./assets/fonts/Montserrat-VariableFont_wght.ttf") format("truetype-variations");
+  src: url("./assets/fonts/Montserrat-VariableFont_wght.ttf")
+    format("truetype-variations");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -10,7 +11,8 @@
 
 @font-face {
   font-family: "Outfit";
-  src: url("./assets/fonts/Outfit-VariableFont_wght.ttf") format("truetype-variations");
+  src: url("./assets/fonts/Outfit-VariableFont_wght.ttf")
+    format("truetype-variations");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -32,26 +34,37 @@
   --font-display: "Outfit", "Montserrat", ui-sans-serif, system-ui, sans-serif;
 
   /* ── Content (text) ─────────────────────────────────────── light │ dark */
-  --color-content-1l: oklch(20.5% 0 0);      --color-content-1d: #fff;                  /* neutral-900 │ white  */
-  --color-content-2l: oklch(43.9% 0 0);      --color-content-2d: rgb(255 255 255 / 0.7); /* neutral-600 │ white/70 */
-  --color-content-3l: oklch(55.6% 0 0);      --color-content-3d: rgb(255 255 255 / 0.55);/* neutral-500 │ white/55 */
-  --color-content-4l: oklch(55.6% 0 0);      --color-content-4d: rgb(255 255 255 / 0.4); /* placeholder — neutral-500 │ white/40 */
+  --color-content-1l: oklch(20.5% 0 0);
+  --color-content-1d: #fff; /* neutral-900 │ white  */
+  --color-content-2l: oklch(43.9% 0 0);
+  --color-content-2d: rgb(255 255 255 / 0.7); /* neutral-600 │ white/70 */
+  --color-content-3l: oklch(55.6% 0 0);
+  --color-content-3d: rgb(255 255 255 / 0.55); /* neutral-500 │ white/55 */
+  --color-content-4l: oklch(55.6% 0 0);
+  --color-content-4d: rgb(
+    255 255 255 / 0.4
+  ); /* placeholder — neutral-500 │ white/40 */
 
   /* ── Surface (field / button fill) ──────────────────────── light │ dark */
-  --color-surface-1l: rgb(0 0 0 / 0.05);     --color-surface-1d: rgb(255 255 255 / 0.1); /* black/5 │ white/10 */
+  --color-surface-1l: rgb(0 0 0 / 0.05);
+  --color-surface-1d: rgb(255 255 255 / 0.1); /* black/5 │ white/10 */
 
   /* ── Edges (borders) ────────────────────────────────────── light │ dark */
-  --color-edge-1l: rgb(0 0 0 / 0.1);         --color-edge-1d: rgb(255 255 255 / 0.1);   /* black/10 │ white/10 */
-  --color-edge-2l: rgb(0 0 0 / 0.15);        --color-edge-2d: rgb(255 255 255 / 0.4);   /* black/15 │ white/40 */
-  --color-edge-3l: rgb(0 0 0 / 0.4);         --color-edge-3d: rgb(255 255 255 / 0.3);   /* focus — black/40 │ white/30 */
+  --color-edge-1l: rgb(0 0 0 / 0.1);
+  --color-edge-1d: rgb(255 255 255 / 0.1); /* black/10 │ white/10 */
+  --color-edge-2l: rgb(0 0 0 / 0.15);
+  --color-edge-2d: rgb(255 255 255 / 0.4); /* black/15 │ white/40 */
+  --color-edge-3l: rgb(0 0 0 / 0.4);
+  --color-edge-3d: rgb(255 255 255 / 0.3); /* focus — black/40 │ white/30 */
 
   /* ── Accent (indigo, invariant across themes) ───────────────────────────── */
-  --color-accent-400: oklch(67.3% 0.182 276.935);   /* indigo-400 */
-  --color-accent-500: oklch(58.5% 0.233 277.117);   /* indigo-500 */
+  --color-accent-400: oklch(67.3% 0.182 276.935); /* indigo-400 */
+  --color-accent-500: oklch(58.5% 0.233 277.117); /* indigo-500 */
   --color-on-accent: #fff;
 
   /* ── Halo (contrast ring around the count badge) ────────── light │ dark */
-  --color-halo-1l: rgb(255 255 255 / 0.7);   --color-halo-1d: rgb(0 0 0 / 0.4);         /* white/70 │ black/40 */
+  --color-halo-1l: rgb(255 255 255 / 0.7);
+  --color-halo-1d: rgb(0 0 0 / 0.4); /* white/70 │ black/40 */
 
   /* ── Corner radius — one --rounding knob (same convention as the main app) →
      rounded-field / rounded-control / rounded-panel. --rounding: 0 squares all. */

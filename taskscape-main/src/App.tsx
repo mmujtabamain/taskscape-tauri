@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { TitleBar } from "./components/TitleBar";
-import { TaskPane } from "./components/TaskPane";
-import { PreviewPanel } from "./components/PreviewPanel";
-import { Spinner } from "./components/Spinner";
-import { ContextMenuProvider } from "./components/ContextMenu";
-import type { DropZone, RowCtx } from "./components/TaskRow";
-import { confirmModal, promptName } from "./lib/modal";
-import { suggestName } from "./lib/nameSuggest";
-import { overlayOpen } from "./lib/overlays";
-import { cmdKey } from "./lib/platform";
-import { api, type List, type Project, type Task, type TaskPatch } from "./api";
+import { listen } from '@tauri-apps/api/event';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api, type List, type Project, type Task, type TaskPatch } from './api';
+import { ContextMenuProvider } from './components/ContextMenu';
+import { PreviewPanel } from './components/PreviewPanel';
+import { Spinner } from './components/Spinner';
+import { TaskPane } from './components/TaskPane';
+import type { DropZone, RowCtx } from './components/TaskRow';
+import { TitleBar } from './components/TitleBar';
+import { confirmModal, promptName } from './lib/modal';
+import { suggestName } from './lib/nameSuggest';
+import { overlayOpen } from './lib/overlays';
+import { cmdKey } from './lib/platform';
 
 const effSort = (t: Task) => t.sort_order || t.created_at;
 
@@ -20,27 +20,38 @@ function App() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [ready, setReady] = useState(false);
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  );
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [splitListId, setSplitListId] = useState<string | null>(
-    () => localStorage.getItem("ui.split") || null,
+    () => localStorage.getItem('ui.split') || null
   );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   // Which pane the user last worked in. Drives the active-tab highlight and
   // keyboard targeting when split view is open.
   const [paneFocus, setPaneFocus] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [showCompleted, setShowCompleted] = useState(true);
-  const [previewOpen, setPreviewOpen] = useState(() => localStorage.getItem("ui.preview") !== "0");
-  const [previewW, setPreviewW] = useState(() => Number(localStorage.getItem("ui.previewW")) || 320);
-  const [splitRatio, setSplitRatio] = useState(() => Number(localStorage.getItem("ui.splitRatio")) || 0.5);
+  const [previewOpen, setPreviewOpen] = useState(
+    () => localStorage.getItem('ui.preview') !== '0'
+  );
+  const [previewW, setPreviewW] = useState(
+    () => Number(localStorage.getItem('ui.previewW')) || 320
+  );
+  const [splitRatio, setSplitRatio] = useState(
+    () => Number(localStorage.getItem('ui.splitRatio')) || 0.5
+  );
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [composeFor, setComposeFor] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ taskId: string; zone: DropZone } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    taskId: string;
+    zone: DropZone;
+  } | null>(null);
 
   const searchRef = useRef<HTMLInputElement | null>(null);
   const composers = useRef(new Map<string, (seed?: string) => void>());
@@ -57,14 +68,15 @@ function App() {
   }, [activeListId]);
 
   const load = useCallback(async () => {
-    const [fetchedProjects, lists, tasks, activeProject, activeList, showDone] = await Promise.all([
-      api.listProjects(),
-      api.listLists(),
-      api.allTasks(),
-      api.getSetting("last_active_project"),
-      api.getSetting("last_active_list"),
-      api.getSetting("show_completed"),
-    ]);
+    const [fetchedProjects, lists, tasks, activeProject, activeList, showDone] =
+      await Promise.all([
+        api.listProjects(),
+        api.listLists(),
+        api.allTasks(),
+        api.getSetting('last_active_project'),
+        api.getSetting('last_active_list'),
+        api.getSetting('show_completed'),
+      ]);
 
     // A brand-new database has no projects yet — seed one so lists have a home.
     let nextProjects = fetchedProjects;
@@ -75,7 +87,7 @@ function App() {
     setProjects(nextProjects);
     setAllLists(lists);
     setAllTasks(tasks);
-    setShowCompleted(showDone !== "0");
+    setShowCompleted(showDone !== '0');
 
     const curP = projectIdRef.current;
     const projectId =
@@ -96,7 +108,9 @@ function App() {
           : (inProject[0]?.id ?? null);
     setActiveListId(listId);
 
-    setSplitListId((s) => (s && s !== listId && inProject.some((l) => l.id === s) ? s : null));
+    setSplitListId((s) =>
+      s && s !== listId && inProject.some((l) => l.id === s) ? s : null
+    );
     setSelectedTaskId((t) => (t && tasks.some((x) => x.id === t) ? t : null));
     setReady(true);
   }, []);
@@ -107,8 +121,8 @@ function App() {
 
   // Reload when the tray process captures a task into the shared database.
   useEffect(() => {
-    const un1 = listen("refresh", () => load());
-    const un2 = listen("settings-changed", () => load());
+    const un1 = listen('refresh', () => load());
+    const un2 = listen('settings-changed', () => load());
     return () => {
       un1.then((fn) => fn());
       un2.then((fn) => fn());
@@ -118,24 +132,25 @@ function App() {
   // Remember the active project/list so we can restore them next launch, and so
   // tray captures land in the last-used list.
   useEffect(() => {
-    if (selectedProjectId) api.setActiveProject(selectedProjectId).catch(() => {});
+    if (selectedProjectId)
+      api.setActiveProject(selectedProjectId).catch(() => {});
   }, [selectedProjectId]);
   useEffect(() => {
     if (activeListId) api.setActiveList(activeListId).catch(() => {});
   }, [activeListId]);
 
   useEffect(() => {
-    if (splitListId) localStorage.setItem("ui.split", splitListId);
-    else localStorage.removeItem("ui.split");
+    if (splitListId) localStorage.setItem('ui.split', splitListId);
+    else localStorage.removeItem('ui.split');
   }, [splitListId]);
   useEffect(() => {
-    localStorage.setItem("ui.preview", previewOpen ? "1" : "0");
+    localStorage.setItem('ui.preview', previewOpen ? '1' : '0');
   }, [previewOpen]);
   useEffect(() => {
-    localStorage.setItem("ui.previewW", String(previewW));
+    localStorage.setItem('ui.previewW', String(previewW));
   }, [previewW]);
   useEffect(() => {
-    localStorage.setItem("ui.splitRatio", String(splitRatio));
+    localStorage.setItem('ui.splitRatio', String(splitRatio));
   }, [splitRatio]);
 
   // ----- derived data -----
@@ -165,13 +180,14 @@ function App() {
 
   const listsInProject = useMemo(
     () => allLists.filter((l) => l.project_id === selectedProjectId),
-    [allLists, selectedProjectId],
+    [allLists, selectedProjectId]
   );
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const t of allTasks) {
-      if (t.parent_id == null && !t.done) c[t.list_id] = (c[t.list_id] ?? 0) + 1;
+      if (t.parent_id == null && !t.done)
+        c[t.list_id] = (c[t.list_id] ?? 0) + 1;
     }
     return c;
   }, [allTasks]);
@@ -196,7 +212,10 @@ function App() {
     if (!query) return null;
     const s = new Set<string>();
     for (const t of allTasks) {
-      if (t.title.toLowerCase().includes(query) || t.notes?.toLowerCase().includes(query)) {
+      if (
+        t.title.toLowerCase().includes(query) ||
+        t.notes?.toLowerCase().includes(query)
+      ) {
         s.add(t.id);
         let p = t.parent_id;
         while (p && !s.has(p)) {
@@ -214,26 +233,29 @@ function App() {
       if (!showCompleted && t.done && !hasPendingDesc.has(t.id)) return false;
       return true;
     },
-    [searchSet, showCompleted, hasPendingDesc],
+    [searchSet, showCompleted, hasPendingDesc]
   );
 
   const activeList = listsInProject.find((l) => l.id === activeListId) ?? null;
   const splitList = listsInProject.find((l) => l.id === splitListId) ?? null;
-  const selectedTask = selectedTaskId ? (taskById[selectedTaskId] ?? null) : null;
+  const selectedTask = selectedTaskId
+    ? (taskById[selectedTaskId] ?? null)
+    : null;
 
   // The focused pane's list — one of the two visible panes, falling back to the
   // left (active) pane whenever `paneFocus` points at a list that isn't on
   // screen (e.g. after a project switch or closing the split).
   const focusedListId =
-    paneFocus != null && (paneFocus === activeListId || paneFocus === splitListId)
+    paneFocus != null &&
+    (paneFocus === activeListId || paneFocus === splitListId)
       ? paneFocus
       : activeListId;
 
   // ----- mutations -----
   const createProject = async () => {
     const name = await promptName({
-      title: "New project",
-      icon: "create_new_folder",
+      title: 'New project',
+      icon: 'create_new_folder',
       placeholder: suggestName(),
     });
     if (!name) return;
@@ -245,10 +267,10 @@ function App() {
 
   const renameProject = async (project: Project) => {
     const name = await promptName({
-      title: "Rename project",
-      icon: "edit",
+      title: 'Rename project',
+      icon: 'edit',
       initialValue: project.name,
-      confirmLabel: "Rename",
+      confirmLabel: 'Rename',
     });
     if (!name || name === project.name) return;
     await api.renameProject(project.id, name);
@@ -256,13 +278,17 @@ function App() {
   };
 
   const deleteProject = async (project: Project) => {
-    const listIds = allLists.filter((l) => l.project_id === project.id).map((l) => l.id);
-    const taskCount = allTasks.filter((t) => listIds.includes(t.list_id)).length;
+    const listIds = allLists
+      .filter((l) => l.project_id === project.id)
+      .map((l) => l.id);
+    const taskCount = allTasks.filter((t) =>
+      listIds.includes(t.list_id)
+    ).length;
     const ok = await confirmModal({
       danger: true,
       title: `Delete “${project.name}”?`,
-      message: `Its ${listIds.length} list${listIds.length === 1 ? "" : "s"} and ${taskCount} task${taskCount === 1 ? "" : "s"} are deleted with it. This cannot be undone.`,
-      confirmLabel: "Delete project",
+      message: `Its ${listIds.length} list${listIds.length === 1 ? '' : 's'} and ${taskCount} task${taskCount === 1 ? '' : 's'} are deleted with it. This cannot be undone.`,
+      confirmLabel: 'Delete project',
     });
     if (!ok) return;
     await api.deleteProject(project.id);
@@ -276,8 +302,8 @@ function App() {
   const createList = async () => {
     if (!selectedProjectId) return;
     const name = await promptName({
-      title: "New list",
-      icon: "list_alt_add",
+      title: 'New list',
+      icon: 'list_alt_add',
       placeholder: suggestName(),
     });
     if (!name) return;
@@ -293,14 +319,24 @@ function App() {
 
   // Tab reorder: rewrite every tab's sort_order to evenly spaced integers in the
   // new visual order. Lists are few, so a full rebuild is cheap and collision-free.
-  const reorderList = async (draggedId: string, targetId: string, before: boolean) => {
+  const reorderList = async (
+    draggedId: string,
+    targetId: string,
+    before: boolean
+  ) => {
     const dragged = listsInProject.find((l) => l.id === draggedId);
     const rest = listsInProject.filter((l) => l.id !== draggedId);
     const targetIdx = rest.findIndex((l) => l.id === targetId);
     if (!dragged || targetIdx < 0) return;
     const insertIdx = before ? targetIdx : targetIdx + 1;
-    const ordered = [...rest.slice(0, insertIdx), dragged, ...rest.slice(insertIdx)];
-    await Promise.all(ordered.map((l, i) => api.reorderList(l.id, (i + 1) * 1000)));
+    const ordered = [
+      ...rest.slice(0, insertIdx),
+      dragged,
+      ...rest.slice(insertIdx),
+    ];
+    await Promise.all(
+      ordered.map((l, i) => api.reorderList(l.id, (i + 1) * 1000))
+    );
     await load();
   };
 
@@ -311,9 +347,9 @@ function App() {
       title: `Delete “${list.name}”?`,
       message:
         taskCount > 0
-          ? `Its ${taskCount} task${taskCount === 1 ? "" : "s"} are deleted with it. This cannot be undone.`
-          : "The list is empty. This cannot be undone.",
-      confirmLabel: "Delete list",
+          ? `Its ${taskCount} task${taskCount === 1 ? '' : 's'} are deleted with it. This cannot be undone.`
+          : 'The list is empty. This cannot be undone.',
+      confirmLabel: 'Delete list',
     });
     if (!ok) return;
     await api.deleteList(list.id);
@@ -353,19 +389,19 @@ function App() {
       const kids = childrenByParent[id] ?? [];
       return kids.reduce((n, k) => n + 1 + subtreeSize(k.id), 0);
     },
-    [childrenByParent],
+    [childrenByParent]
   );
 
   const requestDeleteTask = async (task: Task) => {
     const subs = subtreeSize(task.id);
     const ok = await confirmModal({
       danger: true,
-      title: "Delete task?",
+      title: 'Delete task?',
       message:
         `“${task.title}”` +
-        (subs > 0 ? ` and its ${subs} subtask${subs === 1 ? "" : "s"}` : "") +
-        " will be permanently deleted.",
-      confirmLabel: "Delete",
+        (subs > 0 ? ` and its ${subs} subtask${subs === 1 ? '' : 's'}` : '') +
+        ' will be permanently deleted.',
+      confirmLabel: 'Delete',
     });
     if (!ok) return;
     await api.deleteTask(task.id);
@@ -377,7 +413,7 @@ function App() {
     id: string,
     parentId: string | null,
     listId: string | null,
-    sortOrder?: number,
+    sortOrder?: number
   ) => {
     await api.moveTask(id, parentId, listId, sortOrder);
     await load();
@@ -392,22 +428,24 @@ function App() {
       }
       return false;
     },
-    [taskById],
+    [taskById]
   );
 
   const dropOnRow = async (draggedId: string, target: Task, zone: DropZone) => {
     if (isInSubtree(target.id, draggedId)) return;
-    if (zone === "nest") {
+    if (zone === 'nest') {
       moveTask(draggedId, target.id, null);
       return;
     }
     const parentId = target.parent_id;
     const listArg = parentId ? null : target.list_id;
     const siblings = (
-      parentId ? (childrenByParent[parentId] ?? []) : (rootsByList[target.list_id] ?? [])
+      parentId
+        ? (childrenByParent[parentId] ?? [])
+        : (rootsByList[target.list_id] ?? [])
     ).filter((t) => t.id !== draggedId);
     const targetIdx = siblings.findIndex((t) => t.id === target.id);
-    const insertIdx = zone === "before" ? targetIdx : targetIdx + 1;
+    const insertIdx = zone === 'before' ? targetIdx : targetIdx + 1;
     const prev = siblings[insertIdx - 1];
     const next = siblings[insertIdx];
 
@@ -415,11 +453,17 @@ function App() {
     // many reorders): rebuild the whole group at evenly spaced integers with the
     // dragged task in its new slot, instead of trusting a colliding midpoint.
     if (prev && next && effSort(next) - effSort(prev) < 1) {
-      const ordered = [...siblings.slice(0, insertIdx), null, ...siblings.slice(insertIdx)];
+      const ordered = [
+        ...siblings.slice(0, insertIdx),
+        null,
+        ...siblings.slice(insertIdx),
+      ];
       await Promise.all(
         ordered.map((t, i) =>
-          t ? api.reorderTask(t.id, (i + 1) * 1000) : api.moveTask(draggedId, parentId, listArg, (i + 1) * 1000),
-        ),
+          t
+            ? api.reorderTask(t.id, (i + 1) * 1000)
+            : api.moveTask(draggedId, parentId, listArg, (i + 1) * 1000)
+        )
       );
       load();
       return;
@@ -500,12 +544,13 @@ function App() {
       const walk = (t: Task) => {
         out.push(t);
         if (query || !collapsed.has(t.id))
-          for (const c of (childrenByParent[t.id] ?? []).filter(isVisible)) walk(c);
+          for (const c of (childrenByParent[t.id] ?? []).filter(isVisible))
+            walk(c);
       };
       for (const r of (rootsByList[listId] ?? []).filter(isVisible)) walk(r);
       return out;
     },
-    [rootsByList, childrenByParent, isVisible, collapsed, query],
+    [rootsByList, childrenByParent, isVisible, collapsed, query]
   );
 
   const registerComposer = useCallback(
@@ -513,7 +558,7 @@ function App() {
       if (focus) composers.current.set(listId, focus);
       else composers.current.delete(listId);
     },
-    [],
+    []
   );
 
   // ----- keyboard -----
@@ -521,32 +566,34 @@ function App() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       const typing =
-        el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.isContentEditable;
 
       if (cmdKey(e)) {
-        if (e.key === "f") {
+        if (e.key === 'f') {
           e.preventDefault();
           searchRef.current?.focus();
           searchRef.current?.select();
           return;
         }
-        if (e.key === "n") {
+        if (e.key === 'n') {
           e.preventDefault();
           const target = focusedListId;
           if (target) composers.current.get(target)?.();
           return;
         }
-        if (e.key === ",") {
+        if (e.key === ',') {
           e.preventDefault();
           api.openSettings();
           return;
         }
-        if (e.key === "\\") {
+        if (e.key === '\\') {
           e.preventDefault();
           setPreviewOpen((v) => !v);
           return;
         }
-        if (!typing && e.key >= "1" && e.key <= "9") {
+        if (!typing && e.key >= '1' && e.key <= '9') {
           const list = listsInProject[Number(e.key) - 1];
           if (list) {
             e.preventDefault();
@@ -554,7 +601,7 @@ function App() {
           }
           return;
         }
-        if (!typing && e.key === "Backspace" && selectedTask) {
+        if (!typing && e.key === 'Backspace' && selectedTask) {
           e.preventDefault();
           requestDeleteTask(selectedTask);
           return;
@@ -563,7 +610,7 @@ function App() {
 
       if (typing) return;
 
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         const listId = focusedListId;
         if (!listId) return;
         const flat = flattenVisible(listId);
@@ -571,20 +618,20 @@ function App() {
         e.preventDefault();
         const idx = flat.findIndex((t) => t.id === selectedTaskId);
         const next =
-          e.key === "ArrowDown"
+          e.key === 'ArrowDown'
             ? flat[Math.min(idx + 1, flat.length - 1)]
             : flat[Math.max(idx - 1, 0)];
         setSelectedTaskId(next.id);
         document
           .querySelector(`[data-task-id="${CSS.escape(next.id)}"]`)
-          ?.scrollIntoView({ block: "nearest" });
-      } else if (e.key === " " && selectedTask) {
+          ?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === ' ' && selectedTask) {
         e.preventDefault();
         toggleDone(selectedTask);
-      } else if ((e.key === "F2" || e.key === "Enter") && selectedTask) {
+      } else if ((e.key === 'F2' || e.key === 'Enter') && selectedTask) {
         e.preventDefault();
         setRenamingId(selectedTask.id);
-      } else if (e.key === "Escape") {
+      } else if (e.key === 'Escape') {
         // A menu/dropdown is dismissing itself on this same Escape — don't also
         // clear the selection out from under the user.
         if (!overlayOpen()) setSelectedTaskId(null);
@@ -605,14 +652,14 @@ function App() {
         }
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   });
 
   // ----- layout -----
   return (
     <ContextMenuProvider>
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-1l dark:bg-surface-1d text-content-1l dark:text-content-1d">
+      <div className="bg-surface-1l dark:bg-surface-1d text-content-1l dark:text-content-1d flex h-screen w-screen flex-col overflow-hidden">
         <TitleBar
           projects={projects}
           selectedProjectId={selectedProjectId}
@@ -652,7 +699,9 @@ function App() {
             <div className="flex min-w-0 flex-1">
               <div
                 className="flex min-w-0"
-                style={{ flexBasis: splitList ? `${splitRatio * 100}%` : "100%" }}
+                style={{
+                  flexBasis: splitList ? `${splitRatio * 100}%` : '100%',
+                }}
               >
                 <TaskPane
                   list={activeList}
@@ -671,11 +720,14 @@ function App() {
                   <Resizer
                     onResize={(x, rect) =>
                       setSplitRatio(
-                        Math.min(0.75, Math.max(0.25, (x - rect.left) / rect.width)),
+                        Math.min(
+                          0.75,
+                          Math.max(0.25, (x - rect.left) / rect.width)
+                        )
                       )
                     }
                   />
-                  <div className="flex min-w-0 flex-1 border-l border-edge-2l dark:border-edge-2d">
+                  <div className="border-edge-2l dark:border-edge-2d flex min-w-0 flex-1 border-l">
                     <TaskPane
                       list={splitList}
                       roots={rootsByList[splitList.id] ?? []}
@@ -693,11 +745,13 @@ function App() {
               )}
             </div>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-surface-2l dark:bg-surface-2d">
-              <p className="font-display text-[17px] font-medium text-content-2l dark:text-content-2d">No lists yet</p>
+            <div className="bg-surface-2l dark:bg-surface-2d flex flex-1 flex-col items-center justify-center gap-3">
+              <p className="font-display text-content-2l dark:text-content-2d text-[17px] font-medium">
+                No lists yet
+              </p>
               <button
                 onClick={createList}
-                className="rounded-control bg-accent-500l dark:bg-accent-500d px-4 py-2 text-[13px] font-semibold tracking-[0.01em] text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d active:bg-accent-700l dark:active:bg-accent-700d"
+                className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent hover:bg-accent-600l dark:hover:bg-accent-600d active:bg-accent-700l dark:active:bg-accent-700d px-4 py-2 text-[13px] font-semibold tracking-[0.01em] transition-colors"
               >
                 Create your first list
               </button>
@@ -707,18 +761,30 @@ function App() {
           {previewOpen && (
             <>
               <Resizer
-                onResize={(x, rect) => setPreviewW(Math.min(420, Math.max(280, rect.right - x)))}
+                onResize={(x, rect) =>
+                  setPreviewW(Math.min(420, Math.max(280, rect.right - x)))
+                }
               />
-              <aside style={{ width: previewW }} className="shrink-0 border-l border-edge-2l dark:border-edge-2d">
+              <aside
+                style={{ width: previewW }}
+                className="border-edge-2l dark:border-edge-2d shrink-0 border-l"
+              >
                 <PreviewPanel
                   task={selectedTask}
                   childrenByParent={childrenByParent}
-                  listName={selectedTask ? (allLists.find((l) => l.id === selectedTask.list_id)?.name ?? null) : null}
+                  listName={
+                    selectedTask
+                      ? (allLists.find((l) => l.id === selectedTask.list_id)
+                          ?.name ?? null)
+                      : null
+                  }
                   projectName={
                     selectedTask
                       ? (projects.find(
                           (p) =>
-                            p.id === allLists.find((l) => l.id === selectedTask.list_id)?.project_id,
+                            p.id ===
+                            allLists.find((l) => l.id === selectedTask.list_id)
+                              ?.project_id
                         )?.name ?? null)
                       : null
                   }
@@ -735,7 +801,7 @@ function App() {
         </div>
 
         {!ready && (
-          <div className="absolute inset-0 z-overlay grid place-items-center bg-surface-1l dark:bg-surface-1d">
+          <div className="z-overlay bg-surface-1l dark:bg-surface-1d absolute inset-0 grid place-items-center">
             <Spinner size={26} label="Loading…" />
           </div>
         )}
@@ -748,28 +814,36 @@ function App() {
  *  divider tracks the pointer's absolute position (via the parent's rect), so
  *  the cursor stays pinned to the line rather than drifting with accumulated
  *  deltas. */
-function Resizer({ onResize }: { onResize: (clientX: number, rect: DOMRect) => void }) {
+function Resizer({
+  onResize,
+}: {
+  onResize: (clientX: number, rect: DOMRect) => void;
+}) {
   const [active, setActive] = useState(false);
   return (
     <div
       onMouseDown={(e) => {
         e.preventDefault();
         setActive(true);
-        const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+        const rect = (
+          e.currentTarget.parentElement as HTMLElement
+        ).getBoundingClientRect();
         const move = (ev: MouseEvent) => onResize(ev.clientX, rect);
         const up = () => {
           setActive(false);
-          window.removeEventListener("mousemove", move);
-          window.removeEventListener("mouseup", up);
+          window.removeEventListener('mousemove', move);
+          window.removeEventListener('mouseup', up);
         };
-        window.addEventListener("mousemove", move);
-        window.addEventListener("mouseup", up);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
       }}
-      className="relative z-raised -mr-1.25 w-1.25 shrink-0 cursor-col-resize"
+      className="z-raised relative -mr-1.25 w-1.25 shrink-0 cursor-col-resize"
     >
       <span
         className={`absolute inset-y-0 left-0 w-px transition-colors ${
-          active ? "bg-edge-3l dark:bg-edge-3d" : "bg-transparent hover:bg-edge-2l dark:hover:bg-edge-2d"
+          active
+            ? 'bg-edge-3l dark:bg-edge-3d'
+            : 'hover:bg-edge-2l dark:hover:bg-edge-2d bg-transparent'
         }`}
       />
     </div>

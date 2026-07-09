@@ -1,28 +1,36 @@
-import { useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { api } from "../api";
-import { Icon } from "../components/Icon";
-import type { ModalButton, ModalProps, ModalResult } from "../lib/modal";
-import { suggestName } from "../lib/nameSuggest";
+import { listen } from '@tauri-apps/api/event';
+import { useEffect, useRef, useState } from 'react';
+import { api } from '../api';
+import { Icon } from '../components/Icon';
+import type { ModalButton, ModalProps, ModalResult } from '../lib/modal';
+import { suggestName } from '../lib/nameSuggest';
 
 const WIDTH = 340;
 
 const BTN =
-  "h-7 rounded-field px-3.5 text-[12px] font-semibold tracking-[0.02em] transition duration-150";
-const BTN_VARIANT: Record<NonNullable<ModalButton["variant"]>, string> = {
-  ghost: "border border-edge-2l dark:border-edge-2d text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d",
-  primary: "bg-content-1l dark:bg-content-1d text-surface-2l dark:text-surface-2d hover:opacity-90 active:scale-[0.98]",
-  danger: "bg-danger-500l dark:bg-danger-500d text-on-accent hover:bg-danger-600l dark:hover:bg-danger-600d",
+  'h-7 rounded-field px-3.5 text-[12px] font-semibold tracking-[0.02em] transition duration-150';
+const BTN_VARIANT: Record<NonNullable<ModalButton['variant']>, string> = {
+  ghost:
+    'border border-edge-2l dark:border-edge-2d text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d',
+  primary:
+    'bg-content-1l dark:bg-content-1d text-surface-2l dark:text-surface-2d hover:opacity-90 active:scale-[0.98]',
+  danger:
+    'bg-danger-500l dark:bg-danger-500d text-on-accent hover:bg-danger-600l dark:hover:bg-danger-600d',
 };
 
 // The global reduced-motion rule zeroes animation durations, which would make
 // the drain's animationend fire instantly — skip auto-dismiss entirely instead.
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reducedMotion = window.matchMedia(
+  '(prefers-reduced-motion: reduce)'
+).matches;
 
 /** One reusable panel window serves every modal (it is hidden, never
  *  destroyed): fetch the pending modal on load and again on each re-present. */
 export function ModalWindow() {
-  const [current, setCurrent] = useState<{ id: string; props: ModalProps } | null>(null);
+  const [current, setCurrent] = useState<{
+    id: string;
+    props: ModalProps;
+  } | null>(null);
 
   useEffect(() => {
     let stale = false;
@@ -34,15 +42,20 @@ export function ModalWindow() {
         })
         .catch(() => {});
     fetch();
-    const un = listen("modal-refresh", fetch);
+    const un = listen('modal-refresh', fetch);
     return () => {
       stale = true;
       un.then((fn) => fn());
     };
   }, []);
 
-  if (!current) return <div className="h-screen w-screen bg-surface-3l dark:bg-surface-3d" />;
-  return <ModalContent key={current.id} id={current.id} props={current.props} />;
+  if (!current)
+    return (
+      <div className="bg-surface-3l dark:bg-surface-3d h-screen w-screen" />
+    );
+  return (
+    <ModalContent key={current.id} id={current.id} props={current.props} />
+  );
 }
 
 function ModalContent({ id, props }: { id: string; props: ModalProps }) {
@@ -58,8 +71,8 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
 
   const [value, setValue] = useState(() =>
     props.input
-      ? (props.input.initialValue ?? (props.input.suggest ? suggestName() : ""))
-      : "",
+      ? (props.input.initialValue ?? (props.input.suggest ? suggestName() : ''))
+      : ''
   );
   // Mirror the committed initial state. Never assign this ref inside the
   // useState initializer: StrictMode double-invokes initializers, so a second
@@ -71,7 +84,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
     const trimmed = valueRef.current.trim();
-    const value = trimmed ? trimmed + (props.input?.suffix ?? "") : undefined;
+    const value = trimmed ? trimmed + (props.input?.suffix ?? '') : undefined;
     const result: ModalResult = { buttonId, value };
     if (timedOut) result.timedOut = true;
     void api.closeModal(id, result);
@@ -126,34 +139,36 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       cancelDrain();
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         e.preventDefault();
         resolve(null);
-      } else if (e.key === "Enter") {
+      } else if (e.key === 'Enter') {
         e.preventDefault();
         const last = props.buttons[props.buttons.length - 1];
         if (last) press(last, true);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [props]);
 
   return (
     <div
       data-tauri-drag-region
-      className="relative h-screen w-screen overflow-hidden border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d"
+      className="border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d relative h-screen w-screen overflow-hidden border"
       onPointerEnter={() => setDrainPaused(true)}
       onPointerLeave={() => setDrainPaused(false)}
     >
-      <style>{"@keyframes modal-in { from { opacity: 0; transform: scale(0.97); } }"}</style>
+      <style>
+        {'@keyframes modal-in { from { opacity: 0; transform: scale(0.97); } }'}
+      </style>
       <div
         ref={contentRef}
         data-tauri-drag-region
         className="w-full p-5"
         style={
           presented
-            ? { animation: "modal-in 180ms cubic-bezier(0.2, 0, 0, 1) both" }
+            ? { animation: 'modal-in 180ms cubic-bezier(0.2, 0, 0, 1) both' }
             : { opacity: 0 }
         }
       >
@@ -162,19 +177,25 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
             <Icon
               name={props.icon}
               size={20}
-              className={props.tone === "danger" ? "text-danger-500l dark:text-danger-500d" : "text-accent-500l dark:text-accent-500d"}
+              className={
+                props.tone === 'danger'
+                  ? 'text-danger-500l dark:text-danger-500d'
+                  : 'text-accent-500l dark:text-accent-500d'
+              }
             />
           )}
           <h1
             data-tauri-drag-region
-            className="font-display text-[15px] leading-5 font-semibold text-content-1l dark:text-content-1d"
+            className="font-display text-content-1l dark:text-content-1d text-[15px] leading-5 font-semibold"
           >
             {props.title}
           </h1>
         </div>
 
         {props.message && (
-          <p className="mt-2 text-[13px] leading-4.75 font-[450] text-content-2l dark:text-content-2d">{props.message}</p>
+          <p className="text-content-2l dark:text-content-2d mt-2 text-[13px] leading-4.75 font-[450]">
+            {props.message}
+          </p>
         )}
 
         {props.input && (
@@ -182,7 +203,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
             {props.input.label && (
               <label
                 htmlFor="modal-input"
-                className="mb-1.5 block text-[12px] font-medium text-content-2l dark:text-content-2d"
+                className="text-content-2l dark:text-content-2d mb-1.5 block text-[12px] font-medium"
               >
                 {props.input.label}
               </label>
@@ -191,10 +212,13 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
               {props.input.suffix ? (
                 // Locked-extension field: the name grows to fit and the greyed
                 // extension stays glued to its right; `.` is stripped as typed.
-                <div className="flex h-8 w-full items-center overflow-hidden rounded-field bg-surface-0l dark:bg-surface-0d px-2.5 text-[13px] focus-within:ring-2 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
-                  <span className="relative inline-flex min-w-[1ch] max-w-full flex-none">
-                    <span aria-hidden className="invisible overflow-hidden whitespace-pre">
-                      {value || props.input.placeholder || "​"}
+                <div className="rounded-field bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d flex h-8 w-full items-center overflow-hidden px-2.5 text-[13px] focus-within:ring-2">
+                  <span className="relative inline-flex max-w-full min-w-[1ch] flex-none">
+                    <span
+                      aria-hidden
+                      className="invisible overflow-hidden whitespace-pre"
+                    >
+                      {value || props.input.placeholder || '​'}
                     </span>
                     <input
                       id="modal-input"
@@ -207,27 +231,29 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                       onKeyDown={(e) => {
                         // Block new periods so the locked extension can't be
                         // redefined; dots already in the base are left alone.
-                        if (e.key === ".") e.preventDefault();
+                        if (e.key === '.') e.preventDefault();
                       }}
                       onPaste={(e) => {
-                        const text = e.clipboardData.getData("text");
-                        if (!text.includes(".")) return;
+                        const text = e.clipboardData.getData('text');
+                        if (!text.includes('.')) return;
                         e.preventDefault();
                         const el = e.currentTarget;
                         const start = el.selectionStart ?? el.value.length;
                         const end = el.selectionEnd ?? el.value.length;
                         setInputValue(
-                          el.value.slice(0, start) + text.replace(/\./g, "") + el.value.slice(end),
+                          el.value.slice(0, start) +
+                            text.replace(/\./g, '') +
+                            el.value.slice(end)
                         );
                       }}
                       onFocus={(e) => {
                         cancelDrain();
                         if (props.input?.initialValue) e.currentTarget.select();
                       }}
-                      className="absolute inset-0 w-full bg-transparent text-[13px] text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d outline-none"
+                      className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d absolute inset-0 w-full bg-transparent text-[13px] outline-none"
                     />
                   </span>
-                  <span className="flex-none whitespace-pre text-content-3l dark:text-content-3d select-none">
+                  <span className="text-content-3l dark:text-content-3d flex-none whitespace-pre select-none">
                     {props.input.suffix}
                   </span>
                 </div>
@@ -244,8 +270,8 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                     cancelDrain();
                     if (props.input?.initialValue) e.currentTarget.select();
                   }}
-                  className={`h-8 w-full rounded-field bg-surface-0l dark:bg-surface-0d pl-2.5 text-[13px] text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-2 focus:ring-focus-1l dark:focus:ring-focus-1d ${
-                    props.input.suggest ? "pr-8" : "pr-2.5"
+                  className={`rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-focus-1l dark:focus:ring-focus-1d h-8 w-full pl-2.5 text-[13px] focus:ring-2 ${
+                    props.input.suggest ? 'pr-8' : 'pr-2.5'
                   }`}
                 />
               )}
@@ -256,7 +282,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                   aria-label="Suggest another name"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={rollSuggestion}
-                  className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-field text-content-3l dark:text-content-3d transition duration-150 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
+                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center transition duration-150"
                 >
                   <Icon name="casino" size={16} />
                 </button>
@@ -271,7 +297,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
               key={b.id}
               type="button"
               onClick={() => press(b, i === props.buttons.length - 1)}
-              className={`${BTN} ${BTN_VARIANT[b.variant ?? "ghost"]}`}
+              className={`${BTN} ${BTN_VARIANT[b.variant ?? 'ghost']}`}
             >
               {b.label}
             </button>
@@ -281,10 +307,13 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
 
       {props.timeoutMs != null && !reducedMotion && (
         <div
-          className="pointer-events-none absolute inset-x-5 bottom-0 h-0.5 origin-left bg-accent-500l dark:bg-accent-500d transition-opacity duration-200"
+          className="bg-accent-500l dark:bg-accent-500d pointer-events-none absolute inset-x-5 bottom-0 h-0.5 origin-left transition-opacity duration-200"
           style={{
-            animation: presented ? `drain ${props.timeoutMs}ms linear forwards` : "none",
-            animationPlayState: drainPaused || drainCancelled ? "paused" : "running",
+            animation: presented
+              ? `drain ${props.timeoutMs}ms linear forwards`
+              : 'none',
+            animationPlayState:
+              drainPaused || drainCancelled ? 'paused' : 'running',
             opacity: drainCancelled ? 0 : drainPaused ? 0.25 : 0.45,
           }}
           onAnimationEnd={() => {

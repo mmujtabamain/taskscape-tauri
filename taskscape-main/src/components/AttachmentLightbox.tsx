@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
-import { api, type Attachment } from "../api";
-import { attachmentSrc, fileKindFor, isRemote, previewKindFor, splitFileName } from "../lib/fileKind";
-import { confirmModal, promptName } from "../lib/modal";
-import { propagateAttachmentRename } from "../lib/mentions";
-import { setOverlay } from "../lib/overlays";
-import { Icon } from "./Icon";
+import { useEffect, useState } from 'react';
+import { api, type Attachment } from '../api';
+import {
+  attachmentSrc,
+  fileKindFor,
+  isRemote,
+  previewKindFor,
+  splitFileName,
+} from '../lib/fileKind';
+import { propagateAttachmentRename } from '../lib/mentions';
+import { confirmModal, promptName } from '../lib/modal';
+import { setOverlay } from '../lib/overlays';
+import { Icon } from './Icon';
 
 const TEXT_PREVIEW_CAP = 262144;
 
@@ -32,8 +38,10 @@ function BarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-control text-white/70 transition-colors ${
-        danger ? "hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white" : "hover:bg-white/15 hover:text-white"
+      className={`rounded-control grid h-8 w-8 shrink-0 place-items-center text-white/70 transition-colors ${
+        danger
+          ? 'hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white'
+          : 'hover:bg-white/15 hover:text-white'
       }`}
     >
       <Icon name={name} size={17} />
@@ -44,7 +52,14 @@ function BarButton({
 /** Full-window lightbox for inspecting an attachment. Arrow keys / on-screen
  *  chevrons step through the task's attachments; Escape or a backdrop click
  *  dismisses it. */
-export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDeleted, onRenamed }: Props) {
+export function AttachmentLightbox({
+  attachments,
+  index,
+  onIndex,
+  onClose,
+  onDeleted,
+  onRenamed,
+}: Props) {
   const attachment = attachments[index];
   const count = attachments.length;
   const [src, setSrc] = useState<string | null>(null);
@@ -53,8 +68,10 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   const [textFailed, setTextFailed] = useState(false);
   const [mediaFailed, setMediaFailed] = useState(false);
 
-  const kind = attachment ? fileKindFor(attachment.name, attachment.location) : null;
-  const preview = attachment ? previewKindFor(attachment) : "none";
+  const kind = attachment
+    ? fileKindFor(attachment.name, attachment.location)
+    : null;
+  const preview = attachment ? previewKindFor(attachment) : 'none';
   const remote = attachment ? isRemote(attachment.location) : false;
 
   const step = (delta: number) => {
@@ -66,21 +83,21 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   useEffect(() => {
     setOverlay(true);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         e.stopPropagation();
         onClose();
-      } else if (e.key === "ArrowRight") {
+      } else if (e.key === 'ArrowRight') {
         e.stopPropagation();
         step(1);
-      } else if (e.key === "ArrowLeft") {
+      } else if (e.key === 'ArrowLeft') {
         e.stopPropagation();
         step(-1);
       }
     };
-    window.addEventListener("keydown", onKey, true);
+    window.addEventListener('keydown', onKey, true);
     return () => {
       setOverlay(false);
-      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener('keydown', onKey, true);
     };
   });
 
@@ -101,14 +118,17 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   }, [attachment]);
 
   useEffect(() => {
-    if (preview !== "text" || !src) return;
+    if (preview !== 'text' || !src) return;
     let alive = true;
     setText(null);
     setTextFailed(false);
     fetch(src)
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
       .then((t) => {
-        if (alive) setText(t.length > TEXT_PREVIEW_CAP ? `${t.slice(0, TEXT_PREVIEW_CAP)}…` : t);
+        if (alive)
+          setText(
+            t.length > TEXT_PREVIEW_CAP ? `${t.slice(0, TEXT_PREVIEW_CAP)}…` : t
+          );
       })
       .catch(() => {
         if (alive) setTextFailed(true);
@@ -123,9 +143,9 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   const remove = async () => {
     const ok = await confirmModal({
       danger: true,
-      title: "Remove attachment?",
+      title: 'Remove attachment?',
       message: attachment.name,
-      confirmLabel: "Remove",
+      confirmLabel: 'Remove',
     });
     if (!ok) return;
     await api.deleteAttachment(attachment.id);
@@ -135,29 +155,42 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   const rename = async () => {
     const { base, ext } = splitFileName(attachment.name);
     const name = await promptName({
-      title: "Rename attachment",
-      icon: "drive_file_rename_outline",
+      title: 'Rename attachment',
+      icon: 'drive_file_rename_outline',
       message: remote
-        ? "Renames the reference label; the linked file is untouched."
-        : "The stored file is renamed to match.",
+        ? 'Renames the reference label; the linked file is untouched.'
+        : 'The stored file is renamed to match.',
       initialValue: base,
       suffix: ext ? `.${ext}` : undefined,
-      confirmLabel: "Rename",
+      confirmLabel: 'Rename',
     });
     if (!name || name === attachment.name) return;
     const updated = await api.renameAttachment(attachment.id, name);
-    await propagateAttachmentRename(attachment.task_id, attachment.name, updated.name);
+    await propagateAttachmentRename(
+      attachment.task_id,
+      attachment.name,
+      updated.name
+    );
     onRenamed();
   };
 
   const card = (label: string) => (
-    <div className="flex flex-col items-center gap-3 rounded-panel bg-surface-2l dark:bg-surface-2d px-10 py-12 text-center">
-      <Icon name={kind.icon} size={44} weight={200} className="text-content-3l dark:text-content-3d" />
-      <div className="max-w-xs truncate text-[14px] text-content-1l dark:text-content-1d">{attachment.name}</div>
-      <div className="text-[12px] text-content-3l dark:text-content-3d">{label}</div>
+    <div className="rounded-panel bg-surface-2l dark:bg-surface-2d flex flex-col items-center gap-3 px-10 py-12 text-center">
+      <Icon
+        name={kind.icon}
+        size={44}
+        weight={200}
+        className="text-content-3l dark:text-content-3d"
+      />
+      <div className="text-content-1l dark:text-content-1d max-w-xs truncate text-[14px]">
+        {attachment.name}
+      </div>
+      <div className="text-content-3l dark:text-content-3d text-[12px]">
+        {label}
+      </div>
       <button
         onClick={() => api.openAttachment(attachment)}
-        className="mt-1 flex h-9 items-center gap-1.5 rounded-control bg-accent-500l dark:bg-accent-500d px-4 text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d"
+        className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent hover:bg-accent-600l dark:hover:bg-accent-600d mt-1 flex h-9 items-center gap-1.5 px-4 text-[13px] font-semibold transition-colors"
       >
         <Icon name="open_in_new" size={15} />
         Open externally
@@ -166,54 +199,72 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   );
 
   const body = () => {
-    if (resolving) return <div className="text-[13px] text-white/60">Loading…</div>;
-    if (!src || mediaFailed) return card("No inline preview");
+    if (resolving)
+      return <div className="text-[13px] text-white/60">Loading…</div>;
+    if (!src || mediaFailed) return card('No inline preview');
     switch (preview) {
-      case "image":
+      case 'image':
         return (
           <img
             src={src}
             alt={attachment.name}
             draggable={false}
             onError={() => setMediaFailed(true)}
-            className="max-h-full max-w-full rounded-control object-contain shadow-2xl"
+            className="rounded-control max-h-full max-w-full object-contain shadow-2xl"
           />
         );
-      case "video":
+      case 'video':
         return (
           <video
             controls
             autoPlay
             src={src}
             onError={() => setMediaFailed(true)}
-            className="max-h-full max-w-full rounded-control shadow-2xl"
+            className="rounded-control max-h-full max-w-full shadow-2xl"
           />
         );
-      case "audio":
+      case 'audio':
         return (
           <div className="rounded-panel bg-surface-2l dark:bg-surface-2d px-8 py-10">
-            <Icon name={kind.icon} size={40} weight={200} className="mx-auto mb-4 block text-content-3l dark:text-content-3d" />
-            <audio controls autoPlay src={src} onError={() => setMediaFailed(true)} />
+            <Icon
+              name={kind.icon}
+              size={40}
+              weight={200}
+              className="text-content-3l dark:text-content-3d mx-auto mb-4 block"
+            />
+            <audio
+              controls
+              autoPlay
+              src={src}
+              onError={() => setMediaFailed(true)}
+            />
           </div>
         );
-      case "pdf":
-        return <embed src={src} type="application/pdf" className="h-full w-full max-w-4xl rounded-control" />;
-      case "text":
-        if (textFailed) return card("Couldn’t read this file");
-        if (text === null) return <div className="text-[13px] text-white/60">Loading…</div>;
+      case 'pdf':
         return (
-          <pre className="max-h-full w-full max-w-3xl select-text overflow-auto rounded-control bg-surface-2l dark:bg-surface-2d p-5 text-[12.5px] leading-5 text-content-2l dark:text-content-2d">
+          <embed
+            src={src}
+            type="application/pdf"
+            className="rounded-control h-full w-full max-w-4xl"
+          />
+        );
+      case 'text':
+        if (textFailed) return card('Couldn’t read this file');
+        if (text === null)
+          return <div className="text-[13px] text-white/60">Loading…</div>;
+        return (
+          <pre className="rounded-control bg-surface-2l dark:bg-surface-2d text-content-2l dark:text-content-2d max-h-full w-full max-w-3xl overflow-auto p-5 text-[12.5px] leading-5 select-text">
             {text}
           </pre>
         );
       default:
-        return card("No inline preview");
+        return card('No inline preview');
     }
   };
 
   return (
     <div
-      className="fixed inset-0 z-modal flex flex-col bg-black/75 backdrop-blur-sm"
+      className="z-modal fixed inset-0 flex flex-col bg-black/75 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -221,15 +272,22 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
         onClick={(e) => e.stopPropagation()}
       >
         <Icon name={kind.icon} size={16} className="shrink-0 text-white/70" />
-        <span className="min-w-0 flex-1 truncate text-[13.5px] text-white" title={attachment.name}>
+        <span
+          className="min-w-0 flex-1 truncate text-[13.5px] text-white"
+          title={attachment.name}
+        >
           {attachment.name}
         </span>
         {count > 1 && (
-          <span className="mr-1 shrink-0 text-[12px] tabular-nums text-white/55">
+          <span className="mr-1 shrink-0 text-[12px] text-white/55 tabular-nums">
             {index + 1} / {count}
           </span>
         )}
-        <BarButton name="open_in_new" title="Open externally" onClick={() => api.openAttachment(attachment)} />
+        <BarButton
+          name="open_in_new"
+          title="Open externally"
+          onClick={() => api.openAttachment(attachment)}
+        />
         {!remote && (
           <BarButton
             name="folder_open"
@@ -237,8 +295,17 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
             onClick={() => api.revealAttachment(attachment)}
           />
         )}
-        <BarButton name="drive_file_rename_outline" title="Rename" onClick={rename} />
-        <BarButton name="delete" title="Remove attachment" danger onClick={remove} />
+        <BarButton
+          name="drive_file_rename_outline"
+          title="Rename"
+          onClick={rename}
+        />
+        <BarButton
+          name="delete"
+          title="Remove attachment"
+          danger
+          onClick={remove}
+        />
         <BarButton name="close" title="Close  Esc" onClick={onClose} />
       </div>
 

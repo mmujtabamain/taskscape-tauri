@@ -1,10 +1,10 @@
-import { once } from "@tauri-apps/api/event";
-import { api } from "../api";
+import { once } from '@tauri-apps/api/event';
+import { api } from '../api';
 
 export interface ModalButton {
   id: string;
   label: string;
-  variant?: "primary" | "danger" | "ghost";
+  variant?: 'primary' | 'danger' | 'ghost';
 }
 
 export interface ModalInput {
@@ -21,7 +21,7 @@ export interface ModalInput {
 export interface ModalProps {
   /** Material Symbols glyph shown beside the title. */
   icon?: string;
-  tone?: "default" | "danger";
+  tone?: 'default' | 'danger';
   title: string;
   message?: string;
   input?: ModalInput;
@@ -46,7 +46,9 @@ export async function openModal(props: ModalProps): Promise<ModalResult> {
     resolveResult = resolve;
   });
   // Await the subscription before opening so a fast result can't slip past it.
-  await once<ModalResult>(`modal-result:${id}`, (e) => resolveResult(e.payload));
+  await once<ModalResult>(`modal-result:${id}`, (e) =>
+    resolveResult(e.payload)
+  );
   await api.openModal(id, props);
   return result;
 }
@@ -60,21 +62,21 @@ export async function confirmModal(opts: {
   timeoutMs?: number;
 }): Promise<boolean> {
   const res = await openModal({
-    icon: opts.icon ?? (opts.danger ? "delete" : "help"),
-    tone: opts.danger ? "danger" : "default",
+    icon: opts.icon ?? (opts.danger ? 'delete' : 'help'),
+    tone: opts.danger ? 'danger' : 'default',
     title: opts.title,
     message: opts.message,
     timeoutMs: opts.timeoutMs,
     buttons: [
-      { id: "cancel", label: "Cancel", variant: "ghost" },
+      { id: 'cancel', label: 'Cancel', variant: 'ghost' },
       {
-        id: "confirm",
-        label: opts.confirmLabel ?? "Confirm",
-        variant: opts.danger ? "danger" : "primary",
+        id: 'confirm',
+        label: opts.confirmLabel ?? 'Confirm',
+        variant: opts.danger ? 'danger' : 'primary',
       },
     ],
   });
-  return res.buttonId === "confirm";
+  return res.buttonId === 'confirm';
 }
 
 /** Name prompt with a suggested default; resolves the trimmed name or null. */
@@ -89,7 +91,7 @@ export async function promptName(opts: {
   suffix?: string;
 }): Promise<string | null> {
   const res = await openModal({
-    icon: opts.icon ?? "edit",
+    icon: opts.icon ?? 'edit',
     title: opts.title,
     message: opts.message,
     input: {
@@ -99,10 +101,14 @@ export async function promptName(opts: {
       suggest: !opts.initialValue,
     },
     buttons: [
-      { id: "cancel", label: "Cancel", variant: "ghost" },
-      { id: "confirm", label: opts.confirmLabel ?? "Create", variant: "primary" },
+      { id: 'cancel', label: 'Cancel', variant: 'ghost' },
+      {
+        id: 'confirm',
+        label: opts.confirmLabel ?? 'Create',
+        variant: 'primary',
+      },
     ],
   });
   const name = res.value?.trim();
-  return res.buttonId === "confirm" && name ? name : null;
+  return res.buttonId === 'confirm' && name ? name : null;
 }
