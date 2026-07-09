@@ -27,8 +27,8 @@ function IconButton({
     <button
       onClick={onClick}
       title={title}
-      className={`grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 transition-colors ${
-        danger ? "hover:bg-danger-soft hover:text-danger" : "hover:bg-wash hover:text-ink"
+      className={`grid h-6 w-6 shrink-0 place-items-center rounded-md text-content-3l dark:text-content-3d transition-colors ${
+        danger ? "hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d" : "hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
       }`}
     >
       <Icon name={name} size={14} />
@@ -95,16 +95,16 @@ export function AttachmentViewer({ attachment, onClose, onDeleted }: AttachmentV
     onDeleted();
   };
 
-  const loading = <div className="py-6 text-center text-[11px] text-ink-3">Loading…</div>;
+  const loading = <div className="py-6 text-center text-[11px] text-content-3l dark:text-content-3d">Loading…</div>;
 
   const noneCard = (
     <div className="flex flex-col items-center gap-1.5 px-4 py-6 text-center">
-      <Icon name={kind.icon} size={24} className="text-ink-3" />
-      <div className="max-w-full truncate text-[12px] text-ink">{attachment.name}</div>
-      <div className="text-[11px] text-ink-3">No inline preview</div>
+      <Icon name={kind.icon} size={24} className="text-content-3l dark:text-content-3d" />
+      <div className="max-w-full truncate text-[12px] text-content-1l dark:text-content-1d">{attachment.name}</div>
+      <div className="text-[11px] text-content-3l dark:text-content-3d">No inline preview</div>
       <button
         onClick={() => api.openAttachment(attachment)}
-        className="mt-1 flex h-7 items-center gap-1.5 rounded-md px-3 text-[12px] font-semibold text-ink-2 transition-colors hover:bg-wash hover:text-ink"
+        className="mt-1 flex h-7 items-center gap-1.5 rounded-md px-3 text-[12px] font-semibold text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
       >
         <Icon name="open_in_new" size={14} />
         Open
@@ -145,7 +145,7 @@ export function AttachmentViewer({ attachment, onClose, onDeleted }: AttachmentV
         if (textFailed) return noneCard;
         if (text === null) return loading;
         return (
-          <pre className="max-h-[260px] select-text overflow-auto whitespace-pre-wrap break-words p-3 text-[11px] leading-4 text-ink-2">
+          <pre className="max-h-[260px] select-text overflow-auto whitespace-pre-wrap break-words p-3 text-[11px] leading-4 text-content-2l dark:text-content-2d">
             {text}
           </pre>
         );
@@ -157,8 +157,8 @@ export function AttachmentViewer({ attachment, onClose, onDeleted }: AttachmentV
   return (
     <div>
       <div className="flex items-center gap-1.5 pb-1.5">
-        <Icon name={kind.icon} size={14} className="shrink-0 text-ink-3" />
-        <span className="min-w-0 flex-1 truncate text-[12px] text-ink" title={attachment.name}>
+        <Icon name={kind.icon} size={14} className="shrink-0 text-content-3l dark:text-content-3d" />
+        <span className="min-w-0 flex-1 truncate text-[12px] text-content-1l dark:text-content-1d" title={attachment.name}>
           {attachment.name}
         </span>
         <IconButton name="open_in_new" title="Open" onClick={() => api.openAttachment(attachment)} />
@@ -172,7 +172,7 @@ export function AttachmentViewer({ attachment, onClose, onDeleted }: AttachmentV
         <IconButton name="delete" title="Remove attachment" danger onClick={remove} />
         <IconButton name="close" title="Close preview" onClick={onClose} />
       </div>
-      <div className="max-h-[260px] overflow-hidden rounded-md border border-hairline bg-raised">
+      <div className="max-h-[260px] overflow-hidden rounded-md border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d">
         {renderBody()}
       </div>
     </div>

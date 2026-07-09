@@ -94,14 +94,14 @@ function WinControls() {
   }, [win]);
 
   const base =
-    "flex h-full w-[46px] items-center justify-center text-ink-2 transition-colors duration-100";
+    "flex h-full w-[46px] items-center justify-center text-content-2l dark:text-content-2d transition-colors duration-100";
   return (
     <div className="flex h-full items-stretch" data-no-drag>
-      <button className={`${base} hover:bg-wash-strong`} onClick={() => win.minimize()} title="Minimize">
+      <button className={`${base} hover:bg-wash-2l dark:hover:bg-wash-2d`} onClick={() => win.minimize()} title="Minimize">
         <Icon name="remove" size={20} />
       </button>
       <button
-        className={`${base} hover:bg-wash-strong`}
+        className={`${base} hover:bg-wash-2l dark:hover:bg-wash-2d`}
         onClick={() => win.toggleMaximize()}
         title={maximized ? "Restore" : "Maximize"}
       >

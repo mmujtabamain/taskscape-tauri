@@ -114,12 +114,12 @@ function MenuPanel({
     <div
       ref={ref}
       style={nested ? undefined : { left: pos.x, top: pos.y }}
-      className={`${nested ? "" : "absolute"} min-w-44 rounded-lg border border-hairline bg-raised py-1 shadow-menu`}
+      className={`${nested ? "" : "absolute"} min-w-44 rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1 shadow-menu`}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item) => (
         <div key={item.id} className="relative">
-          {item.dividerAbove && <div className="mx-2 my-1 border-t border-hairline" />}
+          {item.dividerAbove && <div className="mx-2 my-1 border-t border-edge-2l dark:border-edge-2d" />}
           <button
             disabled={item.disabled}
             onMouseEnter={() => setSubFor(item.submenu ? item.id : null)}
@@ -127,13 +127,13 @@ function MenuPanel({
               if (!item.submenu) onPick(item.id);
             }}
             className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] transition-colors ${
-              item.danger ? "text-danger hover:bg-danger-soft" : "text-ink hover:bg-wash-strong"
+              item.danger ? "text-danger-500l dark:text-danger-500d hover:bg-danger-100l dark:hover:bg-danger-100d" : "text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d"
             } disabled:pointer-events-none disabled:opacity-40`}
           >
-            {item.icon && <Icon name={item.icon} size={15} className="text-ink-3" />}
+            {item.icon && <Icon name={item.icon} size={15} className="text-content-3l dark:text-content-3d" />}
             <span className="flex-1 truncate">{item.label}</span>
-            {item.shortcut && <span className="text-[11px] text-ink-3">{item.shortcut}</span>}
-            {item.submenu && <Icon name="chevron_right" size={14} className="text-ink-3" />}
+            {item.shortcut && <span className="text-[11px] text-content-3l dark:text-content-3d">{item.shortcut}</span>}
+            {item.submenu && <Icon name="chevron_right" size={14} className="text-content-3l dark:text-content-3d" />}
           </button>
           {item.submenu && subFor === item.id && (
             <Submenu>

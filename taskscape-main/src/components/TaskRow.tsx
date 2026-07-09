@@ -154,27 +154,27 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           openMenu(e.clientX, e.clientY);
         }}
         className={`group/row relative flex min-h-10 items-center pr-3 transition-colors duration-75 ${
-          selected ? "bg-selection" : "hover:bg-wash"
-        } ${nestHighlight ? "rounded-md bg-selection ring-1 ring-accent ring-inset" : ""} ${
+          selected ? "bg-selection-1l dark:bg-selection-1d" : "hover:bg-wash-1l dark:hover:bg-wash-1d"
+        } ${nestHighlight ? "rounded-md bg-selection-1l dark:bg-selection-1d ring-1 ring-accent-500l dark:ring-accent-500d ring-inset" : ""} ${
           dragging ? "opacity-40" : ""
         }`}
         style={{ paddingLeft: depth * INDENT }}
       >
         {/* Inset row separator (starts at the text column, keeps the gutter clean). */}
         <span
-          className="pointer-events-none absolute right-0 bottom-0 h-px bg-hairline-faint"
+          className="pointer-events-none absolute right-0 bottom-0 h-px bg-edge-1l dark:bg-edge-1d"
           style={{ left: depth * INDENT + 44 }}
         />
 
         {/* Drop indicator: accent line at target depth, with its index-dot terminal. */}
         {drop && drop.zone !== "nest" && (
           <span
-            className={`pointer-events-none absolute right-3 z-10 h-[2px] bg-accent ${
+            className={`pointer-events-none absolute right-3 z-10 h-[2px] bg-accent-500l dark:bg-accent-500d ${
               drop.zone === "before" ? "-top-px" : "-bottom-px"
             }`}
             style={{ left: depth * INDENT + 44 }}
           >
-            <span className="absolute top-1/2 -left-[3px] h-[6px] w-[6px] -translate-y-1/2 rounded-full bg-accent" />
+            <span className="absolute top-1/2 -left-[3px] h-[6px] w-[6px] -translate-y-1/2 rounded-full bg-accent-500l dark:bg-accent-500d" />
           </span>
         )}
 
@@ -187,7 +187,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
                 ctx.toggleCollapsed(task.id);
               }}
               onDoubleClick={(e) => e.stopPropagation()}
-              className={`grid h-5 w-5 place-items-center rounded text-ink-3 transition-opacity hover:text-ink ${
+              className={`grid h-5 w-5 place-items-center rounded text-content-3l dark:text-content-3d transition-opacity hover:text-content-1l dark:hover:text-content-1d ${
                 expanded ? "opacity-0 group-hover/row:opacity-100" : "opacity-100"
               }`}
               title={expanded ? "Collapse" : "Expand"}
@@ -218,7 +218,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           ) : (
             <div
               className={`truncate text-[14px] leading-[19px] font-medium ${
-                task.done ? "strike strike-on text-ink-3" : "text-ink"
+                task.done ? "strike strike-on text-content-3l dark:text-content-3d" : "text-content-1l dark:text-content-1d"
               }`}
             >
               {task.title}
@@ -227,7 +227,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           {task.notes && (
             <div
               className={`truncate text-[12.5px] leading-[17px] ${
-                task.done ? "text-ink-3 opacity-55" : "text-ink-2"
+                task.done ? "text-content-3l dark:text-content-3d opacity-55" : "text-content-2l dark:text-content-2d"
               }`}
             >
               {task.notes}
@@ -239,26 +239,26 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
           className={`ml-2.5 flex shrink-0 items-center gap-2.5 ${task.done ? "opacity-55" : ""}`}
         >
           {!expanded && children.length > 0 && (
-            <span className="text-[11px] font-semibold text-ink-3 tabular-nums">
+            <span className="text-[11px] font-semibold text-content-3l dark:text-content-3d tabular-nums">
               ({children.length})
             </span>
           )}
           {expanded && children.length > 0 && (
             <span
-              className="text-[11px] font-semibold tracking-[0.02em] text-ink-3 tabular-nums"
+              className="text-[11px] font-semibold tracking-[0.02em] text-content-3l dark:text-content-3d tabular-nums"
               title={`${doneChildren} of ${children.length} subtasks done`}
             >
               {doneChildren}/{children.length}
             </span>
           )}
           {task.attachments.length > 0 && (
-            <span className="flex h-5 items-center gap-1 rounded-md border border-hairline px-1.5 text-[11px] font-semibold text-ink-3 tabular-nums">
+            <span className="flex h-5 items-center gap-1 rounded-md border border-edge-2l dark:border-edge-2d px-1.5 text-[11px] font-semibold text-content-3l dark:text-content-3d tabular-nums">
               <Icon name="attach_file" size={13} weight={300} />
               {task.attachments.length}
             </span>
           )}
           <span
-            className="text-[11.5px] tracking-[0.02em] text-ink-3 tabular-nums"
+            className="text-[11.5px] tracking-[0.02em] text-content-3l dark:text-content-3d tabular-nums"
             title={`Created ${absoluteDateTime(task.created_at)}`}
           >
             {relativeTime(task.created_at)}
@@ -270,7 +270,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="grid h-6 w-6 place-items-center rounded text-ink-3 opacity-0 transition-opacity duration-100 group-hover/row:opacity-100 hover:bg-wash-strong hover:text-ink"
+            className="grid h-6 w-6 place-items-center rounded text-content-3l dark:text-content-3d opacity-0 transition-opacity duration-100 group-hover/row:opacity-100 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
             title="More"
           >
             <Icon name="more_horiz" size={17} weight={300} />
@@ -311,11 +311,11 @@ function Check({ done, flashing, onToggle }: { done: boolean; flashing: boolean;
     >
       <span
         className={`absolute inset-0 rounded-[5px] border-[1.5px] transition-colors duration-100 ${
-          done ? "border-transparent" : "border-hairline-strong group-hover/row:border-ink-3"
+          done ? "border-transparent" : "border-edge-3l dark:border-edge-3d group-hover/row:border-content-3l dark:group-hover/row:border-content-3d"
         }`}
       />
       <span
-        className={`absolute inset-0 ${flashing ? "bg-accent" : "bg-done-lamp"}`}
+        className={`absolute inset-0 ${flashing ? "bg-accent-500l dark:bg-accent-500d" : "bg-done-lamp-1l dark:bg-done-lamp-1d"}`}
         style={{
           clipPath: done ? "inset(0 0 0 0)" : "inset(100% 0 0 0)",
           transition: done
@@ -348,7 +348,7 @@ function Check({ done, flashing, onToggle }: { done: boolean; flashing: boolean;
           <path
             d="M2.5 6.5 L5 8.8 L9.5 3.6"
             fill="none"
-            stroke="var(--ink-3)"
+            stroke="var(--content-3)"
             strokeWidth={1.8}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -375,7 +375,7 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (title: str
         if (e.key === "Escape") onDone(null);
       }}
       onBlur={() => onDone(ref.current?.value.trim() || null)}
-      className="w-full rounded bg-recessed px-1.5 py-0.5 text-[14px] font-medium text-ink outline-none"
+      className="w-full rounded bg-surface-0l dark:bg-surface-0d px-1.5 py-0.5 text-[14px] font-medium text-content-1l dark:text-content-1d outline-none"
     />
   );
 }
@@ -398,7 +398,7 @@ function SubtaskComposer({
       className="flex h-9 items-center gap-2 pr-3"
       style={{ paddingLeft: depth * INDENT + 6 }}
     >
-      <Icon name="subdirectory_arrow_right" size={15} weight={300} className="text-ink-3" />
+      <Icon name="subdirectory_arrow_right" size={15} weight={300} className="text-content-3l dark:text-content-3d" />
       <input
         ref={ref}
         placeholder="Subtask title — Enter to add"
@@ -414,7 +414,7 @@ function SubtaskComposer({
           if (e.key === "Escape") onDismiss();
         }}
         onBlur={onDismiss}
-        className="h-7 flex-1 rounded-md bg-recessed px-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3"
+        className="h-7 flex-1 rounded-md bg-surface-0l dark:bg-surface-0d px-2.5 text-[13px] text-content-1l dark:text-content-1d outline-none placeholder:text-content-3l dark:placeholder:text-content-3d"
       />
     </div>
   );

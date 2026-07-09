@@ -79,10 +79,10 @@ export function ListTabs({
         const tabDragOver = tabOver?.id === list.id;
         return (
           <div key={list.id} className="relative flex items-stretch">
-            {!hideSep && <span className="my-auto h-4 w-px shrink-0 bg-hairline-faint" />}
+            {!hideSep && <span className="my-auto h-4 w-px shrink-0 bg-edge-1l dark:bg-edge-1d" />}
             {tabDragOver && (
               <span
-                className={`pointer-events-none absolute inset-y-1 z-10 w-[2px] rounded-full bg-accent ${
+                className={`pointer-events-none absolute inset-y-1 z-10 w-[2px] rounded-full bg-accent-500l dark:bg-accent-500d ${
                   tabOver!.before ? "left-0" : "right-0"
                 }`}
               />
@@ -90,8 +90,8 @@ export function ListTabs({
             <div
               draggable={renaming !== list.id}
               className={`group relative flex cursor-default items-center gap-2 px-4 transition-colors ${
-                active ? "bg-content" : "hover:bg-wash"
-              } ${dropOver === list.id ? "bg-selection" : ""} ${
+                active ? "bg-surface-2l dark:bg-surface-2d" : "hover:bg-wash-1l dark:hover:bg-wash-1d"
+              } ${dropOver === list.id ? "bg-selection-1l dark:bg-selection-1d" : ""} ${
                 draggingTab === list.id ? "opacity-40" : ""
               }`}
               onClick={() => onSelect(list.id)}
@@ -148,12 +148,12 @@ export function ListTabs({
                 <>
                   {/* The notch: side hairlines run into the bar's bottom rule, which
                       breaks for the tab's width. */}
-                  <span className="absolute inset-y-0 left-0 w-px bg-hairline" />
-                  <span className="absolute inset-y-0 right-0 w-px bg-hairline" />
-                  <span className="absolute inset-x-px -bottom-px h-px bg-content" />
+                  <span className="absolute inset-y-0 left-0 w-px bg-edge-2l dark:bg-edge-2d" />
+                  <span className="absolute inset-y-0 right-0 w-px bg-edge-2l dark:bg-edge-2d" />
+                  <span className="absolute inset-x-px -bottom-px h-px bg-surface-2l dark:bg-surface-2d" />
                 </>
               )}
-              {paneDot && <span className="size-1.5 shrink-0 rounded-full bg-accent" />}
+              {paneDot && <span className="size-1.5 shrink-0 rounded-full bg-accent-500l dark:bg-accent-500d" />}
               {renaming === list.id ? (
                 <TabRenameInput
                   initial={list.name}
@@ -165,14 +165,14 @@ export function ListTabs({
               ) : (
                 <span
                   className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
-                    active ? "font-semibold text-ink" : "font-medium text-ink-2"
+                    active ? "font-semibold text-content-1l dark:text-content-1d" : "font-medium text-content-2l dark:text-content-2d"
                   }`}
                 >
                   {list.name}
                 </span>
               )}
               <span className="relative grid w-4 place-items-center">
-                <span className="text-[11.5px] font-semibold tracking-[0.02em] text-ink-3 tabular-nums group-hover:opacity-0">
+                <span className="text-[11.5px] font-semibold tracking-[0.02em] text-content-3l dark:text-content-3d tabular-nums group-hover:opacity-0">
                   {open}
                 </span>
                 <button
@@ -180,7 +180,7 @@ export function ListTabs({
                     e.stopPropagation();
                     onDelete(list);
                   }}
-                  className="absolute inset-0 grid place-items-center rounded text-ink-3 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:text-ink"
+                  className="absolute inset-0 grid place-items-center rounded text-content-3l dark:text-content-3d opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:text-content-1l dark:hover:text-content-1d"
                   title="Delete list"
                 >
                   <Icon name="close" size={15} weight={300} />
@@ -192,7 +192,7 @@ export function ListTabs({
       })}
       <button
         onClick={onCreate}
-        className="my-auto ml-2 grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+        className="my-auto ml-2 grid h-7 w-7 shrink-0 place-items-center rounded-md text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
         title="New list"
       >
         <Icon name="add" size={18} weight={300} />
@@ -218,7 +218,7 @@ function TabRenameInput({ initial, onDone }: { initial: string; onDone: (name: s
         if (e.key === "Escape") onDone(null);
       }}
       onBlur={() => onDone(ref.current?.value.trim() || null)}
-      className="w-32 rounded bg-recessed px-1.5 py-0.5 text-[13px] font-medium text-ink outline-none"
+      className="w-32 rounded bg-surface-0l dark:bg-surface-0d px-1.5 py-0.5 text-[13px] font-medium text-content-1l dark:text-content-1d outline-none"
     />
   );
 }

@@ -10,9 +10,9 @@ const WIDTH = 340;
 const BTN =
   "h-7 rounded-md px-3.5 text-[12px] font-semibold tracking-[0.02em] transition duration-150";
 const BTN_VARIANT: Record<NonNullable<ModalButton["variant"]>, string> = {
-  ghost: "border border-hairline text-ink hover:bg-wash-strong",
-  primary: "bg-ink text-content hover:opacity-90 active:scale-[0.98]",
-  danger: "bg-danger text-on-accent hover:bg-danger-hover",
+  ghost: "border border-edge-2l dark:border-edge-2d text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d",
+  primary: "bg-content-1l dark:bg-content-1d text-surface-2l dark:text-surface-2d hover:opacity-90 active:scale-[0.98]",
+  danger: "bg-danger-500l dark:bg-danger-500d text-on-accent hover:bg-danger-600l dark:hover:bg-danger-600d",
 };
 
 // The global reduced-motion rule zeroes animation durations, which would make
@@ -41,7 +41,7 @@ export function ModalWindow() {
     };
   }, []);
 
-  if (!current) return <div className="h-screen w-screen bg-raised" />;
+  if (!current) return <div className="h-screen w-screen bg-surface-3l dark:bg-surface-3d" />;
   return <ModalContent key={current.id} id={current.id} props={current.props} />;
 }
 
@@ -142,7 +142,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
   return (
     <div
       data-tauri-drag-region
-      className="relative h-screen w-screen overflow-hidden border border-hairline bg-raised"
+      className="relative h-screen w-screen overflow-hidden border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d"
       onPointerEnter={() => setDrainPaused(true)}
       onPointerLeave={() => setDrainPaused(false)}
     >
@@ -162,19 +162,19 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
             <Icon
               name={props.icon}
               size={20}
-              className={props.tone === "danger" ? "text-danger" : "text-accent"}
+              className={props.tone === "danger" ? "text-danger-500l dark:text-danger-500d" : "text-accent-500l dark:text-accent-500d"}
             />
           )}
           <h1
             data-tauri-drag-region
-            className="font-display text-[15px] leading-5 font-semibold text-ink"
+            className="font-display text-[15px] leading-5 font-semibold text-content-1l dark:text-content-1d"
           >
             {props.title}
           </h1>
         </div>
 
         {props.message && (
-          <p className="mt-2 text-[13px] leading-4.75 font-[450] text-ink-2">{props.message}</p>
+          <p className="mt-2 text-[13px] leading-4.75 font-[450] text-content-2l dark:text-content-2d">{props.message}</p>
         )}
 
         {props.input && (
@@ -182,7 +182,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
             {props.input.label && (
               <label
                 htmlFor="modal-input"
-                className="mb-1.5 block text-[12px] font-medium text-ink-2"
+                className="mb-1.5 block text-[12px] font-medium text-content-2l dark:text-content-2d"
               >
                 {props.input.label}
               </label>
@@ -191,7 +191,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
               {props.input.suffix ? (
                 // Locked-extension field: the name grows to fit and the greyed
                 // extension stays glued to its right; `.` is stripped as typed.
-                <div className="flex h-8 w-full items-center overflow-hidden rounded-md bg-recessed px-2.5 text-[13px] focus-within:ring-2 focus-within:ring-focus">
+                <div className="flex h-8 w-full items-center overflow-hidden rounded-md bg-surface-0l dark:bg-surface-0d px-2.5 text-[13px] focus-within:ring-2 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
                   <span className="relative inline-flex min-w-[1ch] max-w-full flex-none">
                     <span aria-hidden className="invisible overflow-hidden whitespace-pre">
                       {value || props.input.placeholder || "​"}
@@ -224,10 +224,10 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                         cancelDrain();
                         if (props.input?.initialValue) e.currentTarget.select();
                       }}
-                      className="absolute inset-0 w-full bg-transparent text-[13px] text-ink placeholder:text-ink-3 outline-none"
+                      className="absolute inset-0 w-full bg-transparent text-[13px] text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d outline-none"
                     />
                   </span>
-                  <span className="flex-none whitespace-pre text-ink-3 select-none">
+                  <span className="flex-none whitespace-pre text-content-3l dark:text-content-3d select-none">
                     {props.input.suffix}
                   </span>
                 </div>
@@ -244,7 +244,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                     cancelDrain();
                     if (props.input?.initialValue) e.currentTarget.select();
                   }}
-                  className={`h-8 w-full rounded-md bg-recessed pl-2.5 text-[13px] text-ink placeholder:text-ink-3 focus:ring-2 focus:ring-focus ${
+                  className={`h-8 w-full rounded-md bg-surface-0l dark:bg-surface-0d pl-2.5 text-[13px] text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-2 focus:ring-focus-1l dark:focus:ring-focus-1d ${
                     props.input.suggest ? "pr-8" : "pr-2.5"
                   }`}
                 />
@@ -256,7 +256,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                   aria-label="Suggest another name"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={rollSuggestion}
-                  className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-ink-3 transition duration-150 hover:bg-wash-strong hover:text-ink"
+                  className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-content-3l dark:text-content-3d transition duration-150 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="casino" size={16} />
                 </button>
@@ -281,7 +281,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
 
       {props.timeoutMs != null && !reducedMotion && (
         <div
-          className="pointer-events-none absolute inset-x-5 bottom-0 h-0.5 origin-left bg-accent transition-opacity duration-200"
+          className="pointer-events-none absolute inset-x-5 bottom-0 h-0.5 origin-left bg-accent-500l dark:bg-accent-500d transition-opacity duration-200"
           style={{
             animation: presented ? `drain ${props.timeoutMs}ms linear forwards` : "none",
             animationPlayState: drainPaused || drainCancelled ? "paused" : "running",

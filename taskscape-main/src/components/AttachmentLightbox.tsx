@@ -33,7 +33,7 @@ function BarButton({
       onClick={onClick}
       title={title}
       className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/70 transition-colors ${
-        danger ? "hover:bg-danger hover:text-white" : "hover:bg-white/15 hover:text-white"
+        danger ? "hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white" : "hover:bg-white/15 hover:text-white"
       }`}
     >
       <Icon name={name} size={17} />
@@ -151,13 +151,13 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   };
 
   const card = (label: string) => (
-    <div className="flex flex-col items-center gap-3 rounded-xl bg-content px-10 py-12 text-center">
-      <Icon name={kind.icon} size={44} weight={200} className="text-ink-3" />
-      <div className="max-w-xs truncate text-[14px] text-ink">{attachment.name}</div>
-      <div className="text-[12px] text-ink-3">{label}</div>
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-surface-2l dark:bg-surface-2d px-10 py-12 text-center">
+      <Icon name={kind.icon} size={44} weight={200} className="text-content-3l dark:text-content-3d" />
+      <div className="max-w-xs truncate text-[14px] text-content-1l dark:text-content-1d">{attachment.name}</div>
+      <div className="text-[12px] text-content-3l dark:text-content-3d">{label}</div>
       <button
         onClick={() => api.openAttachment(attachment)}
-        className="mt-1 flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-hover"
+        className="mt-1 flex h-9 items-center gap-1.5 rounded-lg bg-accent-500l dark:bg-accent-500d px-4 text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d"
       >
         <Icon name="open_in_new" size={15} />
         Open externally
@@ -191,8 +191,8 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
         );
       case "audio":
         return (
-          <div className="rounded-xl bg-content px-8 py-10">
-            <Icon name={kind.icon} size={40} weight={200} className="mx-auto mb-4 block text-ink-3" />
+          <div className="rounded-xl bg-surface-2l dark:bg-surface-2d px-8 py-10">
+            <Icon name={kind.icon} size={40} weight={200} className="mx-auto mb-4 block text-content-3l dark:text-content-3d" />
             <audio controls autoPlay src={src} onError={() => setMediaFailed(true)} />
           </div>
         );
@@ -202,7 +202,7 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
         if (textFailed) return card("Couldn’t read this file");
         if (text === null) return <div className="text-[13px] text-white/60">Loading…</div>;
         return (
-          <pre className="max-h-full w-full max-w-3xl select-text overflow-auto rounded-lg bg-content p-5 text-[12.5px] leading-5 text-ink-2">
+          <pre className="max-h-full w-full max-w-3xl select-text overflow-auto rounded-lg bg-surface-2l dark:bg-surface-2d p-5 text-[12.5px] leading-5 text-content-2l dark:text-content-2d">
             {text}
           </pre>
         );

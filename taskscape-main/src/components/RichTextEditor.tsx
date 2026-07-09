@@ -368,18 +368,18 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
   };
 
   return (
-    <div className="group relative rounded-lg border border-hairline bg-content transition-colors focus-within:border-accent focus-within:ring focus-within:ring-accent">
+    <div className="group relative rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d transition-colors focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring focus-within:ring-accent-500l dark:focus-within:ring-accent-500d">
       {/* Floating controls: absolutely positioned above the box so revealing or
           hiding them never relayouts the note content. */}
-      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 flex origin-bottom scale-95 items-center gap-0.5 rounded-lg border border-hairline bg-raised px-1.5 py-1 opacity-0 shadow-menu transition-[opacity,transform] duration-75 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100">
+      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 flex origin-bottom scale-95 items-center gap-0.5 rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d px-1.5 py-1 opacity-0 shadow-menu transition-[opacity,transform] duration-75 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100">
         <ToolButton cmd="bold" icon="format_bold" title="Bold  ⌘B" onExec={exec} />
         <ToolButton cmd="italic" icon="format_italic" title="Italic  ⌘I" onExec={exec} />
         <ToolButton cmd="underline" icon="format_underlined" title="Underline  ⌘U" onExec={exec} />
         <ToolButton cmd="strikeThrough" icon="strikethrough_s" title="Strikethrough" onExec={exec} />
-        <span className="mx-1 h-4 w-px bg-hairline-faint" />
+        <span className="mx-1 h-4 w-px bg-edge-1l dark:bg-edge-1d" />
         <ToolButton cmd="insertUnorderedList" icon="format_list_bulleted" title="Bulleted list" onExec={exec} />
         <ToolButton cmd="insertOrderedList" icon="format_list_numbered" title="Numbered list" onExec={exec} />
-        <span className="mx-1 h-4 w-px bg-hairline-faint" />
+        <span className="mx-1 h-4 w-px bg-edge-1l dark:bg-edge-1d" />
         <button
           type="button"
           title="Add link"
@@ -387,14 +387,14 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
             e.preventDefault();
             addLink();
           }}
-          className="grid h-6 w-6 place-items-center rounded text-ink-2 transition-colors hover:bg-wash hover:text-ink"
+          className="grid h-6 w-6 place-items-center rounded text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
         >
           <Icon name="link" size={16} weight={400} />
         </button>
-        <span className="mx-1 h-4 w-px bg-hairline-faint" />
+        <span className="mx-1 h-4 w-px bg-edge-1l dark:bg-edge-1d" />
         <span
           className={`px-0.5 text-[10.5px] tabular-nums ${
-            len > maxLength * 0.9 ? "text-danger" : "text-ink-3"
+            len > maxLength * 0.9 ? "text-danger-500l dark:text-danger-500d" : "text-content-3l dark:text-content-3d"
           }`}
         >
           {len}/{maxLength}
@@ -402,7 +402,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
       </div>
 
       {empty && placeholder && (
-        <span className="pointer-events-none absolute left-3 top-2.5 text-[13.5px] text-ink-3">
+        <span className="pointer-events-none absolute left-3 top-2.5 text-[13.5px] text-content-3l dark:text-content-3d">
           {placeholder}
         </span>
       )}
@@ -516,12 +516,12 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
           }
           insertChip(name);
         }}
-        className={`note-rt ${minHeightClass} w-full overflow-y-auto px-3 py-2.5 text-[13.5px] leading-5 text-ink outline-none`}
+        className={`note-rt ${minHeightClass} w-full overflow-y-auto px-3 py-2.5 text-[13.5px] leading-5 text-content-1l dark:text-content-1d outline-none`}
       />
 
       {mentionOpen && (
         <div
-          className="fixed z-70 max-h-56 w-60 overflow-y-auto rounded-lg border border-hairline bg-raised py-1 shadow-menu"
+          className="fixed z-70 max-h-56 w-60 overflow-y-auto rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1 shadow-menu"
           style={{ top: mention!.top + 4, left: mention!.left }}
         >
           {mentionMatches.map((a, i) => (
@@ -534,14 +534,14 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
               }}
               onMouseEnter={() => setMention((m) => (m ? { ...m, index: i } : m))}
               className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] ${
-                i === mentionIdx ? "bg-selection text-ink" : "text-ink-2"
+                i === mentionIdx ? "bg-selection-1l dark:bg-selection-1d text-content-1l dark:text-content-1d" : "text-content-2l dark:text-content-2d"
               }`}
             >
               <Icon
                 name={fileKindFor(a.name, a.location).icon}
                 size={15}
                 weight={300}
-                className="shrink-0 text-ink-3"
+                className="shrink-0 text-content-3l dark:text-content-3d"
               />
               <span className="truncate">{a.name}</span>
             </button>
@@ -571,7 +571,7 @@ function ToolButton({
         e.preventDefault();
         onExec(cmd);
       }}
-      className="grid h-6 w-6 place-items-center rounded text-ink-2 transition-colors hover:bg-wash hover:text-ink"
+      className="grid h-6 w-6 place-items-center rounded text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
     >
       <Icon name={icon} size={16} weight={400} />
     </button>

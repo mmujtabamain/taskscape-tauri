@@ -5,13 +5,13 @@ import { api } from "./api";
 
 const fieldClasses =
   "rounded-lg border px-3 py-2 text-sm outline-none " +
-  "border-black/15 bg-black/5 text-neutral-900 placeholder:text-neutral-500 focus:border-black/40 " +
-  "dark:border-white/40 dark:bg-white/10 dark:text-white dark:placeholder:text-white/40 dark:focus:border-white/30";
+  "border-edge-2l bg-surface-1l text-content-1l placeholder:text-content-4l focus:border-edge-3l " +
+  "dark:border-edge-2d dark:bg-surface-1d dark:text-content-1d dark:placeholder:text-content-4d dark:focus:border-edge-3d";
 
 const iconButtonClasses =
   "grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition " +
-  "border-black/10 bg-black/5 text-neutral-600 hover:text-neutral-900 " +
-  "dark:border-white/10 dark:bg-white/10 dark:text-white/70 dark:hover:text-white";
+  "border-edge-1l bg-surface-1l text-content-2l hover:text-content-1l " +
+  "dark:border-edge-1d dark:bg-surface-1d dark:text-content-2d dark:hover:text-content-1d";
 
 function App() {
   const [title, setTitle] = useState("");
@@ -87,7 +87,7 @@ function App() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-screen w-screen flex-col justify-center gap-2 rounded-2xl p-2.5 text-neutral-900 dark:text-white"
+      className="flex h-screen w-screen flex-col justify-center gap-2 rounded-2xl p-2.5 text-content-1l dark:text-content-1d"
       onKeyDown={onKeyDown}
     >
       <div className="flex items-center gap-2">
@@ -97,7 +97,7 @@ function App() {
           tabIndex={-1}
           className={`relative ${
             count
-              ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-indigo-400 bg-indigo-500 text-white transition disabled:opacity-50"
+              ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-accent-400 bg-accent-500 text-on-accent transition disabled:opacity-50"
               : `${iconButtonClasses} disabled:opacity-50`
           }`}
           title={
@@ -108,7 +108,7 @@ function App() {
         >
           <Icon name="screenshot_monitor" size={18} filled={count > 0} />
           {count > 0 && (
-            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-indigo-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white/70 dark:ring-black/40">
+            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent-500 px-1 text-[10px] font-semibold leading-none text-on-accent ring-2 ring-halo-1l dark:ring-halo-1d">
               {count}
             </span>
           )}
@@ -134,7 +134,7 @@ function App() {
       <button
         onClick={() => api.openMain()}
         tabIndex={-1}
-        className="flex w-full items-center gap-1 pl-1 text-xs text-neutral-500 transition hover:text-neutral-900 dark:text-white/55 dark:hover:text-white"
+        className="flex w-full items-center gap-1 pl-1 text-xs text-content-3l transition hover:text-content-1l dark:text-content-3d dark:hover:text-content-1d"
         title="Open the main Taskscape window"
       >
         <Icon name="open_in_new" size={13} />

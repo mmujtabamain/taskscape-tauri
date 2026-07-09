@@ -59,10 +59,10 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-2 flex items-center gap-3">
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-3">
+      <span className="text-[11px] font-semibold uppercase tracking-widest text-content-3l dark:text-content-3d">
         {label}
       </span>
-      <span className="flex-1 border-t border-hairline-faint" />
+      <span className="flex-1 border-t border-edge-1l dark:border-edge-1d" />
       {trailing}
     </div>
   );
@@ -97,7 +97,7 @@ function NoteCard({
       <button
         onClick={onDelete}
         title="Delete note"
-        className="absolute -top-2 -right-2 z-10 grid h-6 w-6 place-items-center rounded-full border border-hairline bg-raised text-ink-3 opacity-0 shadow-lift transition-opacity hover:text-danger group-hover/note:opacity-100"
+        className="absolute -top-2 -right-2 z-10 grid h-6 w-6 place-items-center rounded-full border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-3l dark:text-content-3d opacity-0 shadow-lift transition-opacity hover:text-danger-500l dark:hover:text-danger-500d group-hover/note:opacity-100"
       >
         <Icon name="close" size={14} weight={400} />
       </button>
@@ -122,8 +122,8 @@ function DoneCheckbox({
       title={done ? "Mark not done" : "Mark done"}
       className={`grid shrink-0 place-items-center border-[1.5px] transition-colors ${box} ${
         done
-          ? "border-transparent bg-done-lamp text-on-accent"
-          : "border-hairline-strong hover:border-ink-3"
+          ? "border-transparent bg-done-lamp-1l dark:bg-done-lamp-1d text-on-accent"
+          : "border-edge-3l dark:border-edge-3d hover:border-content-3l dark:hover:border-content-3d"
       }`}
     >
       {done && <Icon name="check" size={size === 18 ? 14 : 12} weight={700} />}
@@ -327,7 +327,7 @@ function TaskInspector({
     <div className="flex min-h-0 flex-1 animate-rise flex-col">
       <div className="relative shrink-0 p-4">
         {/* Index tick: the panel "receives" the selection. */}
-        <span className="absolute left-0 top-4.75 h-4 w-0.5 bg-accent" />
+        <span className="absolute left-0 top-4.75 h-4 w-0.5 bg-accent-500l dark:bg-accent-500d" />
         <div className="flex items-start gap-2.5">
           <div className="mt-0.5">
             <DoneCheckbox
@@ -350,7 +350,7 @@ function TaskInspector({
                     setEditingTitle(false);
                   }
                 }}
-                className="-mx-1 w-[calc(100%+8px)] rounded bg-recessed px-1 font-display text-[18px] font-semibold leading-6 text-ink outline-none"
+                className="-mx-1 w-[calc(100%+8px)] rounded bg-surface-0l dark:bg-surface-0d px-1 font-display text-[18px] font-semibold leading-6 text-content-1l dark:text-content-1d outline-none"
               />
             ) : (
               <button
@@ -359,24 +359,24 @@ function TaskInspector({
                   setEditingTitle(true);
                 }}
                 title="Click to edit"
-                className="block w-full text-left font-display text-[18px] font-semibold leading-6 text-ink"
+                className="block w-full text-left font-display text-[18px] font-semibold leading-6 text-content-1l dark:text-content-1d"
               >
                 {task.title}
               </button>
             )}
-            <div className="mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums text-ink-3">
+            <div className="mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums text-content-3l dark:text-content-3d">
               <span className="flex items-center gap-1.5">
                 <Icon
                   name="folder_open"
                   size={13}
                   weight={300}
-                  className="shrink-0 text-ink-3"
+                  className="shrink-0 text-content-3l dark:text-content-3d"
                 />
-                <span className="truncate text-ink-2">
+                <span className="truncate text-content-2l dark:text-content-2d">
                   {projectName ?? "—"}
                 </span>
                 {listName && (
-                  <span className="shrink-0 text-ink-3">/ {listName}</span>
+                  <span className="shrink-0 text-content-3l dark:text-content-3d">/ {listName}</span>
                 )}
               </span>
               <span
@@ -387,7 +387,7 @@ function TaskInspector({
                   name="schedule"
                   size={13}
                   weight={300}
-                  className="shrink-0 text-ink-3"
+                  className="shrink-0 text-content-3l dark:text-content-3d"
                 />
                 Created {relativeTime(task.created_at)}
               </span>
@@ -399,7 +399,7 @@ function TaskInspector({
                   name="update"
                   size={13}
                   weight={300}
-                  className="shrink-0 text-ink-3"
+                  className="shrink-0 text-content-3l dark:text-content-3d"
                 />
                 Updated {relativeTime(task.updated_at)}
               </span>
@@ -408,7 +408,7 @@ function TaskInspector({
           <button
             onClick={onClose}
             title="Close panel"
-            className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+            className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
           >
             <Icon name="last_page" size={16} />
           </button>
@@ -421,7 +421,7 @@ function TaskInspector({
             label="Notes"
             trailing={
               notes.length > 0 ? (
-                <span className="text-[11px] tabular-nums text-ink-3">
+                <span className="text-[11px] tabular-nums text-content-3l dark:text-content-3d">
                   {notes.length}
                 </span>
               ) : undefined
@@ -460,7 +460,7 @@ function TaskInspector({
             ) : (
               <button
                 onClick={() => setAddingNote(true)}
-                className="flex h-24 w-full items-center justify-center gap-1.5 rounded-lg bg-raised border border-dashed border-hairline-strong font-semibold text-ink-3 transition-colors hover:border-ink-3 hover:text-ink-2"
+                className="flex h-24 w-full items-center justify-center gap-1.5 rounded-lg bg-surface-3l dark:bg-surface-3d border border-dashed border-edge-3l dark:border-edge-3d font-semibold text-content-3l dark:text-content-3d transition-colors hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d"
               >
                 <Icon name="add" size={16} />
                 Add note
@@ -474,7 +474,7 @@ function TaskInspector({
             <SectionHeader
               label="Subtasks"
               trailing={
-                <span className="text-[11.5px] tabular-nums text-ink-">
+                <span className="text-[11.5px] tabular-nums text-content-3l dark:text-content-3d">
                   {doneChildren} done / {children.length}
                 </span>
               }
@@ -483,7 +483,7 @@ function TaskInspector({
               {children.map((child) => (
                 <div
                   key={child.id}
-                  className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-md px-1.5 hover:bg-wash"
+                  className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-md px-1.5 hover:bg-wash-1l dark:hover:bg-wash-1d"
                 >
                   <DoneCheckbox
                     done={child.done}
@@ -494,7 +494,7 @@ function TaskInspector({
                     onClick={() => onSelectTask(child.id)}
                     title={child.title}
                     className={`min-w-0 flex-1 truncate text-left text-[13.5px] ${
-                      child.done ? "text-ink-3 line-through" : "text-ink"
+                      child.done ? "text-content-3l dark:text-content-3d line-through" : "text-content-1l dark:text-content-1d"
                     }`}
                   >
                     {child.title}
@@ -513,21 +513,21 @@ function TaskInspector({
                 <button
                   onClick={addScreenshot}
                   title="Capture the full screen and attach it"
-                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="screenshot_monitor" size={14} />
                   Shot
                 </button>
                 <button
                   onClick={addLink}
-                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="add_link" size={14} />
                   Link
                 </button>
                 <button
                   onClick={addFile}
-                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-ink-3 transition-colors hover:bg-wash hover:text-ink"
+                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="note_add" size={14} />
                   File
@@ -551,7 +551,7 @@ function TaskInspector({
                         e.dataTransfer.setData(ATTACHMENT_MIME, a.name);
                         e.dataTransfer.effectAllowed = "copy";
                       }}
-                      className="group relative block aspect-square w-full overflow-hidden rounded-lg border border-hairline bg-raised transition-colors hover:border-hairline-strong"
+                      className="group relative block aspect-square w-full overflow-hidden rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d transition-colors hover:border-edge-3l dark:hover:border-edge-3d"
                     >
                       {thumb ? (
                         <img
@@ -565,15 +565,15 @@ function TaskInspector({
                           <Icon
                             name={fileKindFor(a.name, a.location).icon}
                             size={22}
-                            className="text-ink-3"
+                            className="text-content-3l dark:text-content-3d"
                           />
                         </span>
                       )}
-                      <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-raised text-ink-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-surface-3l dark:bg-surface-3d text-content-2l dark:text-content-2d opacity-0 transition-opacity group-hover:opacity-100">
                         <Icon name="open_in_full" size={14} />
                       </span>
                     </button>
-                    <div className="mt-1 truncate text-center text-[11px] text-ink-3">
+                    <div className="mt-1 truncate text-center text-[11px] text-content-3l dark:text-content-3d">
                       {a.name}
                     </div>
                   </div>
@@ -583,10 +583,10 @@ function TaskInspector({
           )}
         </div>
 
-        <div className="mt-auto border-t border-hairline-faint p-4">
+        <div className="mt-auto border-t border-edge-1l dark:border-edge-1d p-4">
           <button
             onClick={() => onRequestDelete(task)}
-            className="flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold text-danger transition-colors hover:bg-danger-soft"
+            className="flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold text-danger-500l dark:text-danger-500d transition-colors hover:bg-danger-100l dark:hover:bg-danger-100d"
           >
             <Icon name="delete" size={15} />
             Delete task
@@ -614,7 +614,7 @@ function TaskInspector({
 export function PreviewPanel(props: PreviewPanelProps) {
   const { task } = props;
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-window">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-1l dark:bg-surface-1d">
       {task ? (
         <TaskInspector key={task.id} {...props} task={task} />
       ) : (
@@ -623,12 +623,12 @@ export function PreviewPanel(props: PreviewPanelProps) {
             name="left_click"
             size={28}
             weight={200}
-            className="mb-1 text-ink-3"
+            className="mb-1 text-content-3l dark:text-content-3d"
           />
-          <p className="font-display text-[17px] font-medium text-ink-2">
+          <p className="font-display text-[17px] font-medium text-content-2l dark:text-content-2d">
             No task selected
           </p>
-          <p className="text-[13px] text-ink-3">Select a task to inspect it</p>
+          <p className="text-[13px] text-content-3l dark:text-content-3d">Select a task to inspect it</p>
         </div>
       )}
     </div>

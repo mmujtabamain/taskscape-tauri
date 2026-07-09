@@ -27,10 +27,10 @@ const SHORTCUTS: { label: string; keys: string; global?: boolean }[] = [
 function SectionLabel({ children }: { children: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[11px] font-semibold tracking-[0.1em] uppercase text-ink-3">
+      <span className="text-[11px] font-semibold tracking-[0.1em] uppercase text-content-3l dark:text-content-3d">
         {children}
       </span>
-      <span className="-mr-5 flex-1 border-t border-hairline-faint" />
+      <span className="-mr-5 flex-1 border-t border-edge-1l dark:border-edge-1d" />
     </div>
   );
 }
@@ -101,7 +101,7 @@ export function SettingsWindow() {
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-window">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-1l dark:bg-surface-1d">
       <style>{"@keyframes settings-in { from { opacity: 0; transform: scale(0.97); } }"}</style>
       <div
         className="flex h-full flex-col"
@@ -114,16 +114,16 @@ export function SettingsWindow() {
         <header
           ref={headerRef}
           data-tauri-drag-region
-          className="flex h-11 shrink-0 items-center border-b border-hairline px-4"
+          className="flex h-11 shrink-0 items-center border-b border-edge-2l dark:border-edge-2d px-4"
         >
-          <h1 data-tauri-drag-region className="font-display text-[15px] font-semibold text-ink">
+          <h1 data-tauri-drag-region className="font-display text-[15px] font-semibold text-content-1l dark:text-content-1d">
             Settings
           </h1>
           <button
             type="button"
             aria-label="Close settings"
             onClick={() => void getCurrentWindow().close()}
-            className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-ink-2 transition duration-150 hover:bg-wash-strong hover:text-ink"
+            className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-content-2l dark:text-content-2d transition duration-150 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
           >
             <Icon name="close" size={18} />
           </button>
@@ -132,7 +132,7 @@ export function SettingsWindow() {
         <div ref={bodyRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
           <section className="space-y-3">
             <SectionLabel>Appearance</SectionLabel>
-            <div className="flex rounded-lg bg-recessed p-0.5">
+            <div className="flex rounded-lg bg-surface-0l dark:bg-surface-0d p-0.5">
               {THEME_OPTIONS.map((o) => (
                 <button
                   key={o.value}
@@ -140,8 +140,8 @@ export function SettingsWindow() {
                   onClick={() => chooseTheme(o.value)}
                   className={`h-7 flex-1 rounded-[6px] text-[12px] font-medium transition duration-150 ${
                     theme === o.value
-                      ? "border border-hairline bg-raised text-ink"
-                      : "text-ink-2 hover:text-ink"
+                      ? "border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d"
+                      : "text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d"
                   }`}
                 >
                   {o.label}
@@ -153,7 +153,7 @@ export function SettingsWindow() {
           <section className="space-y-3">
             <SectionLabel>Tasks</SectionLabel>
             <div className="flex items-center justify-between">
-              <span className="text-[13px] text-ink">Show completed tasks</span>
+              <span className="text-[13px] text-content-1l dark:text-content-1d">Show completed tasks</span>
               <button
                 type="button"
                 role="switch"
@@ -161,11 +161,11 @@ export function SettingsWindow() {
                 aria-label="Show completed tasks"
                 onClick={toggleCompleted}
                 className={`relative h-5 w-[34px] shrink-0 rounded-full border transition-colors duration-[160ms] ${
-                  showCompleted ? "border-transparent bg-accent" : "border-hairline bg-recessed"
+                  showCompleted ? "border-transparent bg-accent-500l dark:bg-accent-500d" : "border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d"
                 }`}
               >
                 <span
-                  className={`absolute top-1/2 left-px h-4 w-4 -translate-y-1/2 rounded-full bg-raised shadow-sm transition-transform duration-[160ms] ${
+                  className={`absolute top-1/2 left-px h-4 w-4 -translate-y-1/2 rounded-full bg-surface-3l dark:bg-surface-3d shadow-sm transition-transform duration-[160ms] ${
                     showCompleted ? "translate-x-[14px]" : "translate-x-0"
                   }`}
                 />
@@ -179,16 +179,16 @@ export function SettingsWindow() {
               {SHORTCUTS.map((s) => (
                 <div
                   key={s.label}
-                  className="flex items-center justify-between text-[12.5px] text-ink-2"
+                  className="flex items-center justify-between text-[12.5px] text-content-2l dark:text-content-2d"
                 >
                   <span>{s.label}</span>
                   <span className="flex items-center gap-1.5">
                     {s.global && (
-                      <span className="text-[10px] tracking-[0.08em] uppercase text-ink-3">
+                      <span className="text-[10px] tracking-[0.08em] uppercase text-content-3l dark:text-content-3d">
                         global
                       </span>
                     )}
-                    <kbd className="inline-flex h-5 items-center rounded border border-hairline bg-recessed px-1.5 font-sans text-[11px] text-ink-2 tabular-nums">
+                    <kbd className="inline-flex h-5 items-center rounded border border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d px-1.5 font-sans text-[11px] text-content-2l dark:text-content-2d tabular-nums">
                       {s.keys}
                     </kbd>
                   </span>
@@ -198,7 +198,7 @@ export function SettingsWindow() {
           </section>
         </div>
 
-        <footer ref={footerRef} className="shrink-0 pb-4 text-center text-[11px] text-ink-3">
+        <footer ref={footerRef} className="shrink-0 pb-4 text-center text-[11px] text-content-3l dark:text-content-3d">
           Taskscape 0.1.0
         </footer>
       </div>

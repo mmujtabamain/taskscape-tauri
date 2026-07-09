@@ -89,9 +89,9 @@ export function TaskPane({
   };
 
   return (
-    <section className="flex h-full min-w-0 flex-1 flex-col bg-content">
-      <div className="mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 rounded-lg bg-recessed px-3 transition-shadow focus-within:ring-1 focus-within:ring-focus">
-        <Icon name="add" size={18} weight={300} className="shrink-0 text-ink-3" />
+    <section className="flex h-full min-w-0 flex-1 flex-col bg-surface-2l dark:bg-surface-2d">
+      <div className="mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 rounded-lg bg-surface-0l dark:bg-surface-0d px-3 transition-shadow focus-within:ring-1 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
+        <Icon name="add" size={18} weight={300} className="shrink-0 text-content-3l dark:text-content-3d" />
         <input
           ref={composerRef}
           placeholder="Add a task — Enter to save"
@@ -100,12 +100,12 @@ export function TaskPane({
             if (e.key === "Enter") submit();
             if (e.key === "Escape") (e.target as HTMLInputElement).blur();
           }}
-          className="w-full bg-transparent text-[14px] text-ink outline-none placeholder:text-ink-3"
+          className="w-full bg-transparent text-[14px] text-content-1l dark:text-content-1d outline-none placeholder:text-content-3l dark:placeholder:text-content-3d"
         />
         {isSplit && onCloseSplit && (
           <button
             onClick={onCloseSplit}
-            className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 hover:bg-wash hover:text-ink"
+            className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
             title="Close split"
           >
             <Icon name="close" size={16} weight={300} />
@@ -139,7 +139,7 @@ export function TaskPane({
         <div ref={contentRef} className="relative pb-6">
           {tick && (
             <span
-              className="pointer-events-none absolute z-10 h-5 w-[2px] rounded-full bg-accent transition-[top,left] duration-100 ease-[cubic-bezier(0.2,0,0,1)]"
+              className="pointer-events-none absolute z-10 h-5 w-[2px] rounded-full bg-accent-500l dark:bg-accent-500d transition-[top,left] duration-100 ease-[cubic-bezier(0.2,0,0,1)]"
               style={{ top: tick.top, left: tick.left }}
             />
           )}
@@ -147,8 +147,8 @@ export function TaskPane({
             <TaskRow key={task.id} task={task} depth={0} ctx={ctx} />
           ))}
           {rootDropOver && ctx.draggingId && (
-            <div className="relative mx-3 mt-1 h-[2px] rounded bg-accent">
-              <span className="absolute top-1/2 -left-[3px] h-[6px] w-[6px] -translate-y-1/2 rounded-full bg-accent" />
+            <div className="relative mx-3 mt-1 h-[2px] rounded bg-accent-500l dark:bg-accent-500d">
+              <span className="absolute top-1/2 -left-[3px] h-[6px] w-[6px] -translate-y-1/2 rounded-full bg-accent-500l dark:bg-accent-500d" />
             </div>
           )}
           {visibleRoots.length === 0 && (
@@ -157,12 +157,12 @@ export function TaskPane({
                 name={searching ? "search_off" : "landscape"}
                 size={30}
                 weight={200}
-                className="mb-1 text-ink-3"
+                className="mb-1 text-content-3l dark:text-content-3d"
               />
-              <p className="font-display text-[16px] font-medium text-ink-2">
+              <p className="font-display text-[16px] font-medium text-content-2l dark:text-content-2d">
                 {searching ? `No matches in ${list.name}` : "Nothing here yet"}
               </p>
-              <p className="text-[13px] tracking-[0.01em] text-ink-3">
+              <p className="text-[13px] tracking-[0.01em] text-content-3l dark:text-content-3d">
                 {searching
                   ? "Try a different search"
                   : "Add a task above, or press ⌘⏎ anywhere to capture one"}
@@ -179,20 +179,20 @@ export function TaskPane({
 
 function StatsBar({ open, done, total, pct }: { open: number; done: number; total: number; pct: number }) {
   return (
-    <div className="flex h-9 shrink-0 items-center gap-3 border-t border-hairline bg-content px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3 tabular-nums">
-      <span className="text-accent">{open} open</span>
-      <span className="h-3 w-px bg-hairline" />
+    <div className="flex h-9 shrink-0 items-center gap-3 border-t border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-content-3l dark:text-content-3d tabular-nums">
+      <span className="text-accent-500l dark:text-accent-500d">{open} open</span>
+      <span className="h-3 w-px bg-edge-2l dark:bg-edge-2d" />
       <span>
         {done}/{total} done
       </span>
       <div className="ml-auto flex items-center gap-2">
-        <span className="relative h-1 w-24 overflow-hidden rounded-full bg-recessed">
+        <span className="relative h-1 w-24 overflow-hidden rounded-full bg-surface-0l dark:bg-surface-0d">
           <span
-            className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-150"
+            className="absolute inset-y-0 left-0 rounded-full bg-accent-500l dark:bg-accent-500d transition-[width] duration-150"
             style={{ width: `${pct}%` }}
           />
         </span>
-        <span className="w-8 text-right text-ink-2">{pct}%</span>
+        <span className="w-8 text-right text-content-2l dark:text-content-2d">{pct}%</span>
       </div>
     </div>
   );

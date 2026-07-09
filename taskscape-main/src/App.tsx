@@ -591,7 +591,7 @@ function App() {
   // ----- layout -----
   return (
     <ContextMenuProvider>
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-window text-ink">
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-1l dark:bg-surface-1d text-content-1l dark:text-content-1d">
         <TitleBar
           projects={projects}
           selectedProjectId={selectedProjectId}
@@ -652,7 +652,7 @@ function App() {
                       )
                     }
                   />
-                  <div className="flex min-w-0 flex-1 border-l border-hairline">
+                  <div className="flex min-w-0 flex-1 border-l border-edge-2l dark:border-edge-2d">
                     <TaskPane
                       list={splitList}
                       roots={rootsByList[splitList.id] ?? []}
@@ -669,11 +669,11 @@ function App() {
               )}
             </div>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-content">
-              <p className="font-display text-[17px] font-medium text-ink-2">No lists yet</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-surface-2l dark:bg-surface-2d">
+              <p className="font-display text-[17px] font-medium text-content-2l dark:text-content-2d">No lists yet</p>
               <button
                 onClick={createList}
-                className="rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold tracking-[0.01em] text-on-accent transition-colors hover:bg-accent-hover active:bg-accent-active"
+                className="rounded-lg bg-accent-500l dark:bg-accent-500d px-4 py-2 text-[13px] font-semibold tracking-[0.01em] text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d active:bg-accent-700l dark:active:bg-accent-700d"
               >
                 Create your first list
               </button>
@@ -685,7 +685,7 @@ function App() {
               <Resizer
                 onResize={(x, rect) => setPreviewW(Math.min(420, Math.max(280, rect.right - x)))}
               />
-              <aside style={{ width: previewW }} className="shrink-0 border-l border-hairline">
+              <aside style={{ width: previewW }} className="shrink-0 border-l border-edge-2l dark:border-edge-2d">
                 <PreviewPanel
                   task={selectedTask}
                   childrenByParent={childrenByParent}
@@ -711,7 +711,7 @@ function App() {
         </div>
 
         {!ready && (
-          <div className="absolute inset-0 z-50 grid place-items-center bg-window">
+          <div className="absolute inset-0 z-50 grid place-items-center bg-surface-1l dark:bg-surface-1d">
             <Spinner size={26} label="Loading…" />
           </div>
         )}
@@ -745,7 +745,7 @@ function Resizer({ onResize }: { onResize: (clientX: number, rect: DOMRect) => v
     >
       <span
         className={`absolute inset-y-0 left-0 w-px transition-colors ${
-          active ? "bg-hairline-strong" : "bg-transparent hover:bg-hairline"
+          active ? "bg-edge-3l dark:bg-edge-3d" : "bg-transparent hover:bg-edge-2l dark:hover:bg-edge-2d"
         }`}
       />
     </div>
