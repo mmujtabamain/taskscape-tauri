@@ -151,10 +151,10 @@ function App() {
         <button
           onClick={() => api.openMain()}
           tabIndex={-1}
-          className="flex min-w-0 items-center gap-1 text-xs text-content-2l transition hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d"
+          className="flex min-w-0 items-center gap-2 text-xs text-content-2l transition hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d"
           title="Open the main Taskscape window"
         >
-          <Icon name="open_in_new" size={12} />
+          <Icon name="open_in_new" size={14} />
           <span className="truncate">
             {target ? (
               <>
