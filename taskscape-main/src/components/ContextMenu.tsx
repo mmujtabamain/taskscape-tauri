@@ -1,41 +1,12 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { setOverlay } from '../lib/overlays';
+import {
+  MenuContext,
+  type MenuItem,
+  type OpenMenu,
+} from './contextMenuContext';
 import { Icon } from './Icon';
-
-export interface MenuItem {
-  id: string;
-  label: string;
-  icon?: string;
-  danger?: boolean;
-  disabled?: boolean;
-  /** Renders a separator above this item. */
-  dividerAbove?: boolean;
-  shortcut?: string;
-  submenu?: MenuItem[];
-}
-
-interface OpenMenu {
-  items: MenuItem[];
-  x: number;
-  y: number;
-  onPick: (id: string) => void;
-}
-
-const MenuContext = createContext<{ open: (m: OpenMenu) => void }>({
-  open: () => {},
-});
-
-export function useContextMenu() {
-  return useContext(MenuContext);
-}
 
 /** App-wide context-menu layer. Wrap the window root once; open menus from
  *  anywhere via useContextMenu().open({ items, x, y, onPick }). */

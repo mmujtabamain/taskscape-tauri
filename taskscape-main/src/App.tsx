@@ -53,7 +53,12 @@ function App() {
     zone: DropZone;
   } | null>(null);
 
-  const searchRef = useRef<HTMLInputElement | null>(null);
+  // The search input lives in TitleBar; it registers a focus handler here so ⌘F
+  // can focus it without threading a ref through props (mirrors registerComposer).
+  const searchFocusRef = useRef<(() => void) | null>(null);
+  const registerSearch = useCallback((focus: (() => void) | null) => {
+    searchFocusRef.current = focus;
+  }, []);
   const composers = useRef(new Map<string, (seed?: string) => void>());
 
   // Refs mirror the current selection so `load` (a stable callback) can preserve
@@ -116,7 +121,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   // Reload when the tray process captures a task into the shared database.
@@ -386,8 +393,11 @@ function App() {
 
   const subtreeSize = useCallback(
     (id: string): number => {
-      const kids = childrenByParent[id] ?? [];
-      return kids.reduce((n, k) => n + 1 + subtreeSize(k.id), 0);
+      const count = (i: string): number => {
+        const kids = childrenByParent[i] ?? [];
+        return kids.reduce((n, k) => n + 1 + count(k.id), 0);
+      };
+      return count(id);
     },
     [childrenByParent]
   );
@@ -573,8 +583,7 @@ function App() {
       if (cmdKey(e)) {
         if (e.key === 'f') {
           e.preventDefault();
-          searchRef.current?.focus();
-          searchRef.current?.select();
+          searchFocusRef.current?.();
           return;
         }
         if (e.key === 'n') {
@@ -689,7 +698,7 @@ function App() {
           onReorderList={reorderList}
           search={search}
           onSearchChange={setSearch}
-          searchRef={searchRef}
+          registerSearch={registerSearch}
           previewOpen={previewOpen}
           onTogglePreview={() => setPreviewOpen((v) => !v)}
         />

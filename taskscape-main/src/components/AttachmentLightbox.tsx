@@ -62,11 +62,29 @@ export function AttachmentLightbox({
 }: Props) {
   const attachment = attachments[index];
   const count = attachments.length;
-  const [src, setSrc] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(true);
-  const [text, setText] = useState<string | null>(null);
-  const [textFailed, setTextFailed] = useState(false);
-  const [mediaFailed, setMediaFailed] = useState(false);
+  // Async results are tagged with the attachment (or src) they belong to, so a
+  // stale result is ignored by a render-time identity check instead of resetting
+  // state synchronously inside the effect when the input changes.
+  const [resolved, setResolved] = useState<{
+    id: string;
+    src: string | null;
+  } | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const [loadedText, setLoadedText] = useState<{
+    src: string;
+    text: string | null;
+    failed: boolean;
+  } | null>(null);
+
+  const resolving = !attachment || resolved?.id !== attachment.id;
+  const src =
+    attachment && resolved && resolved.id === attachment.id
+      ? resolved.src
+      : null;
+  const mediaFailed = !!attachment && failedId === attachment.id;
+  const textForSrc = loadedText && loadedText.src === src ? loadedText : null;
+  const text = textForSrc ? textForSrc.text : null;
+  const textFailed = textForSrc ? textForSrc.failed : false;
 
   const kind = attachment
     ? fileKindFor(attachment.name, attachment.location)
@@ -104,13 +122,8 @@ export function AttachmentLightbox({
   useEffect(() => {
     if (!attachment) return;
     let alive = true;
-    setResolving(true);
-    setSrc(null);
-    setMediaFailed(false);
     attachmentSrc(attachment).then((s) => {
-      if (!alive) return;
-      setSrc(s);
-      setResolving(false);
+      if (alive) setResolved({ id: attachment.id, src: s });
     });
     return () => {
       alive = false;
@@ -120,18 +133,21 @@ export function AttachmentLightbox({
   useEffect(() => {
     if (preview !== 'text' || !src) return;
     let alive = true;
-    setText(null);
-    setTextFailed(false);
     fetch(src)
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
       .then((t) => {
         if (alive)
-          setText(
-            t.length > TEXT_PREVIEW_CAP ? `${t.slice(0, TEXT_PREVIEW_CAP)}…` : t
-          );
+          setLoadedText({
+            src,
+            text:
+              t.length > TEXT_PREVIEW_CAP
+                ? `${t.slice(0, TEXT_PREVIEW_CAP)}…`
+                : t,
+            failed: false,
+          });
       })
       .catch(() => {
-        if (alive) setTextFailed(true);
+        if (alive) setLoadedText({ src, text: null, failed: true });
       });
     return () => {
       alive = false;
@@ -209,7 +225,7 @@ export function AttachmentLightbox({
             src={src}
             alt={attachment.name}
             draggable={false}
-            onError={() => setMediaFailed(true)}
+            onError={() => setFailedId(attachment.id)}
             className="rounded-control max-h-full max-w-full object-contain shadow-2xl"
           />
         );
@@ -219,7 +235,7 @@ export function AttachmentLightbox({
             controls
             autoPlay
             src={src}
-            onError={() => setMediaFailed(true)}
+            onError={() => setFailedId(attachment.id)}
             className="rounded-control max-h-full max-w-full shadow-2xl"
           />
         );
@@ -236,7 +252,7 @@ export function AttachmentLightbox({
               controls
               autoPlay
               src={src}
-              onError={() => setMediaFailed(true)}
+              onError={() => setFailedId(attachment.id)}
             />
           </div>
         );

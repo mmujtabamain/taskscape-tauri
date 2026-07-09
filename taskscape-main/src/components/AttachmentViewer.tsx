@@ -52,24 +52,35 @@ export function AttachmentViewer({
   const preview = previewKindFor(attachment);
   const remote = isRemote(attachment.location);
 
-  const [src, setSrc] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(true);
-  const [text, setText] = useState<string | null>(null);
-  const [textFailed, setTextFailed] = useState(false);
+  // Async results are tagged with the attachment (or src) they belong to, so a
+  // stale result is ignored by a render-time identity check instead of resetting
+  // state synchronously inside the effect when the input changes.
+  const [resolved, setResolved] = useState<{
+    id: string;
+    src: string | null;
+  } | null>(null);
   // The asset protocol only serves files under its configured scope; a
   // reference pointing outside it fails to load — degrade to the "Open" card
-  // rather than a broken <img>/<embed>.
-  const [mediaFailed, setMediaFailed] = useState(false);
+  // rather than a broken <img>/<embed>. Tagged by attachment id so it clears
+  // itself when the attachment changes.
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const [loadedText, setLoadedText] = useState<{
+    src: string;
+    text: string | null;
+    failed: boolean;
+  } | null>(null);
+
+  const resolving = resolved?.id !== attachment.id;
+  const src = resolved && resolved.id === attachment.id ? resolved.src : null;
+  const mediaFailed = failedId === attachment.id;
+  const textForSrc = loadedText && loadedText.src === src ? loadedText : null;
+  const text = textForSrc ? textForSrc.text : null;
+  const textFailed = textForSrc ? textForSrc.failed : false;
 
   useEffect(() => {
     let alive = true;
-    setResolving(true);
-    setSrc(null);
-    setMediaFailed(false);
     attachmentSrc(attachment).then((s) => {
-      if (!alive) return;
-      setSrc(s);
-      setResolving(false);
+      if (alive) setResolved({ id: attachment.id, src: s });
     });
     return () => {
       alive = false;
@@ -79,18 +90,21 @@ export function AttachmentViewer({
   useEffect(() => {
     if (preview !== 'text' || !src) return;
     let alive = true;
-    setText(null);
-    setTextFailed(false);
     fetch(src)
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
       .then((t) => {
         if (alive)
-          setText(
-            t.length > TEXT_PREVIEW_CAP ? `${t.slice(0, TEXT_PREVIEW_CAP)}…` : t
-          );
+          setLoadedText({
+            src,
+            text:
+              t.length > TEXT_PREVIEW_CAP
+                ? `${t.slice(0, TEXT_PREVIEW_CAP)}…`
+                : t,
+            failed: false,
+          });
       })
       .catch(() => {
-        if (alive) setTextFailed(true);
+        if (alive) setLoadedText({ src, text: null, failed: true });
       });
     return () => {
       alive = false;
@@ -148,9 +162,9 @@ export function AttachmentViewer({
             src={src}
             alt={attachment.name}
             draggable={false}
-            onError={() => setMediaFailed(true)}
+            onError={() => setFailedId(attachment.id)}
             onClick={() => api.openAttachment(attachment)}
-            className="max-h-[260px] w-full cursor-pointer object-contain"
+            className="max-h-65 w-full cursor-pointer object-contain"
             title="Open full size"
           />
         );
@@ -159,8 +173,8 @@ export function AttachmentViewer({
           <video
             controls
             src={src}
-            onError={() => setMediaFailed(true)}
-            className="max-h-[260px] w-full"
+            onError={() => setFailedId(attachment.id)}
+            className="max-h-65 w-full"
           />
         );
       case 'audio':
@@ -168,7 +182,7 @@ export function AttachmentViewer({
           <audio
             controls
             src={src}
-            onError={() => setMediaFailed(true)}
+            onError={() => setFailedId(attachment.id)}
             className="w-full"
           />
         );
@@ -177,14 +191,14 @@ export function AttachmentViewer({
           <embed
             src={src}
             type="application/pdf"
-            className="h-[260px] w-full"
+            className="h-65 w-full"
           />
         );
       case 'text':
         if (textFailed) return noneCard;
         if (text === null) return loading;
         return (
-          <pre className="text-content-2l dark:text-content-2d max-h-[260px] overflow-auto p-3 text-[11px] leading-4 break-words whitespace-pre-wrap select-text">
+          <pre className="text-content-2l dark:text-content-2d max-h-65 overflow-auto p-3 text-[11px] leading-4 wrap-break-word whitespace-pre-wrap select-text">
             {text}
           </pre>
         );
@@ -227,7 +241,7 @@ export function AttachmentViewer({
         />
         <IconButton name="close" title="Close preview" onClick={onClose} />
       </div>
-      <div className="rounded-field border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d max-h-[260px] overflow-hidden border">
+      <div className="rounded-field border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d max-h-65 overflow-hidden border">
         {renderBody()}
       </div>
     </div>

@@ -17,7 +17,7 @@ import { propagateAttachmentRename } from '../lib/mentions';
 import { confirmModal, openModal, promptName } from '../lib/modal';
 import { absoluteDateTime, relativeTime } from '../time';
 import { AttachmentLightbox } from './AttachmentLightbox';
-import { useContextMenu } from './ContextMenu';
+import { useContextMenu } from './contextMenuContext';
 import { Icon } from './Icon';
 import {
   ATTACHMENT_MIME,

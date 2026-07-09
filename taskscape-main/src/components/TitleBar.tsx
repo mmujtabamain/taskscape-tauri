@@ -1,4 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useEffect, useRef } from 'react';
 import { api, type List, type Project } from '../api';
 import { cmd, isMac } from '../lib/platform';
 import { Icon } from './Icon';
@@ -29,7 +30,7 @@ interface Props {
 
   search: string;
   onSearchChange: (q: string) => void;
-  searchRef: React.RefObject<HTMLInputElement | null>;
+  registerSearch: (focus: (() => void) | null) => void;
 
   previewOpen: boolean;
   onTogglePreview: () => void;
@@ -40,6 +41,16 @@ export function TitleBar(props: Props) {
     props.splitListId ??
     props.lists.find((l) => l.id !== props.activeListId)?.id ??
     null;
+
+  const searchRef = useRef<HTMLInputElement>(null);
+  const { registerSearch } = props;
+  useEffect(() => {
+    registerSearch(() => {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    });
+    return () => registerSearch(null);
+  }, [registerSearch]);
 
   return (
     <header
@@ -87,7 +98,7 @@ export function TitleBar(props: Props) {
             className="text-content-3l dark:text-content-3d shrink-0"
           />
           <input
-            ref={props.searchRef}
+            ref={searchRef}
             value={props.search}
             onChange={(e) => props.onSearchChange(e.target.value)}
             onKeyDown={(e) => {

@@ -129,7 +129,7 @@ function linkifyMentions(root: ParentNode, names: string[]) {
   for (const text of texts) {
     if (!text.parentElement || text.parentElement.closest('.att-chip'))
       continue;
-    let value = text.textContent ?? '';
+    const value = text.textContent ?? '';
     const at = value.indexOf('@');
     if (at < 0) continue;
     const name = ordered.find((nm) => value.slice(at + 1).startsWith(nm));
