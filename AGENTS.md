@@ -6,9 +6,10 @@ Orientation for coding agents. This mirrors [`CLAUDE.md`](CLAUDE.md); the two ar
 
 **Taskscape** — a macOS task manager built as **two independent Tauri v2 apps** sharing **one Rust crate** and **one SQLite database**:
 
-- **`taskscape-main/`** — the full task-manager window.
-- **`taskscape-tray/`** — an always-on menu-bar agent; its only UI is a frameless "mini" capture bar summoned with **⌘Return**. (Its Tauri window label is `"main"` — that's the mini bar, _not_ the main app.)
+- **`apps/main/`** (package `taskscape-main`) — the full task-manager window.
+- **`apps/tray/`** (package `taskscape-tray`) — an always-on menu-bar agent; its only UI is a frameless "mini" capture bar summoned with **⌘Return**. (Its Tauri window label is `"main"` — that's the mini bar, _not_ the main app.)
 - **`common/`** — shared Rust library (`taskscape_common`): SQLite storage, screenshots, attachments, and the localhost HTTP IPC (main :7420, tray :7421).
+- **`packages/common-ui/`** (package `@taskscape/common-ui`) — shared React/TS frontend library, imported by both apps as `@taskscape/common-ui/*`. The repo is an npm workspace (`apps/*` + `packages/*`).
 
 Two separate processes; they coordinate via the shared SQLite DB in`~/.taskscape/` and localhost HTTP.
 

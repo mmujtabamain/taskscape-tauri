@@ -3,15 +3,18 @@
 ## Two apps, one crate, one database
 
 ```
-taskscape-tauri/
+taskscape-tauri/                # npm workspace (apps/* + packages/*)
 ├── common/            # shared Rust library (taskscape_common)
-├── taskscape-main/    # full task-manager window   (Tauri app)
-├── taskscape-tray/    # menu-bar agent + mini bar   (Tauri app)
+├── packages/
+│   └── common-ui/     # shared React/TS UI lib (@taskscape/common-ui)
+├── apps/
+│   ├── main/          # full task-manager window  (Tauri app, pkg taskscape-main)
+│   └── tray/          # menu-bar agent + mini bar  (Tauri app, pkg taskscape-tray)
 ├── run-dev.sh         # run both apps in dev
 └── make-app.sh        # build + package into one .dmg
 ```
 
-Both `taskscape-main` and `taskscape-tray` are **standalone Tauri v2 apps** with their own `src-tauri/` (Rust) and `src/` (React + TypeScript + Vite). They both depend on the local `common` crate.
+Both apps — `apps/main` and `apps/tray` (packages `taskscape-main` / `taskscape-tray`) — are **standalone Tauri v2 apps** with their own `src-tauri/` (Rust) and `src/` (React + TypeScript + Vite). They both depend on the local `common` Rust crate and the shared `@taskscape/common-ui` frontend package.
 
 ## Why two processes?
 

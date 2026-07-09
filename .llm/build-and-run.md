@@ -6,14 +6,14 @@
 ./run-dev.sh
 ```
 
-Runs **both** apps together and tears both down on Ctrl-C. Each is a normal `npm run tauri dev` (installs `node_modules` first if missing):
+Runs **both** apps together and tears both down on Ctrl-C. The script does one hoisted npm-workspace install at the repo root if `node_modules` is missing, then runs each app's `npm run tauri dev`:
 
 - `taskscape-main` → Vite on **:1420**, HTTP on **:7420**
 - `taskscape-tray` → Vite on **:1421**, HTTP on **:7421**
 
 In dev the two apps are launched by the script, so the main app's `launch_embedded_tray()` is a no-op (the nested bundle only exists in packaged builds).
 
-To run just one app: `cd taskscape-tray && npm run tauri dev`.
+To run just one app: `cd apps/tray && npm run tauri dev` (or `npm run dev -w taskscape-tray`).
 
 ## Ports (fixed)
 

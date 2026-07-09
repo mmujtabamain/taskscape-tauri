@@ -6,12 +6,15 @@ Guidance for Claude Code (and other agents) working in this repository.
 
 **Taskscape** — a macOS task manager built as **two independent Tauri v2 apps** sharing **one Rust crate** and **one SQLite database**:
 
-- **`taskscape-main/`** — the full task-manager window.
-- **`taskscape-tray/`** — an always-on menu-bar agent whose only UI is a frameless "mini" capture bar summoned with **⌘Return**.
+- **`apps/main/`** (package `taskscape-main`) — the full task-manager window.
+- **`apps/tray/`** (package `taskscape-tray`) — an always-on menu-bar agent whose only UI is a frameless "mini" capture bar summoned with **⌘Return**.
 - **`common/`** — shared Rust library (`taskscape_common`): SQLite storage, screenshot capture, attachments, and the localhost HTTP endpoints the two apps use to talk (main :7420, tray :7421).
+- **`packages/common-ui/`** (package `@taskscape/common-ui`) — shared React/TypeScript frontend library (`Icon`, `RichTextEditor`, `sanitizeHtml`, `fileKind`), imported by both apps as `@taskscape/common-ui/*`.
 
 The two apps are separate processes; they coordinate via the shared SQLite DB at
 `~/.taskscape/` and localhost HTTP.
+
+The repo is an **npm workspace** (`apps/*` + `packages/*`) — one hoisted `node_modules` at the root. The shared Rust `common` crate stays at the repo root, referenced by each app's `src-tauri/Cargo.toml` as `../../../common`.
 
 ## Detailed docs — read the one that matches your task
 
@@ -31,7 +34,7 @@ Navigation docs live in [`.llm/`](.llm/README.md):
 ./make-app.sh    # build + package → dist/Taskscape.dmg
 ```
 
-Run one app: `cd taskscape-tray && npm run tauri dev`.
+Run one app: `cd apps/tray && npm run tauri dev` (or `npm run dev -w taskscape-tray`).
 
 ## Conventions (short version — see .llm/conventions.md)
 

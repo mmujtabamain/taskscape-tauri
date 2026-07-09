@@ -1,8 +1,21 @@
-/* Rich-text note content (authored in a contenteditable, stored as HTML). These
-   are plain CSS rules because the markup is injected, so Tailwind's JIT never
-   sees the classes. */
+/* Rich-text note content (authored in a Tiptap/ProseMirror editor, stored as
+   HTML). These are plain CSS rules because the markup is injected, so Tailwind's
+   JIT never sees the classes. */
+.note-rt {
+  /* ProseMirror needs this for correct caret behavior around spaces/wrapping. */
+  white-space: pre-wrap;
+}
 .note-rt p {
   margin: 0 0 0.4em;
+}
+/* Placeholder (Tiptap Placeholder extension): rendered as the empty editor's
+   first-paragraph ::before so the caret sits to its left, not on top of it. */
+.note-rt p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--content-3);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
 .note-rt p:last-child {
   margin-bottom: 0;

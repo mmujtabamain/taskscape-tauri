@@ -33,6 +33,12 @@ async fn resolve_dark(store: &Store, window: &tauri::WebviewWindow) -> bool {
 /// still pending when the window goes away means the modal never answered.
 struct ModalState(Mutex<Option<(String, serde_json::Value)>>);
 
+/// Sender into the note-write queue. Autosave streams `update_note` calls as the
+/// user types; enqueuing them (instead of writing inline) lets a single worker
+/// apply them in arrival order, off the command path, so concurrent edits to the
+/// same note never race.
+struct NoteQueue(tauri::async_runtime::Sender<(String, String)>);
+
 /// In the packaged macOS app the always-on menu-bar agent ships nested inside
 /// this bundle at `Contents/Library/LoginItems/taskscape-tray.app`, so the user
 /// only ever installs and launches one app. `open` (without `-n`) reuses a
@@ -202,11 +208,13 @@ async fn create_note(
 
 #[tauri::command]
 async fn update_note(
-    store: State<'_, Arc<Store>>,
+    queue: State<'_, NoteQueue>,
     id: String,
     content: String,
-) -> Result<Note, String> {
-    store.update_note(&id, &content).await.map_err(err)
+) -> Result<(), String> {
+    // Fire-and-forget: hand the edit to the ordered write queue and return. The
+    // worker spawned in `run`'s setup applies each one via `Store::update_note`.
+    queue.0.send((id, content)).await.map_err(err)
 }
 
 #[tauri::command]
@@ -519,11 +527,18 @@ pub fn run() {
     );
     let server_store = store.clone();
 
+    // Ordered note-write queue: autosave enqueues `update_note` edits here and a
+    // worker (spawned in `setup`) applies them in order. Bounded so a runaway
+    // producer can't grow memory without bound; 512 is far above the debounced
+    // autosave rate.
+    let (note_tx, note_rx) = tauri::async_runtime::channel::<(String, String)>(512);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(store)
         .manage(ModalState(Mutex::new(None)))
+        .manage(NoteQueue(note_tx))
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             launch_embedded_tray();
@@ -576,6 +591,19 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = server::serve(MAIN_PORT, router).await {
                     eprintln!("[taskscape-main] HTTP server error: {e}");
+                }
+            });
+
+            // Drain the note-write queue: apply each autosave edit in arrival
+            // order. An update whose note was meanwhile deleted just errors
+            // harmlessly (logged), then we move on to the next.
+            let queue_store = server_store.clone();
+            let mut note_rx = note_rx;
+            tauri::async_runtime::spawn(async move {
+                while let Some((id, content)) = note_rx.recv().await {
+                    if let Err(e) = queue_store.update_note(&id, &content).await {
+                        eprintln!("[taskscape-main] queued note update failed ({id}): {e}");
+                    }
                 }
             });
             Ok(())

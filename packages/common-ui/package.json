@@ -5,6 +5,12 @@
   "type": "module",
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "@tiptap/core": "^3.27.3",
+    "@tiptap/extension-character-count": "^3.27.3",
+    "@tiptap/extensions": "^3.27.3",
+    "@tiptap/pm": "^3.27.3",
+    "@tiptap/react": "^3.27.3",
+    "@tiptap/starter-kit": "^3.27.3",
     "material-symbols": "^0.45.6",
     "tailwind-merge": "^3.6.0"
   },

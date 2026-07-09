@@ -85,22 +85,52 @@ function SectionHeader({
   );
 }
 
-/** A saved note: its own rich-text editor that commits on blur (empty → delete),
- *  with a hover delete affordance. */
+/** Debounce for note autosave — how long typing pauses before a write is sent. */
+const AUTOSAVE_MS = 500;
+
+/** A saved note: its own rich-text editor that autosaves as you type (debounced)
+ *  and on blur; clearing it to empty and blurring deletes it. The hover
+ *  affordance deletes it outright (with confirmation, in the parent). */
 function NoteCard({
   note,
   attachments,
   onOpenMention,
-  onCommit,
+  onSave,
+  onEmptied,
   onDelete,
 }: {
   note: Note;
   attachments: Attachment[];
   onOpenMention: (name: string) => void;
-  onCommit: (html: string) => void;
+  onSave: (id: string, html: string) => void;
+  onEmptied: (id: string) => void;
   onDelete: () => void;
 }) {
   const ref = useRef<RichTextHandle>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const lastSaved = useRef(note.content);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const save = () => {
+    const html = ref.current?.getHtml() ?? '';
+    if (html && html !== lastSaved.current) {
+      lastSaved.current = html;
+      onSave(note.id, html);
+    }
+  };
+
+  const flush = () => {
+    window.clearTimeout(timer.current);
+    const html = ref.current?.getHtml() ?? '';
+    // Emptied and blurred → delete; otherwise persist any unsaved change.
+    if (!html) {
+      if (lastSaved.current !== '') onEmptied(note.id);
+      return;
+    }
+    save();
+  };
+
   return (
     <div className="group/note relative">
       <RichTextEditor
@@ -110,7 +140,11 @@ function NoteCard({
         attachments={attachments}
         onOpenMention={onOpenMention}
         onRequestLink={requestNoteLink}
-        onBlur={() => onCommit(ref.current?.getHtml() ?? '')}
+        onChange={() => {
+          window.clearTimeout(timer.current);
+          timer.current = window.setTimeout(save, AUTOSAVE_MS);
+        }}
+        onBlur={flush}
       />
       <button
         onClick={onDelete}
@@ -170,12 +204,18 @@ function TaskInspector({
   const [addingNote, setAddingNote] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const addNoteRef = useRef<RichTextHandle>(null);
-  const savingNote = useRef(false);
+  const addCreated = useRef<Note | null>(null);
+  const addTimer = useRef<number | undefined>(undefined);
+  const addLastSaved = useRef('');
+  const addChain = useRef<Promise<void>>(Promise.resolve());
   const menu = useContextMenu();
 
   const children = childrenByParent[task.id] ?? [];
   const doneChildren = children.filter((c) => c.done).length;
-  const notes = task.note_items;
+  // Notes are managed locally so autosave never has to refetch the task (which
+  // would remount the editor you're typing in). Seeded per task — this inspector
+  // is keyed by task.id, so it remounts (and reseeds) on selection change.
+  const [notes, setNotes] = useState<Note[]>(task.note_items);
 
   const openMention = (name: string) => {
     const idx = task.attachments.findIndex((a) => a.name === name);
@@ -186,31 +226,17 @@ function TaskInspector({
     }
   };
 
-  const saveNewNote = async () => {
-    if (savingNote.current) return;
-    if (addNoteRef.current?.isEmpty() ?? true) {
-      setAddingNote(false);
-      return;
-    }
-    const html = addNoteRef.current?.getHtml() ?? '';
-    savingNote.current = true;
-    try {
-      await api.createNote(task.id, html);
-    } finally {
-      savingNote.current = false;
-    }
-    setAddingNote(false);
-    onRefresh();
+  // An existing note's edits autosave in place — fire-and-forget onto the backend
+  // write queue. The editor holds the live content, so we deliberately don't
+  // refetch here (that would remount the editor mid-edit).
+  const saveNote = (id: string, html: string) => {
+    void api.updateNote(id, html);
   };
 
-  const commitNote = async (note: Note, html: string) => {
-    if (html === note.content) return;
-    if (!html) {
-      await api.deleteNote(note.id);
-    } else {
-      await api.updateNote(note.id, html);
-    }
-    onRefresh();
+  // A note cleared to empty and blurred is removed.
+  const discardNote = (id: string) => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    void api.deleteNote(id).then(onRefresh);
   };
 
   const removeNote = async (note: Note) => {
@@ -221,7 +247,60 @@ function TaskInspector({
       confirmLabel: 'Delete',
     });
     if (!ok) return;
+    setNotes((prev) => prev.filter((n) => n.id !== note.id));
     await api.deleteNote(note.id);
+    onRefresh();
+  };
+
+  // Add-note editor: create the row on the first keystroke, then stream edits.
+  // Saves are serialized through a promise chain so the create can't double-fire
+  // and a blur can await the final write before promoting the draft to a card.
+  const addNoteSave = async (final: boolean) => {
+    const html = addNoteRef.current?.getHtml() ?? '';
+    if (!html) {
+      if (final && addCreated.current) {
+        const id = addCreated.current.id;
+        addCreated.current = null;
+        addLastSaved.current = '';
+        await api.deleteNote(id);
+      }
+      return;
+    }
+    if (!final && html === addLastSaved.current) return;
+    if (!addCreated.current) {
+      addCreated.current = await api.createNote(task.id, html);
+      addLastSaved.current = html;
+    } else if (html !== addLastSaved.current) {
+      addLastSaved.current = html;
+      void api.updateNote(addCreated.current.id, html);
+    }
+  };
+
+  const enqueueAddNote = (final: boolean) => {
+    addChain.current = addChain.current
+      .then(() => addNoteSave(final))
+      .catch(() => {});
+    return addChain.current;
+  };
+
+  const scheduleAddNote = () => {
+    window.clearTimeout(addTimer.current);
+    addTimer.current = window.setTimeout(
+      () => enqueueAddNote(false),
+      AUTOSAVE_MS
+    );
+  };
+
+  const finishAddNote = async () => {
+    window.clearTimeout(addTimer.current);
+    await enqueueAddNote(true);
+    const created = addCreated.current;
+    const html = addNoteRef.current?.getHtml() ?? '';
+    addCreated.current = null;
+    addLastSaved.current = '';
+    setAddingNote(false);
+    if (created && html)
+      setNotes((prev) => [...prev, { ...created, content: html }]);
     onRefresh();
   };
 
@@ -458,11 +537,12 @@ function TaskInspector({
           <div className="flex flex-col gap-2.5">
             {notes.map((note) => (
               <NoteCard
-                key={`${note.id}:${note.updated_at}`}
+                key={note.id}
                 note={note}
                 attachments={task.attachments}
                 onOpenMention={openMention}
-                onCommit={(html) => commitNote(note, html)}
+                onSave={saveNote}
+                onEmptied={discardNote}
                 onDelete={() => removeNote(note)}
               />
             ))}
@@ -476,14 +556,14 @@ function TaskInspector({
                 attachments={task.attachments}
                 onOpenMention={openMention}
                 onRequestLink={requestNoteLink}
+                onChange={scheduleAddNote}
                 onBlur={() => {
                   // The link toolbar opens a native modal window (and the user
                   // may just switch apps); either drops window focus. Keep the
-                  // editor mounted then so that flow can return to it — commit
+                  // editor mounted then so that flow can return to it — finalize
                   // only when focus stays in this window (clicked elsewhere here).
-                  if (document.hasFocus()) void saveNewNote();
+                  if (document.hasFocus()) void finishAddNote();
                 }}
-                onSubmit={saveNewNote}
               />
             ) : (
               <button

@@ -105,8 +105,10 @@ export const api = {
   listNotes: (taskId: string) => invoke<Note[]>('list_notes', { taskId }),
   createNote: (taskId: string, content: string) =>
     invoke<Note>('create_note', { taskId, content }),
+  // Fire-and-forget: the backend enqueues the edit onto an ordered write queue
+  // (autosave streams these as the user types) and returns immediately.
   updateNote: (id: string, content: string) =>
-    invoke<Note>('update_note', { id, content }),
+    invoke<void>('update_note', { id, content }),
   deleteNote: (id: string) => invoke<void>('delete_note', { id }),
 
   // app state
