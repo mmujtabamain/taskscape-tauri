@@ -1,0 +1,111 @@
+@import 'tailwindcss';
+/* Scan the shared common-ui sources so their Tailwind classes generate here too.
+   This app's large src happens to use them all today, but the shared lib is the
+   real source — keep it scanned so a common-ui-only class can't silently drop. */
+@source '../../../packages/common-ui/src';
+@import '../../../packages/common-ui/styles/tokens.css';
+@import '../../../packages/common-ui/styles/note-rt.css';
+
+@font-face {
+  font-family: 'Montserrat';
+  src: url('./assets/fonts/Montserrat-VariableFont_wght.ttf')
+    format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Outfit';
+  src: url('./assets/fonts/Outfit-VariableFont_wght.ttf')
+    format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Theme is driven by a `.dark` class on <html> (set in lib/theme.ts from the
+   saved preference or the system appearance), so a manual override always wins. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* ── App-specific (traffic-light discs + icon weight, theme-swapping) ────── */
+  --tl-inactive-ring: #cececf;
+  --tl-inactive-fill: #c5c5c6;
+  --icon-wght: 350;
+}
+
+.dark {
+  --surface-1: var(--surface-1d);
+  --edge-2: var(--edge-2d);
+  --edge-3: var(--edge-3d);
+  --content-1: var(--content-1d);
+  --content-3: var(--content-3d);
+  --accent-500: var(--accent-500d);
+  --selection-1: var(--selection-1d);
+  --focus-1: var(--focus-1d);
+
+  --tl-inactive-ring: #5a5a5c;
+  --tl-inactive-fill: #4e4e50;
+  --icon-wght: 300;
+}
+
+/* Base element defaults live in @layer base so Tailwind utilities (a later
+   cascade layer) always override them — an unlayered element rule would beat
+   every utility regardless of specificity. */
+@layer base {
+  /* Desktop-app feel: no rubber-band flash, no stray text selection or I-beams
+     outside editable fields. */
+  html,
+  body {
+    overscroll-behavior: none;
+    background-color: var(--surface-1);
+    color: var(--content-1);
+    font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    cursor: default;
+  }
+
+  input,
+  textarea,
+  [contenteditable] {
+    user-select: text;
+    cursor: text;
+  }
+
+  ::selection {
+    background: var(--selection-1);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-1);
+    outline-offset: 1px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  [contenteditable]:focus-visible {
+    outline: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--edge-2);
+    border-radius: 6px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--edge-3);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}

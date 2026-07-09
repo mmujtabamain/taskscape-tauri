@@ -3,7 +3,7 @@
 # make-app.sh — build both Taskscape apps for macOS and package them into a
 # single distributable DMG containing ONE app the user installs.
 #
-# The always-on menu-bar agent (taskscape-tray) is embedded inside the main app
+# The always-on menu-bar agent (apps/tray) is embedded inside the main app
 # at Taskscape.app/Contents/Library/LoginItems/, so from the user's point of view
 # there is a single "Taskscape" app. The main app launches the embedded tray on
 # startup.
@@ -21,14 +21,16 @@ DIST="$ROOT/dist"
 STAGE="$DIST/dmg-staging"
 DMG="$DIST/Taskscape.dmg"
 
+# Install the whole workspace once (hoisted node_modules at the repo root).
+if [ ! -d "$ROOT/node_modules" ]; then
+  echo "==> Installing npm dependencies (workspace)"
+  (cd "$ROOT" && npm install)
+fi
+
 build_app() {
   local dir="$1"
   echo "==> Building $dir"
   cd "$ROOT/$dir"
-  if [ ! -d node_modules ]; then
-    echo "    installing npm dependencies…"
-    npm install
-  fi
   # Only the .app bundle; we assemble the DMG ourselves below.
   npm run tauri -- build --bundles app
 }
@@ -40,11 +42,11 @@ find_app() {
   ls -dt "$ROOT/$1/src-tauri/target/release/bundle/macos/"*.app 2>/dev/null | head -1
 }
 
-build_app taskscape-main
-build_app taskscape-tray
+build_app apps/main
+build_app apps/tray
 
-MAIN_APP="$(find_app taskscape-main)"
-TRAY_APP="$(find_app taskscape-tray)"
+MAIN_APP="$(find_app apps/main)"
+TRAY_APP="$(find_app apps/tray)"
 
 if [ -z "$MAIN_APP" ] || [ -z "$TRAY_APP" ]; then
   echo "error: could not locate built .app bundles" >&2
