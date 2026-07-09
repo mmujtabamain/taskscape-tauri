@@ -116,10 +116,13 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     ref
   ) {
     const edRef = useRef<HTMLDivElement>(null);
+    const wrapRef = useRef<HTMLDivElement>(null);
     const lastHtml = useRef('');
     const savedRange = useRef<Range | null>(null);
     const [empty, setEmpty] = useState(true);
     const [len, setLen] = useState(0);
+    const [toolbarShown, setToolbarShown] = useState(false);
+    const [toolbarPos, setToolbarPos] = useState({ left: 0, bottom: 0 });
     const [mention, setMention] = useState<{
       query: string;
       top: number;
@@ -195,6 +198,26 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
       return () =>
         document.removeEventListener('selectionchange', onSelectionChange);
     }, []);
+
+    // The toolbar is position:fixed so the inspector's scroll container can't clip
+    // it above the editor. Fixed coords are viewport-relative, so recompute them
+    // from the wrapper on every scroll/resize while the editor is focused.
+    useEffect(() => {
+      if (!toolbarShown) return;
+      const place = () => {
+        const el = wrapRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        setToolbarPos({ left: r.left, bottom: window.innerHeight - r.top + 6 });
+      };
+      place();
+      window.addEventListener('scroll', place, true);
+      window.addEventListener('resize', place);
+      return () => {
+        window.removeEventListener('scroll', place, true);
+        window.removeEventListener('resize', place);
+      };
+    }, [toolbarShown]);
 
     useImperativeHandle(ref, () => ({
       getHtml: () => sanitizeNoteHtml(edRef.current?.innerHTML ?? '', names),
@@ -405,10 +428,21 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     };
 
     return (
-      <div className="group rounded-control border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring-accent-500l dark:focus-within:ring-accent-500d relative border transition-colors focus-within:ring">
-        {/* Floating controls: absolutely positioned above the box so revealing or
-          hiding them never relayouts the note content. */}
-        <div className="z-popover rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu pointer-events-none absolute bottom-full left-0 mb-1.5 flex origin-bottom scale-95 items-center gap-0.5 border px-1.5 py-1 opacity-0 transition-[opacity,transform] duration-75 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100">
+      <div
+        ref={wrapRef}
+        className="group rounded-control border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring-accent-500l dark:focus-within:ring-accent-500d relative border transition-colors focus-within:ring"
+      >
+        {/* Floating controls: position:fixed (coords computed from the wrapper)
+          so the inspector's scroll container never clips them above the box, and
+          revealing or hiding them never relayouts the note content. */}
+        <div
+          style={{ left: toolbarPos.left, bottom: toolbarPos.bottom }}
+          className={`z-popover rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu fixed flex origin-bottom items-center gap-0.5 border px-1.5 py-1 transition-[opacity,transform] duration-75 ${
+            toolbarShown
+              ? 'pointer-events-auto scale-100 opacity-100'
+              : 'pointer-events-none scale-95 opacity-0'
+          }`}
+        >
           <ToolButton
             cmd="bold"
             icon="format_bold"
@@ -483,7 +517,9 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
             handleInput();
             detectMention();
           }}
+          onFocus={() => setToolbarShown(true)}
           onBlur={() => {
+            setToolbarShown(false);
             setMention(null);
             onBlur?.();
           }}
