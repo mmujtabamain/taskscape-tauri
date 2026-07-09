@@ -75,7 +75,7 @@ export function TitleBar(props: Props) {
       />
 
       <div className="flex items-center gap-2 pr-3 pl-3">
-        <div className="flex h-8 w-56 items-center gap-2 rounded-lg bg-surface-0l dark:bg-surface-0d px-2.5 transition-shadow focus-within:ring-1 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
+        <div className="flex h-8 w-56 items-center gap-2 rounded-control bg-surface-0l dark:bg-surface-0d px-2.5 transition-shadow focus-within:ring-1 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
           <Icon name="search" size={16} weight={300} className="shrink-0 text-content-3l dark:text-content-3d" />
           <input
             ref={props.searchRef}
@@ -93,7 +93,7 @@ export function TitleBar(props: Props) {
           {props.search && (
             <button
               onClick={() => props.onSearchChange("")}
-              className="grid h-5 w-5 shrink-0 place-items-center rounded text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d"
+              className="grid h-5 w-5 shrink-0 place-items-center rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d"
               title="Clear search"
             >
               <Icon name="close" size={13} />
@@ -140,7 +140,7 @@ function BarButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d ${
+      className={`grid h-8 w-8 place-items-center rounded-control transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d ${
         active ? "text-content-1l dark:text-content-1d" : "text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d"
       } disabled:pointer-events-none disabled:opacity-35`}
     >

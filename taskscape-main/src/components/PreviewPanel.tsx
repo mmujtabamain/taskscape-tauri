@@ -97,7 +97,7 @@ function NoteCard({
       <button
         onClick={onDelete}
         title="Delete note"
-        className="absolute -top-2 -right-2 z-10 grid h-6 w-6 place-items-center rounded-full border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-3l dark:text-content-3d opacity-0 shadow-lift transition-opacity hover:text-danger-500l dark:hover:text-danger-500d group-hover/note:opacity-100"
+        className="absolute -top-2 -right-2 z-raised grid h-6 w-6 place-items-center rounded-full border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-3l dark:text-content-3d opacity-0 shadow-lift transition-opacity hover:text-danger-500l dark:hover:text-danger-500d group-hover/note:opacity-100"
       >
         <Icon name="close" size={14} weight={400} />
       </button>
@@ -115,7 +115,7 @@ function DoneCheckbox({
   onToggle: () => void;
 }) {
   const box =
-    size === 18 ? "h-5 w-5 rounded-[6px]" : "h-[18px] w-[18px] rounded-[5px]";
+    size === 18 ? "h-5 w-5 rounded-field" : "h-[18px] w-[18px] rounded-field";
   return (
     <button
       onClick={onToggle}
@@ -350,7 +350,7 @@ function TaskInspector({
                     setEditingTitle(false);
                   }
                 }}
-                className="-mx-1 w-[calc(100%+8px)] rounded bg-surface-0l dark:bg-surface-0d px-1 font-display text-[18px] font-semibold leading-6 text-content-1l dark:text-content-1d outline-none"
+                className="-mx-1 w-[calc(100%+8px)] rounded-field bg-surface-0l dark:bg-surface-0d px-1 font-display text-[18px] font-semibold leading-6 text-content-1l dark:text-content-1d outline-none"
               />
             ) : (
               <button
@@ -408,7 +408,7 @@ function TaskInspector({
           <button
             onClick={onClose}
             title="Close panel"
-            className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+            className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-field text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
           >
             <Icon name="last_page" size={16} />
           </button>
@@ -460,7 +460,7 @@ function TaskInspector({
             ) : (
               <button
                 onClick={() => setAddingNote(true)}
-                className="flex h-24 w-full items-center justify-center gap-1.5 rounded-lg bg-surface-3l dark:bg-surface-3d border border-dashed border-edge-3l dark:border-edge-3d font-semibold text-content-3l dark:text-content-3d transition-colors hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d"
+                className="flex h-24 w-full items-center justify-center gap-1.5 rounded-control bg-surface-3l dark:bg-surface-3d border border-dashed border-edge-3l dark:border-edge-3d font-semibold text-content-3l dark:text-content-3d transition-colors hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d"
               >
                 <Icon name="add" size={16} />
                 Add note
@@ -483,7 +483,7 @@ function TaskInspector({
               {children.map((child) => (
                 <div
                   key={child.id}
-                  className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-md px-1.5 hover:bg-wash-1l dark:hover:bg-wash-1d"
+                  className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-field px-1.5 hover:bg-wash-1l dark:hover:bg-wash-1d"
                 >
                   <DoneCheckbox
                     done={child.done}
@@ -513,21 +513,21 @@ function TaskInspector({
                 <button
                   onClick={addScreenshot}
                   title="Capture the full screen and attach it"
-                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+                  className="flex h-7 items-center gap-1 rounded-field px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="screenshot_monitor" size={14} />
                   Shot
                 </button>
                 <button
                   onClick={addLink}
-                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+                  className="flex h-7 items-center gap-1 rounded-field px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="add_link" size={14} />
                   Link
                 </button>
                 <button
                   onClick={addFile}
-                  className="flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+                  className="flex h-7 items-center gap-1 rounded-field px-2 text-[12px] font-semibold text-content-3l dark:text-content-3d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="note_add" size={14} />
                   File
@@ -551,7 +551,7 @@ function TaskInspector({
                         e.dataTransfer.setData(ATTACHMENT_MIME, a.name);
                         e.dataTransfer.effectAllowed = "copy";
                       }}
-                      className="group relative block aspect-square w-full overflow-hidden rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d transition-colors hover:border-edge-3l dark:hover:border-edge-3d"
+                      className="group relative block aspect-square w-full overflow-hidden rounded-control border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d transition-colors hover:border-edge-3l dark:hover:border-edge-3d"
                     >
                       {thumb ? (
                         <img
@@ -586,7 +586,7 @@ function TaskInspector({
         <div className="mt-auto border-t border-edge-1l dark:border-edge-1d p-4">
           <button
             onClick={() => onRequestDelete(task)}
-            className="flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold text-danger-500l dark:text-danger-500d transition-colors hover:bg-danger-100l dark:hover:bg-danger-100d"
+            className="flex h-8 items-center gap-1.5 rounded-field px-3 text-[13px] font-semibold text-danger-500l dark:text-danger-500d transition-colors hover:bg-danger-100l dark:hover:bg-danger-100d"
           >
             <Icon name="delete" size={15} />
             Delete task

@@ -182,59 +182,106 @@
   --animate-panel-in: panel-in 120ms cubic-bezier(0.2, 0, 0, 1) both;
 }
 
-/* Desktop-app feel: no rubber-band flash, no stray text selection or I-beams
-   outside editable fields. */
-html,
-body {
-  overscroll-behavior: none;
-  background-color: var(--surface-1);
-  color: var(--content-1);
-  font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
-  -webkit-font-smoothing: antialiased;
-  user-select: none;
-  cursor: default;
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATIC TOKENS  (ported from punkt_xii): radius knob · z-layers · motion
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme {
+  /* Corner radius — one --rounding knob drives three role radii, surfaced as the
+     rounded-field / rounded-control / rounded-panel utilities. Set --rounding: 0
+     to square every corner on the app at once. */
+  --rounding: 0.5rem;
+  --radius-field: calc(var(--rounding) * 0.625); /* tight controls: inputs, small chips */
+  --radius-control: var(--rounding); /* buttons, tabs, menu items */
+  --radius-panel: calc(var(--rounding) * 1.5); /* cards, dialogs, menus, the mini bar */
+
+  /* Named stacking layers — the single source of truth for z-order, mirrored in
+     lib/zLayers.ts. Tailwind turns these into z-base / z-raised / z-modal / …; a
+     raw z-<number> in src fails `npm run typecheck` (scripts/check-z-layers.mjs). */
+  --z-index-base: 0;
+  --z-index-raised: 10;
+  --z-index-popover: 20;
+  --z-index-dropdown: 40;
+  --z-index-overlay: 50;
+  --z-index-modal: 60;
+  --z-index-tooltip: 70;
+
+  /* Motion tokens ported from punkt_xii for later use — the CSS twins below and
+     the JS mirror in src/motion/lib/motion.ts share them. Not yet wired to any
+     component. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 0.18s;
+  --duration-base: 0.28s;
+  --duration-slow: 0.5s;
 }
 
-input,
-textarea,
-[contenteditable] {
-  user-select: text;
-  cursor: text;
+/* Base element defaults live in @layer base so Tailwind utilities (a later
+   cascade layer) always override them — an unlayered element rule would beat
+   every utility regardless of specificity. */
+@layer base {
+  /* Desktop-app feel: no rubber-band flash, no stray text selection or I-beams
+     outside editable fields. */
+  html,
+  body {
+    overscroll-behavior: none;
+    background-color: var(--surface-1);
+    color: var(--content-1);
+    font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    cursor: default;
+  }
+
+  input,
+  textarea,
+  [contenteditable] {
+    user-select: text;
+    cursor: text;
+  }
+
+  ::selection {
+    background: var(--selection-1);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-1);
+    outline-offset: 1px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  [contenteditable]:focus-visible {
+    outline: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--edge-2);
+    border-radius: 6px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--edge-3);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
 }
 
-::selection {
-  background: var(--selection-1);
-}
+/* Hide the scrollbar while keeping the element scrollable (ported from punkt_xii)
+   — for rows/overlays whose scroll affordance is something else. */
+@utility no-scrollbar {
+  scrollbar-width: none;
 
-:focus-visible {
-  outline: 2px solid var(--focus-1);
-  outline-offset: 1px;
-}
-
-input:focus-visible,
-textarea:focus-visible,
-[contenteditable]:focus-visible {
-  outline: none;
-}
-
-::-webkit-scrollbar {
-  width: 11px;
-  height: 11px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--edge-2);
-  border-radius: 6px;
-  border: 3px solid transparent;
-  background-clip: content-box;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--edge-3);
-  border: 3px solid transparent;
-  background-clip: content-box;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes rise {
@@ -258,6 +305,36 @@ textarea:focus-visible,
   }
   to {
     transform: scaleX(0);
+  }
+}
+
+/* ── Motion CSS twins (ported from punkt_xii for later use; NOT yet applied to
+   any component). JS equivalents live in src/motion/lib/motion.ts. All share the
+   --ease-out curve and are neutralized by the reduced-motion block below. ── */
+.animate-fade-in-up {
+  animation: fade-in-up var(--duration-base) var(--ease-out) both;
+}
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.animate-fade-in {
+  animation: fade-in var(--duration-slow) var(--ease-out) both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.animate-scale-in {
+  animation: scale-in var(--duration-base) var(--ease-out) both;
+}
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
   }
 }
 

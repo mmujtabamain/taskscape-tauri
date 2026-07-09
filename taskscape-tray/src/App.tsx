@@ -4,12 +4,12 @@ import { Icon } from "./components/Icon";
 import { api } from "./api";
 
 const fieldClasses =
-  "rounded-lg border px-3 py-2 text-sm outline-none " +
+  "rounded-control border px-3 py-2 text-sm outline-none " +
   "border-edge-2l bg-surface-1l text-content-1l placeholder:text-content-4l focus:border-edge-3l " +
   "dark:border-edge-2d dark:bg-surface-1d dark:text-content-1d dark:placeholder:text-content-4d dark:focus:border-edge-3d";
 
 const iconButtonClasses =
-  "grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition " +
+  "grid h-9 w-9 shrink-0 place-items-center rounded-control border transition " +
   "border-edge-1l bg-surface-1l text-content-2l hover:text-content-1l " +
   "dark:border-edge-1d dark:bg-surface-1d dark:text-content-2d dark:hover:text-content-1d";
 
@@ -87,7 +87,7 @@ function App() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-screen w-screen flex-col justify-center gap-2 rounded-2xl p-2.5 text-content-1l dark:text-content-1d"
+      className="flex h-screen w-screen flex-col justify-center gap-2 rounded-panel p-2.5 text-content-1l dark:text-content-1d"
       onKeyDown={onKeyDown}
     >
       <div className="flex items-center gap-2">
@@ -97,7 +97,7 @@ function App() {
           tabIndex={-1}
           className={`relative ${
             count
-              ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-accent-400 bg-accent-500 text-on-accent transition disabled:opacity-50"
+              ? "grid h-9 w-9 shrink-0 place-items-center rounded-control border border-accent-400 bg-accent-500 text-on-accent transition disabled:opacity-50"
               : `${iconButtonClasses} disabled:opacity-50`
           }`}
           title={

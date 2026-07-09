@@ -155,7 +155,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
         }}
         className={`group/row relative flex min-h-10 items-center pr-3 transition-colors duration-75 ${
           selected ? "bg-selection-1l dark:bg-selection-1d" : "hover:bg-wash-1l dark:hover:bg-wash-1d"
-        } ${nestHighlight ? "rounded-md bg-selection-1l dark:bg-selection-1d ring-1 ring-accent-500l dark:ring-accent-500d ring-inset" : ""} ${
+        } ${nestHighlight ? "rounded-field bg-selection-1l dark:bg-selection-1d ring-1 ring-accent-500l dark:ring-accent-500d ring-inset" : ""} ${
           dragging ? "opacity-40" : ""
         }`}
         style={{ paddingLeft: depth * INDENT }}
@@ -169,7 +169,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
         {/* Drop indicator: accent line at target depth, with its index-dot terminal. */}
         {drop && drop.zone !== "nest" && (
           <span
-            className={`pointer-events-none absolute right-3 z-10 h-[2px] bg-accent-500l dark:bg-accent-500d ${
+            className={`pointer-events-none absolute right-3 z-raised h-[2px] bg-accent-500l dark:bg-accent-500d ${
               drop.zone === "before" ? "-top-px" : "-bottom-px"
             }`}
             style={{ left: depth * INDENT + 44 }}
@@ -187,7 +187,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
                 ctx.toggleCollapsed(task.id);
               }}
               onDoubleClick={(e) => e.stopPropagation()}
-              className={`grid h-5 w-5 place-items-center rounded text-content-3l dark:text-content-3d transition-opacity hover:text-content-1l dark:hover:text-content-1d ${
+              className={`grid h-5 w-5 place-items-center rounded-field text-content-3l dark:text-content-3d transition-opacity hover:text-content-1l dark:hover:text-content-1d ${
                 expanded ? "opacity-0 group-hover/row:opacity-100" : "opacity-100"
               }`}
               title={expanded ? "Collapse" : "Expand"}
@@ -252,7 +252,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
             </span>
           )}
           {task.attachments.length > 0 && (
-            <span className="flex h-5 items-center gap-1 rounded-md border border-edge-2l dark:border-edge-2d px-1.5 text-[11px] font-semibold text-content-3l dark:text-content-3d tabular-nums">
+            <span className="flex h-5 items-center gap-1 rounded-field border border-edge-2l dark:border-edge-2d px-1.5 text-[11px] font-semibold text-content-3l dark:text-content-3d tabular-nums">
               <Icon name="attach_file" size={13} weight={300} />
               {task.attachments.length}
             </span>
@@ -270,7 +270,7 @@ export function TaskRow({ task, depth, ctx }: { task: Task; depth: number; ctx: 
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="grid h-6 w-6 place-items-center rounded text-content-3l dark:text-content-3d opacity-0 transition-opacity duration-100 group-hover/row:opacity-100 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
+            className="grid h-6 w-6 place-items-center rounded-field text-content-3l dark:text-content-3d opacity-0 transition-opacity duration-100 group-hover/row:opacity-100 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
             title="More"
           >
             <Icon name="more_horiz" size={17} weight={300} />
@@ -306,11 +306,11 @@ function Check({ done, flashing, onToggle }: { done: boolean; flashing: boolean;
         onToggle();
       }}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="group/check relative h-[18px] w-[18px] shrink-0 overflow-hidden rounded-[5px]"
+      className="group/check relative h-[18px] w-[18px] shrink-0 overflow-hidden rounded-field"
       title={done ? "Mark not done" : "Mark done"}
     >
       <span
-        className={`absolute inset-0 rounded-[5px] border-[1.5px] transition-colors duration-100 ${
+        className={`absolute inset-0 rounded-field border-[1.5px] transition-colors duration-100 ${
           done ? "border-transparent" : "border-edge-3l dark:border-edge-3d group-hover/row:border-content-3l dark:group-hover/row:border-content-3d"
         }`}
       />
@@ -375,7 +375,7 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (title: str
         if (e.key === "Escape") onDone(null);
       }}
       onBlur={() => onDone(ref.current?.value.trim() || null)}
-      className="w-full rounded bg-surface-0l dark:bg-surface-0d px-1.5 py-0.5 text-[14px] font-medium text-content-1l dark:text-content-1d outline-none"
+      className="w-full rounded-field bg-surface-0l dark:bg-surface-0d px-1.5 py-0.5 text-[14px] font-medium text-content-1l dark:text-content-1d outline-none"
     />
   );
 }
@@ -414,7 +414,7 @@ function SubtaskComposer({
           if (e.key === "Escape") onDismiss();
         }}
         onBlur={onDismiss}
-        className="h-7 flex-1 rounded-md bg-surface-0l dark:bg-surface-0d px-2.5 text-[13px] text-content-1l dark:text-content-1d outline-none placeholder:text-content-3l dark:placeholder:text-content-3d"
+        className="h-7 flex-1 rounded-field bg-surface-0l dark:bg-surface-0d px-2.5 text-[13px] text-content-1l dark:text-content-1d outline-none placeholder:text-content-3l dark:placeholder:text-content-3d"
       />
     </div>
   );

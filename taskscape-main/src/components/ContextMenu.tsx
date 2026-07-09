@@ -57,7 +57,7 @@ export function ContextMenuProvider({ children }: { children: React.ReactNode })
       {menu &&
         createPortal(
           <div
-            className="fixed inset-0 z-50"
+            className="fixed inset-0 z-overlay"
             onMouseDown={() => setMenu(null)}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -114,7 +114,7 @@ function MenuPanel({
     <div
       ref={ref}
       style={nested ? undefined : { left: pos.x, top: pos.y }}
-      className={`${nested ? "" : "absolute"} min-w-44 rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1 shadow-menu`}
+      className={`${nested ? "" : "absolute"} min-w-44 rounded-control border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1 shadow-menu`}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item) => (

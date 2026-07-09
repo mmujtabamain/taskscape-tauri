@@ -8,7 +8,7 @@ import { suggestName } from "../lib/nameSuggest";
 const WIDTH = 340;
 
 const BTN =
-  "h-7 rounded-md px-3.5 text-[12px] font-semibold tracking-[0.02em] transition duration-150";
+  "h-7 rounded-field px-3.5 text-[12px] font-semibold tracking-[0.02em] transition duration-150";
 const BTN_VARIANT: Record<NonNullable<ModalButton["variant"]>, string> = {
   ghost: "border border-edge-2l dark:border-edge-2d text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d",
   primary: "bg-content-1l dark:bg-content-1d text-surface-2l dark:text-surface-2d hover:opacity-90 active:scale-[0.98]",
@@ -191,7 +191,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
               {props.input.suffix ? (
                 // Locked-extension field: the name grows to fit and the greyed
                 // extension stays glued to its right; `.` is stripped as typed.
-                <div className="flex h-8 w-full items-center overflow-hidden rounded-md bg-surface-0l dark:bg-surface-0d px-2.5 text-[13px] focus-within:ring-2 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
+                <div className="flex h-8 w-full items-center overflow-hidden rounded-field bg-surface-0l dark:bg-surface-0d px-2.5 text-[13px] focus-within:ring-2 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
                   <span className="relative inline-flex min-w-[1ch] max-w-full flex-none">
                     <span aria-hidden className="invisible overflow-hidden whitespace-pre">
                       {value || props.input.placeholder || "​"}
@@ -244,7 +244,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                     cancelDrain();
                     if (props.input?.initialValue) e.currentTarget.select();
                   }}
-                  className={`h-8 w-full rounded-md bg-surface-0l dark:bg-surface-0d pl-2.5 text-[13px] text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-2 focus:ring-focus-1l dark:focus:ring-focus-1d ${
+                  className={`h-8 w-full rounded-field bg-surface-0l dark:bg-surface-0d pl-2.5 text-[13px] text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-2 focus:ring-focus-1l dark:focus:ring-focus-1d ${
                     props.input.suggest ? "pr-8" : "pr-2.5"
                   }`}
                 />
@@ -256,7 +256,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                   aria-label="Suggest another name"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={rollSuggestion}
-                  className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-content-3l dark:text-content-3d transition duration-150 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
+                  className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-field text-content-3l dark:text-content-3d transition duration-150 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
                 >
                   <Icon name="casino" size={16} />
                 </button>

@@ -47,7 +47,7 @@ export function ProjectSwitcher({
     <div ref={rootRef} className="relative flex items-center" data-no-drag>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-0l dark:bg-surface-0d py-1.5 pr-2.5 pl-3.5 transition-colors hover:bg-wash-2l dark:hover:bg-wash-2d"
+        className="flex h-8 items-center gap-1.5 rounded-control bg-surface-0l dark:bg-surface-0d py-1.5 pr-2.5 pl-3.5 transition-colors hover:bg-wash-2l dark:hover:bg-wash-2d"
         title="Switch project"
       >
         <span className="max-w-44 truncate font-display text-[14px] font-semibold text-content-1l dark:text-content-1d">
@@ -57,7 +57,7 @@ export function ProjectSwitcher({
       </button>
 
       {open && (
-        <div className="absolute top-10 left-0 z-40 min-w-60 rounded-xl border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1.5 shadow-menu">
+        <div className="absolute top-10 left-0 z-dropdown min-w-60 rounded-panel border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1.5 shadow-menu">
           {projects.map((p) => (
             <div
               key={p.id}
@@ -77,7 +77,7 @@ export function ProjectSwitcher({
                   setOpen(false);
                   onRename(p);
                 }}
-                className="grid h-6 w-6 place-items-center rounded text-content-3l dark:text-content-3d opacity-0 transition-opacity group-hover:opacity-100 hover:text-content-1l dark:hover:text-content-1d"
+                className="grid h-6 w-6 place-items-center rounded-field text-content-3l dark:text-content-3d opacity-0 transition-opacity group-hover:opacity-100 hover:text-content-1l dark:hover:text-content-1d"
                 title="Rename project"
               >
                 <Icon name="edit" size={16} weight={500} />
@@ -88,7 +88,7 @@ export function ProjectSwitcher({
                   setOpen(false);
                   onDelete(p);
                 }}
-                className="grid h-6 w-6 place-items-center rounded text-content-3l dark:text-content-3d opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger-500l dark:hover:text-danger-500d"
+                className="grid h-6 w-6 place-items-center rounded-field text-content-3l dark:text-content-3d opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger-500l dark:hover:text-danger-500d"
                 title="Delete project"
               >
                 <Icon name="delete" size={16} weight={500} />

@@ -52,6 +52,13 @@
 
   /* ── Halo (contrast ring around the count badge) ────────── light │ dark */
   --color-halo-1l: rgb(255 255 255 / 0.7);   --color-halo-1d: rgb(0 0 0 / 0.4);         /* white/70 │ black/40 */
+
+  /* ── Corner radius — one --rounding knob (same convention as the main app) →
+     rounded-field / rounded-control / rounded-panel. --rounding: 0 squares all. */
+  --rounding: 0.5rem;
+  --radius-field: calc(var(--rounding) * 0.625);
+  --radius-control: var(--rounding);
+  --radius-panel: calc(var(--rounding) * 1.5);
 }
 
 /* Let the native vibrancy (window-vibrancy) show through the webview. */

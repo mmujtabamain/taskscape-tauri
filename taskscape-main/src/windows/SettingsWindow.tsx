@@ -123,7 +123,7 @@ export function SettingsWindow() {
             type="button"
             aria-label="Close settings"
             onClick={() => void getCurrentWindow().close()}
-            className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-content-2l dark:text-content-2d transition duration-150 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
+            className="ml-auto flex h-6 w-6 items-center justify-center rounded-field text-content-2l dark:text-content-2d transition duration-150 hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d"
           >
             <Icon name="close" size={18} />
           </button>
@@ -132,13 +132,13 @@ export function SettingsWindow() {
         <div ref={bodyRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
           <section className="space-y-3">
             <SectionLabel>Appearance</SectionLabel>
-            <div className="flex rounded-lg bg-surface-0l dark:bg-surface-0d p-0.5">
+            <div className="flex rounded-control bg-surface-0l dark:bg-surface-0d p-0.5">
               {THEME_OPTIONS.map((o) => (
                 <button
                   key={o.value}
                   type="button"
                   onClick={() => chooseTheme(o.value)}
-                  className={`h-7 flex-1 rounded-[6px] text-[12px] font-medium transition duration-150 ${
+                  className={`h-7 flex-1 rounded-field text-[12px] font-medium transition duration-150 ${
                     theme === o.value
                       ? "border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d"
                       : "text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d"
@@ -188,7 +188,7 @@ export function SettingsWindow() {
                         global
                       </span>
                     )}
-                    <kbd className="inline-flex h-5 items-center rounded border border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d px-1.5 font-sans text-[11px] text-content-2l dark:text-content-2d tabular-nums">
+                    <kbd className="inline-flex h-5 items-center rounded-field border border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d px-1.5 font-sans text-[11px] text-content-2l dark:text-content-2d tabular-nums">
                       {s.keys}
                     </kbd>
                   </span>

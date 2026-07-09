@@ -368,10 +368,10 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
   };
 
   return (
-    <div className="group relative rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d transition-colors focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring focus-within:ring-accent-500l dark:focus-within:ring-accent-500d">
+    <div className="group relative rounded-control border border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d transition-colors focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring focus-within:ring-accent-500l dark:focus-within:ring-accent-500d">
       {/* Floating controls: absolutely positioned above the box so revealing or
           hiding them never relayouts the note content. */}
-      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 flex origin-bottom scale-95 items-center gap-0.5 rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d px-1.5 py-1 opacity-0 shadow-menu transition-[opacity,transform] duration-75 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100">
+      <div className="pointer-events-none absolute bottom-full left-0 z-popover mb-1.5 flex origin-bottom scale-95 items-center gap-0.5 rounded-control border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d px-1.5 py-1 opacity-0 shadow-menu transition-[opacity,transform] duration-75 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100">
         <ToolButton cmd="bold" icon="format_bold" title="Bold  ⌘B" onExec={exec} />
         <ToolButton cmd="italic" icon="format_italic" title="Italic  ⌘I" onExec={exec} />
         <ToolButton cmd="underline" icon="format_underlined" title="Underline  ⌘U" onExec={exec} />
@@ -387,7 +387,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
             e.preventDefault();
             addLink();
           }}
-          className="grid h-6 w-6 place-items-center rounded text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+          className="grid h-6 w-6 place-items-center rounded-field text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
         >
           <Icon name="link" size={16} weight={400} />
         </button>
@@ -521,7 +521,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
 
       {mentionOpen && (
         <div
-          className="fixed z-70 max-h-56 w-60 overflow-y-auto rounded-lg border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1 shadow-menu"
+          className="fixed z-tooltip max-h-56 w-60 overflow-y-auto rounded-control border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d py-1 shadow-menu"
           style={{ top: mention!.top + 4, left: mention!.left }}
         >
           {mentionMatches.map((a, i) => (
@@ -571,7 +571,7 @@ function ToolButton({
         e.preventDefault();
         onExec(cmd);
       }}
-      className="grid h-6 w-6 place-items-center rounded text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+      className="grid h-6 w-6 place-items-center rounded-field text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
     >
       <Icon name={icon} size={16} weight={400} />
     </button>

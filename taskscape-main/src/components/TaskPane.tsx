@@ -90,7 +90,7 @@ export function TaskPane({
 
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col bg-surface-2l dark:bg-surface-2d">
-      <div className="mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 rounded-lg bg-surface-0l dark:bg-surface-0d px-3 transition-shadow focus-within:ring-1 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
+      <div className="mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 rounded-control bg-surface-0l dark:bg-surface-0d px-3 transition-shadow focus-within:ring-1 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
         <Icon name="add" size={18} weight={300} className="shrink-0 text-content-3l dark:text-content-3d" />
         <input
           ref={composerRef}
@@ -105,7 +105,7 @@ export function TaskPane({
         {isSplit && onCloseSplit && (
           <button
             onClick={onCloseSplit}
-            className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-md text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+            className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
             title="Close split"
           >
             <Icon name="close" size={16} weight={300} />
@@ -139,7 +139,7 @@ export function TaskPane({
         <div ref={contentRef} className="relative pb-6">
           {tick && (
             <span
-              className="pointer-events-none absolute z-10 h-5 w-[2px] rounded-full bg-accent-500l dark:bg-accent-500d transition-[top,left] duration-100 ease-[cubic-bezier(0.2,0,0,1)]"
+              className="pointer-events-none absolute z-raised h-5 w-[2px] rounded-full bg-accent-500l dark:bg-accent-500d transition-[top,left] duration-100 ease-[cubic-bezier(0.2,0,0,1)]"
               style={{ top: tick.top, left: tick.left }}
             />
           )}
@@ -147,7 +147,7 @@ export function TaskPane({
             <TaskRow key={task.id} task={task} depth={0} ctx={ctx} />
           ))}
           {rootDropOver && ctx.draggingId && (
-            <div className="relative mx-3 mt-1 h-[2px] rounded bg-accent-500l dark:bg-accent-500d">
+            <div className="relative mx-3 mt-1 h-[2px] rounded-field bg-accent-500l dark:bg-accent-500d">
               <span className="absolute top-1/2 -left-[3px] h-[6px] w-[6px] -translate-y-1/2 rounded-full bg-accent-500l dark:bg-accent-500d" />
             </div>
           )}

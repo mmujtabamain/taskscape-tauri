@@ -673,7 +673,7 @@ function App() {
               <p className="font-display text-[17px] font-medium text-content-2l dark:text-content-2d">No lists yet</p>
               <button
                 onClick={createList}
-                className="rounded-lg bg-accent-500l dark:bg-accent-500d px-4 py-2 text-[13px] font-semibold tracking-[0.01em] text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d active:bg-accent-700l dark:active:bg-accent-700d"
+                className="rounded-control bg-accent-500l dark:bg-accent-500d px-4 py-2 text-[13px] font-semibold tracking-[0.01em] text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d active:bg-accent-700l dark:active:bg-accent-700d"
               >
                 Create your first list
               </button>
@@ -711,7 +711,7 @@ function App() {
         </div>
 
         {!ready && (
-          <div className="absolute inset-0 z-50 grid place-items-center bg-surface-1l dark:bg-surface-1d">
+          <div className="absolute inset-0 z-overlay grid place-items-center bg-surface-1l dark:bg-surface-1d">
             <Spinner size={26} label="Loading…" />
           </div>
         )}
@@ -741,7 +741,7 @@ function Resizer({ onResize }: { onResize: (clientX: number, rect: DOMRect) => v
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", up);
       }}
-      className="relative z-10 -mr-1.25 w-1.25 shrink-0 cursor-col-resize"
+      className="relative z-raised -mr-1.25 w-1.25 shrink-0 cursor-col-resize"
     >
       <span
         className={`absolute inset-y-0 left-0 w-px transition-colors ${

@@ -32,7 +32,7 @@ function BarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/70 transition-colors ${
+      className={`grid h-8 w-8 shrink-0 place-items-center rounded-control text-white/70 transition-colors ${
         danger ? "hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white" : "hover:bg-white/15 hover:text-white"
       }`}
     >
@@ -151,13 +151,13 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
   };
 
   const card = (label: string) => (
-    <div className="flex flex-col items-center gap-3 rounded-xl bg-surface-2l dark:bg-surface-2d px-10 py-12 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-panel bg-surface-2l dark:bg-surface-2d px-10 py-12 text-center">
       <Icon name={kind.icon} size={44} weight={200} className="text-content-3l dark:text-content-3d" />
       <div className="max-w-xs truncate text-[14px] text-content-1l dark:text-content-1d">{attachment.name}</div>
       <div className="text-[12px] text-content-3l dark:text-content-3d">{label}</div>
       <button
         onClick={() => api.openAttachment(attachment)}
-        className="mt-1 flex h-9 items-center gap-1.5 rounded-lg bg-accent-500l dark:bg-accent-500d px-4 text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d"
+        className="mt-1 flex h-9 items-center gap-1.5 rounded-control bg-accent-500l dark:bg-accent-500d px-4 text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-600l dark:hover:bg-accent-600d"
       >
         <Icon name="open_in_new" size={15} />
         Open externally
@@ -176,7 +176,7 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
             alt={attachment.name}
             draggable={false}
             onError={() => setMediaFailed(true)}
-            className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+            className="max-h-full max-w-full rounded-control object-contain shadow-2xl"
           />
         );
       case "video":
@@ -186,23 +186,23 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
             autoPlay
             src={src}
             onError={() => setMediaFailed(true)}
-            className="max-h-full max-w-full rounded-lg shadow-2xl"
+            className="max-h-full max-w-full rounded-control shadow-2xl"
           />
         );
       case "audio":
         return (
-          <div className="rounded-xl bg-surface-2l dark:bg-surface-2d px-8 py-10">
+          <div className="rounded-panel bg-surface-2l dark:bg-surface-2d px-8 py-10">
             <Icon name={kind.icon} size={40} weight={200} className="mx-auto mb-4 block text-content-3l dark:text-content-3d" />
             <audio controls autoPlay src={src} onError={() => setMediaFailed(true)} />
           </div>
         );
       case "pdf":
-        return <embed src={src} type="application/pdf" className="h-full w-full max-w-4xl rounded-lg" />;
+        return <embed src={src} type="application/pdf" className="h-full w-full max-w-4xl rounded-control" />;
       case "text":
         if (textFailed) return card("Couldn’t read this file");
         if (text === null) return <div className="text-[13px] text-white/60">Loading…</div>;
         return (
-          <pre className="max-h-full w-full max-w-3xl select-text overflow-auto rounded-lg bg-surface-2l dark:bg-surface-2d p-5 text-[12.5px] leading-5 text-content-2l dark:text-content-2d">
+          <pre className="max-h-full w-full max-w-3xl select-text overflow-auto rounded-control bg-surface-2l dark:bg-surface-2d p-5 text-[12.5px] leading-5 text-content-2l dark:text-content-2d">
             {text}
           </pre>
         );
@@ -213,7 +213,7 @@ export function AttachmentLightbox({ attachments, index, onIndex, onClose, onDel
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex flex-col bg-black/75 backdrop-blur-sm"
+      className="fixed inset-0 z-modal flex flex-col bg-black/75 backdrop-blur-sm"
       onClick={onClose}
     >
       <div

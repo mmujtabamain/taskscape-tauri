@@ -27,7 +27,7 @@ function IconButton({
     <button
       onClick={onClick}
       title={title}
-      className={`grid h-6 w-6 shrink-0 place-items-center rounded-md text-content-3l dark:text-content-3d transition-colors ${
+      className={`grid h-6 w-6 shrink-0 place-items-center rounded-field text-content-3l dark:text-content-3d transition-colors ${
         danger ? "hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d" : "hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
       }`}
     >
@@ -104,7 +104,7 @@ export function AttachmentViewer({ attachment, onClose, onDeleted }: AttachmentV
       <div className="text-[11px] text-content-3l dark:text-content-3d">No inline preview</div>
       <button
         onClick={() => api.openAttachment(attachment)}
-        className="mt-1 flex h-7 items-center gap-1.5 rounded-md px-3 text-[12px] font-semibold text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
+        className="mt-1 flex h-7 items-center gap-1.5 rounded-field px-3 text-[12px] font-semibold text-content-2l dark:text-content-2d transition-colors hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d"
       >
         <Icon name="open_in_new" size={14} />
         Open
@@ -172,7 +172,7 @@ export function AttachmentViewer({ attachment, onClose, onDeleted }: AttachmentV
         <IconButton name="delete" title="Remove attachment" danger onClick={remove} />
         <IconButton name="close" title="Close preview" onClick={onClose} />
       </div>
-      <div className="max-h-[260px] overflow-hidden rounded-md border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d">
+      <div className="max-h-[260px] overflow-hidden rounded-field border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d">
         {renderBody()}
       </div>
     </div>
