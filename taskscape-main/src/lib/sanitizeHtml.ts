@@ -123,7 +123,19 @@ export function sanitizeNoteHtml(html: string, mentionNames: string[] = []): str
     else if (child.nodeType === Node.COMMENT_NODE) child.parentNode?.removeChild(child);
   }
   if (mentionNames.length) linkifyMentions(tpl.content, mentionNames);
-  return tpl.innerHTML.trim();
+  // Drop trailing line breaks and the zero-width spaces the editor parks the
+  // caret in on a fresh line — neither should persist as real content.
+  let tail = tpl.content.lastChild;
+  while (
+    tail &&
+    ((tail.nodeType === Node.ELEMENT_NODE && (tail as Element).tagName === "BR") ||
+      (tail.nodeType === Node.TEXT_NODE && (tail.textContent ?? "").replace(/\u200B/g, "").trim() === ""))
+  ) {
+    const prev = tail.previousSibling;
+    tail.remove();
+    tail = prev;
+  }
+  return tpl.innerHTML.replace(/\u200B/g, "").trim();
 }
 
 /** Rewrite every mention chip pointing at `oldName` to `newName` in note HTML.

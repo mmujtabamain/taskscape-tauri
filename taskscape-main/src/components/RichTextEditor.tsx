@@ -114,14 +114,18 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
   const mentionOpen = mention !== null && mentionMatches.length > 0;
   const mentionIdx = mention ? Math.min(mention.index, Math.max(0, mentionMatches.length - 1)) : 0;
 
+  // Zero-width spaces are never meaningful note content (WebKit editing artifacts
+  // or pasted text) — ignore them when measuring the editor.
+  const plainText = (el: HTMLElement) => (el.textContent ?? "").replace(/\u200B/g, "");
+
   const isEmpty = (el: HTMLElement) =>
-    (el.textContent ?? "").trim() === "" && !el.querySelector(".att-chip");
+    plainText(el).trim() === "" && !el.querySelector(".att-chip");
 
   const sync = () => {
     const el = edRef.current;
     if (!el) return;
     setEmpty(isEmpty(el));
-    setLen((el.textContent ?? "").length);
+    setLen(plainText(el).length);
   };
 
   // Seed the editable region exactly once — re-rendering its HTML would jump the
@@ -180,7 +184,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
   const handleInput = () => {
     const el = edRef.current;
     if (!el) return;
-    if ((el.textContent ?? "").length > maxLength) {
+    if (plainText(el).length > maxLength) {
       el.innerHTML = lastHtml.current; // revert the edit that broke the cap
       placeCaretEnd(el);
     } else {
@@ -192,6 +196,44 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
   const exec = (cmd: string) => {
     edRef.current?.focus();
     document.execCommand(cmd);
+    handleInput();
+  };
+
+  // Insert a line break at the caret by hand rather than let WebKit handle Enter:
+  // its native break is a bogus/block node the sanitizer unwraps (only <br> is
+  // whitelisted), and a lone trailing <br> won't render its empty line — so at
+  // the end of the content we insert <br><br> with the caret between the pair, and
+  // strip the extra trailing <br> on save.
+  const insertLineBreak = () => {
+    const el = edRef.current;
+    const sel = window.getSelection();
+    if (!el || !sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if (!el.contains(range.startContainer)) return;
+    range.deleteContents();
+    const br = document.createElement("br");
+    range.insertNode(br);
+
+    // insertNode at the end of a text node leaves an empty text node after the
+    // <br>. That stray node broke the first Enter: it read as "content follows",
+    // so no trailing <br> was added and the caret stayed on the old line. Drop it.
+    while (
+      br.nextSibling &&
+      br.nextSibling.nodeType === Node.TEXT_NODE &&
+      (br.nextSibling.textContent ?? "").length === 0
+    ) {
+      br.nextSibling.remove();
+    }
+
+    // Nothing after the break: add a trailing <br> so the new (empty) line
+    // renders; the caret sits between the pair.
+    if (!br.nextSibling) br.after(document.createElement("br"));
+
+    const caret = document.createRange();
+    caret.setStartAfter(br);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
     handleInput();
   };
 
@@ -326,7 +368,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
   };
 
   return (
-    <div className="group relative rounded-lg border border-hairline bg-content transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-focus">
+    <div className="group relative rounded-lg border border-hairline bg-content transition-colors focus-within:border-accent focus-within:ring focus-within:ring-accent">
       {/* Floating controls: absolutely positioned above the box so revealing or
           hiding them never relayouts the note content. */}
       <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 flex origin-bottom scale-95 items-center gap-0.5 rounded-lg border border-hairline bg-raised px-1.5 py-1 opacity-0 shadow-menu transition-[opacity,transform] duration-75 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100">
@@ -402,9 +444,17 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
               return;
             }
           }
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          if (e.key === "Enter") {
+            // Plain Enter submits when the parent wants a submit action (the
+            // add-note editor). Every other Enter — Shift+Enter, or plain Enter
+            // in a saved note — inserts a line break.
+            if (!e.shiftKey && onSubmit) {
+              e.preventDefault();
+              onSubmit();
+              return;
+            }
             e.preventDefault();
-            onSubmit?.();
+            insertLineBreak();
             return;
           }
           if (e.key === "Backspace" || e.key === "Delete") {
@@ -471,7 +521,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTex
 
       {mentionOpen && (
         <div
-          className="fixed z-[70] max-h-56 w-60 overflow-y-auto rounded-lg border border-hairline bg-raised py-1 shadow-menu"
+          className="fixed z-70 max-h-56 w-60 overflow-y-auto rounded-lg border border-hairline bg-raised py-1 shadow-menu"
           style={{ top: mention!.top + 4, left: mention!.left }}
         >
           {mentionMatches.map((a, i) => (

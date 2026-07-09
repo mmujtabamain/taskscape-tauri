@@ -1,13 +1,28 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { api, type Attachment, type Note, type Task, type TaskPatch } from "../api";
-import { attachmentSrc, fileKindFor, isRemote, splitFileName } from "../lib/fileKind";
+import {
+  api,
+  type Attachment,
+  type Note,
+  type Task,
+  type TaskPatch,
+} from "../api";
+import {
+  attachmentSrc,
+  fileKindFor,
+  isRemote,
+  splitFileName,
+} from "../lib/fileKind";
 import { confirmModal, openModal, promptName } from "../lib/modal";
 import { propagateAttachmentRename } from "../lib/mentions";
 import { absoluteDateTime, relativeTime } from "../time";
 import { AttachmentLightbox } from "./AttachmentLightbox";
 import { useContextMenu } from "./ContextMenu";
-import { RichTextEditor, ATTACHMENT_MIME, type RichTextHandle } from "./RichTextEditor";
+import {
+  RichTextEditor,
+  ATTACHMENT_MIME,
+  type RichTextHandle,
+} from "./RichTextEditor";
 import { Icon } from "./Icon";
 
 interface PreviewPanelProps {
@@ -35,10 +50,16 @@ function referenceName(location: string): string {
   return location.split(/[\\/]/).filter(Boolean).pop() || location;
 }
 
-function SectionHeader({ label, trailing }: { label: string; trailing?: ReactNode }) {
+function SectionHeader({
+  label,
+  trailing,
+}: {
+  label: string;
+  trailing?: ReactNode;
+}) {
   return (
     <div className="mb-2 flex items-center gap-3">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
+      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-3">
         {label}
       </span>
       <span className="flex-1 border-t border-hairline-faint" />
@@ -93,7 +114,8 @@ function DoneCheckbox({
   size: 14 | 18;
   onToggle: () => void;
 }) {
-  const box = size === 18 ? "h-5 w-5 rounded-[6px]" : "h-[18px] w-[18px] rounded-[5px]";
+  const box =
+    size === 18 ? "h-5 w-5 rounded-[6px]" : "h-[18px] w-[18px] rounded-[5px]";
   return (
     <button
       onClick={onToggle}
@@ -127,7 +149,9 @@ function TaskInspector({
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
+  const [addingNote, setAddingNote] = useState(false);
   const addNoteRef = useRef<RichTextHandle>(null);
+  const savingNote = useRef(false);
   const menu = useContextMenu();
 
   const children = childrenByParent[task.id] ?? [];
@@ -143,11 +167,20 @@ function TaskInspector({
     }
   };
 
-  const addNote = async () => {
+  const saveNewNote = async () => {
+    if (savingNote.current) return;
+    if (addNoteRef.current?.isEmpty() ?? true) {
+      setAddingNote(false);
+      return;
+    }
     const html = addNoteRef.current?.getHtml() ?? "";
-    if (!html || addNoteRef.current?.isEmpty()) return;
-    await api.createNote(task.id, html);
-    addNoteRef.current?.clear();
+    savingNote.current = true;
+    try {
+      await api.createNote(task.id, html);
+    } finally {
+      savingNote.current = false;
+    }
+    setAddingNote(false);
     onRefresh();
   };
 
@@ -195,7 +228,10 @@ function TaskInspector({
   };
 
   const addFile = async () => {
-    const picked = await open({ multiple: false, title: "Choose a file to copy" });
+    const picked = await open({
+      multiple: false,
+      title: "Choose a file to copy",
+    });
     if (typeof picked === "string") {
       await api.addCopy(task.id, picked);
       onRefresh();
@@ -270,7 +306,13 @@ function TaskInspector({
         ...(isRemote(a.location)
           ? []
           : [{ id: "reveal", label: "Reveal in Finder", icon: "folder_open" }]),
-        { id: "remove", label: "Remove", icon: "delete", danger: true, dividerAbove: true },
+        {
+          id: "remove",
+          label: "Remove",
+          icon: "delete",
+          danger: true,
+          dividerAbove: true,
+        },
       ],
       onPick: (id) => {
         if (id === "rename") renameAttachment(a);
@@ -283,12 +325,16 @@ function TaskInspector({
 
   return (
     <div className="flex min-h-0 flex-1 animate-rise flex-col">
-      <div className="relative shrink-0 border-b border-hairline p-4 pb-3">
+      <div className="relative shrink-0 p-4">
         {/* Index tick: the panel "receives" the selection. */}
-        <span className="absolute left-0 top-[19px] h-4 w-0.5 bg-accent" />
+        <span className="absolute left-0 top-4.75 h-4 w-0.5 bg-accent" />
         <div className="flex items-start gap-2.5">
           <div className="mt-0.5">
-            <DoneCheckbox done={task.done} size={18} onToggle={() => onToggleDone(task)} />
+            <DoneCheckbox
+              done={task.done}
+              size={18}
+              onToggle={() => onToggleDone(task)}
+            />
           </div>
           <div className="min-w-0 flex-1">
             {editingTitle ? (
@@ -320,16 +366,41 @@ function TaskInspector({
             )}
             <div className="mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums text-ink-3">
               <span className="flex items-center gap-1.5">
-                <Icon name="folder_open" size={13} weight={300} className="shrink-0 text-ink-3" />
-                <span className="truncate text-ink-2">{projectName ?? "—"}</span>
-                {listName && <span className="shrink-0 text-ink-3">/ {listName}</span>}
+                <Icon
+                  name="folder_open"
+                  size={13}
+                  weight={300}
+                  className="shrink-0 text-ink-3"
+                />
+                <span className="truncate text-ink-2">
+                  {projectName ?? "—"}
+                </span>
+                {listName && (
+                  <span className="shrink-0 text-ink-3">/ {listName}</span>
+                )}
               </span>
-              <span className="flex items-center gap-1.5" title={absoluteDateTime(task.created_at)}>
-                <Icon name="schedule" size={13} weight={300} className="shrink-0 text-ink-3" />
+              <span
+                className="flex items-center gap-1.5"
+                title={absoluteDateTime(task.created_at)}
+              >
+                <Icon
+                  name="schedule"
+                  size={13}
+                  weight={300}
+                  className="shrink-0 text-ink-3"
+                />
                 Created {relativeTime(task.created_at)}
               </span>
-              <span className="flex items-center gap-1.5" title={absoluteDateTime(task.updated_at)}>
-                <Icon name="update" size={13} weight={300} className="shrink-0 text-ink-3" />
+              <span
+                className="flex items-center gap-1.5"
+                title={absoluteDateTime(task.updated_at)}
+              >
+                <Icon
+                  name="update"
+                  size={13}
+                  weight={300}
+                  className="shrink-0 text-ink-3"
+                />
                 Updated {relativeTime(task.updated_at)}
               </span>
             </div>
@@ -345,12 +416,14 @@ function TaskInspector({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div className="p-4">
+        <div className="p-4 pt-0">
           <SectionHeader
             label="Notes"
             trailing={
               notes.length > 0 ? (
-                <span className="text-[11px] tabular-nums text-ink-3">{notes.length}</span>
+                <span className="text-[11px] tabular-nums text-ink-3">
+                  {notes.length}
+                </span>
               ) : undefined
             }
           />
@@ -367,56 +440,72 @@ function TaskInspector({
               />
             ))}
 
-            <RichTextEditor
-              ref={addNoteRef}
-              placeholder="Write a note…  (drop an attachment to @mention it)"
-              minHeightClass="min-h-24"
-              attachments={task.attachments}
-              onOpenMention={openMention}
-              onSubmit={addNote}
-            />
-            <button
-              onClick={addNote}
-              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-accent text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-hover active:bg-accent-active"
-            >
-              <Icon name="add" size={16} />
-              Add note
-              <span className="text-[11px] font-medium opacity-70">⌘⏎</span>
-            </button>
+            {addingNote ? (
+              <RichTextEditor
+                ref={addNoteRef}
+                autoFocus
+                placeholder="Write a note…  (drop an attachment to @mention it)"
+                minHeightClass="min-h-24"
+                attachments={task.attachments}
+                onOpenMention={openMention}
+                onBlur={() => {
+                  // The link toolbar opens a native modal window (and the user
+                  // may just switch apps); either drops window focus. Keep the
+                  // editor mounted then so that flow can return to it — commit
+                  // only when focus stays in this window (clicked elsewhere here).
+                  if (document.hasFocus()) void saveNewNote();
+                }}
+                onSubmit={saveNewNote}
+              />
+            ) : (
+              <button
+                onClick={() => setAddingNote(true)}
+                className="flex h-24 w-full items-center justify-center gap-1.5 rounded-lg bg-raised border border-dashed border-hairline-strong font-semibold text-ink-3 transition-colors hover:border-ink-3 hover:text-ink-2"
+              >
+                <Icon name="add" size={16} />
+                Add note
+              </button>
+            )}
           </div>
         </div>
 
         {children.length > 0 && (
-          <div className="px-4 pb-4">
+          <div className="p-4 pt-0">
             <SectionHeader
               label="Subtasks"
               trailing={
-                <span className="text-[11.5px] tabular-nums text-ink-3">
+                <span className="text-[11.5px] tabular-nums text-ink-">
                   {doneChildren} done / {children.length}
                 </span>
               }
             />
-            {children.map((child) => (
-              <div
-                key={child.id}
-                className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-md px-1.5 hover:bg-wash"
-              >
-                <DoneCheckbox done={child.done} size={14} onToggle={() => onToggleDone(child)} />
-                <button
-                  onClick={() => onSelectTask(child.id)}
-                  title={child.title}
-                  className={`min-w-0 flex-1 truncate text-left text-[13.5px] ${
-                    child.done ? "text-ink-3 line-through" : "text-ink"
-                  }`}
+            <div className="-mb-2">
+              {children.map((child) => (
+                <div
+                  key={child.id}
+                  className="-mx-1.5 flex h-8 items-center gap-2.5 rounded-md px-1.5 hover:bg-wash"
                 >
-                  {child.title}
-                </button>
-              </div>
-            ))}
+                  <DoneCheckbox
+                    done={child.done}
+                    size={14}
+                    onToggle={() => onToggleDone(child)}
+                  />
+                  <button
+                    onClick={() => onSelectTask(child.id)}
+                    title={child.title}
+                    className={`min-w-0 flex-1 truncate text-left text-[13.5px] ${
+                      child.done ? "text-ink-3 line-through" : "text-ink"
+                    }`}
+                  >
+                    {child.title}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        <div className="p-4">
+        <div className="p-4 pt-0">
           <SectionHeader
             label="Attachments"
             trailing={
@@ -529,9 +618,16 @@ export function PreviewPanel(props: PreviewPanelProps) {
       {task ? (
         <TaskInspector key={task.id} {...props} task={task} />
       ) : (
-        <div className="flex flex-1 animate-rise flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <Icon name="left_click" size={28} weight={200} className="mb-1 text-ink-3" />
-          <p className="font-display text-[17px] font-medium text-ink-2">No task selected</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 text-center">
+          <Icon
+            name="left_click"
+            size={28}
+            weight={200}
+            className="mb-1 text-ink-3"
+          />
+          <p className="font-display text-[17px] font-medium text-ink-2">
+            No task selected
+          </p>
           <p className="text-[13px] text-ink-3">Select a task to inspect it</p>
         </div>
       )}

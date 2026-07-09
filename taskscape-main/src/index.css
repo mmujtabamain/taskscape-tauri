@@ -168,7 +168,8 @@ textarea,
 }
 
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+[contenteditable]:focus-visible {
   outline: none;
 }
 
