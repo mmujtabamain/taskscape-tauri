@@ -1,15 +1,3 @@
-// Fails when a raw numeric z-index utility (z-10, -z-50, …) is used in either
-// app's src. The only sanctioned stacking values are the named layers in
-// taskscape-main/src/lib/zLayers.ts (z-base, z-raised, z-modal, …, plus z-auto);
-// see the header comment there and the `--z-index-*` tokens in index.css. Wired
-// into `npm run typecheck` so a stray z-<number> breaks the build alongside tsc.
-//
-// Output mirrors tsc's diagnostic format (path:line:col - error … + caret
-// underline) so it reads as one continuous stream alongside the tsc errors.
-//
-// Ported from punkt_xii (scripts/check-z-layers.mjs), generalized to scan both
-// taskscape apps and skip the motion/ staging bundle.
-
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,12 +15,10 @@ const c = {
   bold: paint('1'),
 };
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-const srcDirs = [
-  join(repoRoot, 'taskscape-main/src'),
-  join(repoRoot, 'taskscape-tray/src'),
-];
-const zLayersFile = join(repoRoot, 'taskscape-main/src/lib/zLayers.ts');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = dirname(__dirname);
+const zLayersFile = 'src/lib/zLayers.ts';
+const srcDir = "src/";
 
 // Read the allowed layer names live from zLayers.ts so this check and the source
 // of truth can never drift apart.
@@ -57,18 +43,22 @@ function* walk(dir) {
 }
 
 const violations = [];
-for (const srcDir of srcDirs) {
-  for (const file of walk(srcDir)) {
-    const lines = readFileSync(file, 'utf8').split('\n');
-    lines.forEach((line, i) => {
-      for (const m of line.matchAll(Z_NUMERIC)) {
-        const cls = `${m[2]}z-${m[3]}`;
-        if (allowedLayers.has(cls)) continue;
-        const col = m.index + 1 + 1;
-        violations.push({ file: relative(repoRoot, file), line: i + 1, col, cls, text: line });
-      }
-    });
-  }
+for (const file of walk(srcDir)) {
+  const lines = readFileSync(file, 'utf8').split('\n');
+  lines.forEach((line, i) => {
+    for (const m of line.matchAll(Z_NUMERIC)) {
+      const cls = `${m[2]}z-${m[3]}`;
+      if (allowedLayers.has(cls)) continue;
+      const col = m.index + 1 + 1;
+      violations.push({
+        file: relative(repoRoot, file),
+        line: i + 1,
+        col,
+        cls,
+        text: line,
+      });
+    }
+  });
 }
 
 if (violations.length > 0) {

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "typecheck": "tsc && node ../scripts/check-z-layers.mjs",
+    "check:z": "node scripts/check-z-layers.mjs",
+    "typecheck": "tsc && node scripts/check-z-layers.mjs",
     "lint": "eslint .",
     "format": "prettier --write src",
     "preview": "vite preview",
