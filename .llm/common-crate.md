@@ -4,16 +4,18 @@ Everything both apps share: persistence, screenshots, attachments, and the HTTP 
 
 ## Modules (`common/src/`)
 
-| Module           | Responsibility                                                                                                                |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `lib.rs`         | Re-exports (`Store`, `Task`, `List`, `Attachment`, `LinkType`) and the port constants `MAIN_PORT = 7420`, `TRAY_PORT = 7421`. |
-| `models.rs`      | Serde structs: `List`, `Task`, `Attachment`, and the `LinkType` enum (`Reference` \| `Copy`).                                 |
-| `storage.rs`     | `Store` — the SQLite handle. All DB reads/writes and the schema/migrations.                                                   |
-| `paths.rs`       | Locations under `~/.taskscape/` and `ensure_dirs()`.                                                                          |
-| `screenshot.rs`  | `capture_fullscreen()` — shells out to macOS `screencapture -x`.                                                              |
-| `attachments.rs` | `attach_reference` (record a pointer) and `attach_copy` (copy a file into the data dir).                                      |
-| `server.rs`      | axum `data_router`, `serve(port, router)`, and the `client` helpers (`is_up`, `post_json`).                                   |
-| `util.rs`        | `now_millis()`, `new_id()` (UUID v4).                                                                                         |
+| Module           | Responsibility                                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib.rs`         | Re-exports (`Store`, `Project`, `List`, `Task`, `Note`, `Attachment`, `LinkType`) and the port constants `MAIN_PORT`/`TRAY_PORT`.      |
+| `models.rs`      | Serde **domain** structs: `Project`, `List`, `Task`, `Note`, `Attachment`, and `LinkType` (`Reference` \| `Copy`). The JSON contract.  |
+| `storage.rs`     | `Store` — the async SeaORM handle. All DB reads/writes; maps entities → domain models.                                                 |
+| `entities/`      | **Generated** SeaORM entities (`sea-orm-cli`, via `gen-entities.sh`). Never serialized to the frontend — mapped in `storage.rs`.       |
+| `migrations.rs`  | Runtime applier: embeds `common/migrations/*.sql` and applies unrecorded versions at startup. Atlas authors the SQL; it's not shipped. |
+| `paths.rs`       | Locations under `~/.taskscape/` and `ensure_dirs()`.                                                                                   |
+| `screenshot.rs`  | `capture_fullscreen()` — shells out to macOS `screencapture -x`.                                                                       |
+| `attachments.rs` | `attach_reference` / `attach_copy` / `rename_attachment` (async — they call `Store`).                                                  |
+| `server.rs`      | axum `data_router`, `serve(port, router)`, and the `client` helpers (`is_up`, `post_json`).                                            |
+| `util.rs`        | `now_millis()`, `new_id()` (UUID v4).                                                                                                  |
 
 ## Data locations (`paths.rs`)
 
@@ -26,19 +28,56 @@ Everything both apps share: persistence, screenshots, attachments, and the HTTP 
 
 ## The database (`storage.rs`)
 
-One connection per process (`Mutex<Connection>`), WAL journaling + 5s busy timeout so both apps share the file. Schema is created idempotently in `migrate()`; `ensure_column()` adds new columns to older DBs (e.g. `due_at`).
+`Store` wraps an **async SeaORM `DatabaseConnection`** over an SQLx SQLite pool
+(`max_connections = 4`). The pool's `SqliteConnectOptions` set `journal_mode=WAL`,
+`busy_timeout=5s`, and `foreign_keys=ON` on **every** connection — the last is
+required for the schema's `ON DELETE CASCADE` rules to fire. `Store::open()` is
+`async`; call it from a sync context with `tauri::async_runtime::block_on(...)`.
 
-Tables: `lists`, `tasks` (FK → lists, `ON DELETE CASCADE`), `attachments` (FK → tasks, cascade), and a `settings` key/value table (e.g. `last_active_list`). Indexes on `tasks(list_id)` and `attachments(task_id)`.
+**Schema & migrations.** The schema is defined declaratively in
+[`common/schema.hcl`](../common/schema.hcl) (Atlas HCL — "the models"). Atlas
+autogenerates versioned SQL into `common/migrations/`; at startup `migrations.rs`
+records applied versions in a `schema_migrations` table and replays any new ones
+in a transaction. See [build-and-run.md](build-and-run.md#schema-changes-the-dev-loop)
+for the schema-change dev loop, and [`.plans/orm-migration.md`](../.plans/orm-migration.md)
+for the full design.
 
-`Store` methods group by entity: lists (`create/list/rename/delete_list`), tasks (`create/list/all/update/get/delete_task`, `set_task_due`), attachments (`add/list/delete_attachment`), settings (`get/set_setting`). `attach_all()` populates each `Task.attachments` after a query.
+**Tables** (all with full referential integrity):
+`projects` → `lists` (FK, cascade) → `tasks` (FK, cascade; plus a self-referential
+`parent_id` FK, cascade, so deleting a task drops its whole subtree in the DB) →
+`attachments` and `task_notes` (both FK, cascade). Plus a `settings` key/value
+table. `sort_order` is `REAL NOT NULL` everywhere. Indexes on every FK column.
+
+**Entities vs. domain models.** SeaORM entity `Model`s live in `entities/` and are
+**mapped** to the `models.rs` structs at the `Store` boundary (`to_task`,
+`to_list`, …) — entities are never serialized to the frontend. Regenerate entities
+with `common/gen-entities.sh` after a schema change (it normalizes SQLite's loose
+numeric typing to the domain's `i64` millis / `f64` ordering keys).
+
+**Method groups:** settings (`get/set_setting`), projects (`create/list/rename/delete_project`,
+`default_project`), lists (`create/list/reorder/rename/delete_list`), tasks
+(`create/list/all/update/get/delete/move/reorder_task`), attachments
+(`add/list/get/update/delete_attachment`), notes (`list/create/update/delete_note`).
+`hydrate()` batch-loads each task's attachments + notes with SeaORM `load_many`
+(two queries total, not N+1). Multi-statement writes (`create_task` + first note,
+`move_task` + subtree relist, note write + preview recompute) run in a transaction.
 
 ## Models (`models.rs`)
 
-`Task` carries `notes: Option<String>`, `done`, `created_at`/`updated_at` (unix millis), optional `due_at`, and a `#[serde(default)] attachments: Vec<Attachment>`. `Attachment` has a `LinkType` (`reference` copies nothing and stores a URL/path; `copy` copies the file into `attachments/` and stores a relative `location`). Timestamps are unix millis via `util::now_millis()`; IDs are UUIDv4 via `util::new_id()`.
+`Task` carries `notes: Option<String>` (a derived plaintext preview of its rich
+`note_items`, kept for the list-row preview and search), `done`, `sort_order`,
+`created_at`/`updated_at` (unix millis), an optional `parent_id` (subtasks nest
+arbitrarily deep), and `#[serde(default)]` `attachments` and `note_items`. `Note`
+is a rich-text block (`content` is sanitized HTML). `Attachment` has a `LinkType`
+(`reference` copies nothing and stores a URL/path; `copy` copies the file into
+`attachments/` and stores a relative `location`). Timestamps via `util::now_millis()`;
+IDs via `util::new_id()` (UUIDv4).
 
 ## HTTP IPC (`server.rs`)
 
-`data_router(store)` exposes the shared data API; each app serves it on its port and may `.merge()` extra routes (main adds `/refresh`, `/focus`).
+`data_router(store)` exposes the shared data API; each app serves it on its port
+and may `.merge()` extra routes (main adds `/refresh`, `/focus`, `/quit`). Handlers
+are `async` and `.await` the store.
 
 | Method + path                       | Action                                      |
 | ----------------------------------- | ------------------------------------------- |
@@ -50,8 +89,12 @@ Tables: `lists`, `tasks` (FK → lists, `ON DELETE CASCADE`), `attachments` (FK 
 | `GET/POST /tasks/{id}/attachments`  | List / add-by-reference.                    |
 | `POST /tasks/{id}/attachments/copy` | Add-by-copy.                                |
 
-`client::post_json(port, path, body)` and `client::is_up(port)` are how one app calls the other. Errors are wrapped by `AppError` → HTTP 500 with the message.
+`client::post_json(port, path, body)` and `client::is_up(port)` are how one app
+calls the other. Errors are wrapped by `AppError` → HTTP 500 with the message.
 
 ## Screenshots (`screenshot.rs`)
 
-macOS only: `capture_fullscreen()` runs `screencapture -x` (silent) into `~/.taskscape/screenshots/screenshot-<millis>.png` and returns the path. First use triggers the macOS Screen Recording permission prompt for that app. Non-macOS targets `bail!`.
+macOS only: `capture_fullscreen()` runs `screencapture -x` (silent) into
+`~/.taskscape/screenshots/screenshot-<millis>.png` and returns the path. First use
+triggers the macOS Screen Recording permission prompt for that app. Non-macOS
+targets `bail!`.

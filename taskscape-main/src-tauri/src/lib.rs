@@ -15,8 +15,8 @@ fn err<E: std::fmt::Display>(e: E) -> String {
 
 /// Whether the main window should paint dark: the saved `theme` preference wins
 /// ("light"/"dark"), otherwise follow the current system appearance.
-fn resolve_dark(store: &Store, window: &tauri::WebviewWindow) -> bool {
-    match store.get_setting("theme").ok().flatten().as_deref() {
+async fn resolve_dark(store: &Store, window: &tauri::WebviewWindow) -> bool {
+    match store.get_setting("theme").await.ok().flatten().as_deref() {
         Some("dark") => true,
         Some("light") => false,
         _ => window
@@ -57,73 +57,81 @@ fn launch_embedded_tray() {
 }
 
 #[tauri::command]
-fn list_projects(store: State<'_, Arc<Store>>) -> Result<Vec<Project>, String> {
-    store.list_projects().map_err(err)
+async fn list_projects(store: State<'_, Arc<Store>>) -> Result<Vec<Project>, String> {
+    store.list_projects().await.map_err(err)
 }
 
 #[tauri::command]
-fn create_project(store: State<'_, Arc<Store>>, name: String) -> Result<Project, String> {
-    store.create_project(&name).map_err(err)
+async fn create_project(store: State<'_, Arc<Store>>, name: String) -> Result<Project, String> {
+    store.create_project(&name).await.map_err(err)
 }
 
 #[tauri::command]
-fn rename_project(store: State<'_, Arc<Store>>, id: String, name: String) -> Result<(), String> {
-    store.rename_project(&id, &name).map_err(err)
+async fn rename_project(
+    store: State<'_, Arc<Store>>,
+    id: String,
+    name: String,
+) -> Result<(), String> {
+    store.rename_project(&id, &name).await.map_err(err)
 }
 
 #[tauri::command]
-fn delete_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.delete_project(&id).map_err(err)
+async fn delete_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.delete_project(&id).await.map_err(err)
 }
 
 /// The default project (created on demand). Used to seed a first project when
 /// the database has none yet.
 #[tauri::command]
-fn default_project(store: State<'_, Arc<Store>>) -> Result<Project, String> {
-    store.default_project().map_err(err)
+async fn default_project(store: State<'_, Arc<Store>>) -> Result<Project, String> {
+    store.default_project().await.map_err(err)
 }
 
 #[tauri::command]
-fn list_lists(store: State<'_, Arc<Store>>) -> Result<Vec<List>, String> {
-    store.list_lists().map_err(err)
+async fn list_lists(store: State<'_, Arc<Store>>) -> Result<Vec<List>, String> {
+    store.list_lists().await.map_err(err)
 }
 
 #[tauri::command]
-fn create_list(
+async fn create_list(
     store: State<'_, Arc<Store>>,
     project_id: String,
     name: String,
 ) -> Result<List, String> {
-    store.create_list(&project_id, &name).map_err(err)
+    store.create_list(&project_id, &name).await.map_err(err)
 }
 
 #[tauri::command]
-fn rename_list(store: State<'_, Arc<Store>>, id: String, name: String) -> Result<(), String> {
-    store.rename_list(&id, &name).map_err(err)
+async fn rename_list(store: State<'_, Arc<Store>>, id: String, name: String) -> Result<(), String> {
+    store.rename_list(&id, &name).await.map_err(err)
 }
 
 #[tauri::command]
-fn delete_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.delete_list(&id).map_err(err)
+async fn delete_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.delete_list(&id).await.map_err(err)
 }
 
 #[tauri::command]
-fn reorder_list(store: State<'_, Arc<Store>>, id: String, sort_order: f64) -> Result<(), String> {
-    store.reorder_list(&id, sort_order).map_err(err)
+async fn reorder_list(
+    store: State<'_, Arc<Store>>,
+    id: String,
+    sort_order: f64,
+) -> Result<(), String> {
+    store.reorder_list(&id, sort_order).await.map_err(err)
 }
 
 #[tauri::command]
-fn list_tasks(store: State<'_, Arc<Store>>, list_id: String) -> Result<Vec<Task>, String> {
-    store.list_tasks(&list_id).map_err(err)
+async fn list_tasks(store: State<'_, Arc<Store>>, list_id: String) -> Result<Vec<Task>, String> {
+    store.list_tasks(&list_id).await.map_err(err)
 }
 
 #[tauri::command]
-fn all_tasks(store: State<'_, Arc<Store>>) -> Result<Vec<Task>, String> {
-    store.all_tasks().map_err(err)
+async fn all_tasks(store: State<'_, Arc<Store>>) -> Result<Vec<Task>, String> {
+    store.all_tasks().await.map_err(err)
 }
 
 #[tauri::command]
-fn create_task(
+async fn create_task(
     store: State<'_, Arc<Store>>,
     list_id: String,
     title: String,
@@ -132,11 +140,12 @@ fn create_task(
 ) -> Result<Task, String> {
     store
         .create_task(&list_id, &title, notes.as_deref(), parent_id.as_deref())
+        .await
         .map_err(err)
 }
 
 #[tauri::command]
-fn update_task(
+async fn update_task(
     store: State<'_, Arc<Store>>,
     id: String,
     title: Option<String>,
@@ -145,16 +154,17 @@ fn update_task(
 ) -> Result<Task, String> {
     store
         .update_task(&id, title.as_deref(), notes.as_deref(), done)
+        .await
         .map_err(err)
 }
 
 #[tauri::command]
-fn delete_task(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.delete_task(&id).map_err(err)
+async fn delete_task(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.delete_task(&id).await.map_err(err)
 }
 
 #[tauri::command]
-fn move_task(
+async fn move_task(
     store: State<'_, Arc<Store>>,
     id: String,
     parent_id: Option<String>,
@@ -163,78 +173,102 @@ fn move_task(
 ) -> Result<Task, String> {
     store
         .move_task(&id, parent_id.as_deref(), list_id.as_deref(), sort_order)
+        .await
         .map_err(err)
 }
 
 #[tauri::command]
-fn reorder_task(store: State<'_, Arc<Store>>, id: String, sort_order: f64) -> Result<Task, String> {
-    store.reorder_task(&id, sort_order).map_err(err)
+async fn reorder_task(
+    store: State<'_, Arc<Store>>,
+    id: String,
+    sort_order: f64,
+) -> Result<Task, String> {
+    store.reorder_task(&id, sort_order).await.map_err(err)
 }
 
 #[tauri::command]
-fn list_notes(store: State<'_, Arc<Store>>, task_id: String) -> Result<Vec<Note>, String> {
-    store.list_notes(&task_id).map_err(err)
+async fn list_notes(store: State<'_, Arc<Store>>, task_id: String) -> Result<Vec<Note>, String> {
+    store.list_notes(&task_id).await.map_err(err)
 }
 
 #[tauri::command]
-fn create_note(store: State<'_, Arc<Store>>, task_id: String, content: String) -> Result<Note, String> {
-    store.create_note(&task_id, &content).map_err(err)
+async fn create_note(
+    store: State<'_, Arc<Store>>,
+    task_id: String,
+    content: String,
+) -> Result<Note, String> {
+    store.create_note(&task_id, &content).await.map_err(err)
 }
 
 #[tauri::command]
-fn update_note(store: State<'_, Arc<Store>>, id: String, content: String) -> Result<Note, String> {
-    store.update_note(&id, &content).map_err(err)
+async fn update_note(
+    store: State<'_, Arc<Store>>,
+    id: String,
+    content: String,
+) -> Result<Note, String> {
+    store.update_note(&id, &content).await.map_err(err)
 }
 
 #[tauri::command]
-fn delete_note(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.delete_note(&id).map_err(err)
+async fn delete_note(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.delete_note(&id).await.map_err(err)
 }
 
 #[tauri::command]
-fn list_attachments(store: State<'_, Arc<Store>>, task_id: String) -> Result<Vec<Attachment>, String> {
-    store.list_attachments(&task_id).map_err(err)
+async fn list_attachments(
+    store: State<'_, Arc<Store>>,
+    task_id: String,
+) -> Result<Vec<Attachment>, String> {
+    store.list_attachments(&task_id).await.map_err(err)
 }
 
 #[tauri::command]
-fn add_reference(
+async fn add_reference(
     store: State<'_, Arc<Store>>,
     task_id: String,
     name: String,
     location: String,
 ) -> Result<Attachment, String> {
-    taskscape_common::attachments::attach_reference(&store, &task_id, &name, &location).map_err(err)
+    taskscape_common::attachments::attach_reference(&store, &task_id, &name, &location)
+        .await
+        .map_err(err)
 }
 
 #[tauri::command]
-fn add_copy(
+async fn add_copy(
     store: State<'_, Arc<Store>>,
     task_id: String,
     source_path: String,
     name: Option<String>,
 ) -> Result<Attachment, String> {
     taskscape_common::attachments::attach_copy(&store, &task_id, &source_path, name.as_deref())
+        .await
         .map_err(err)
 }
 
 #[tauri::command]
-fn delete_attachment(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.delete_attachment(&id).map_err(err)
+async fn delete_attachment(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.delete_attachment(&id).await.map_err(err)
 }
 
 #[tauri::command]
-fn rename_attachment(
+async fn rename_attachment(
     store: State<'_, Arc<Store>>,
     id: String,
     name: String,
 ) -> Result<Attachment, String> {
-    taskscape_common::attachments::rename_attachment(&store, &id, &name).map_err(err)
+    taskscape_common::attachments::rename_attachment(&store, &id, &name)
+        .await
+        .map_err(err)
 }
 
 /// Capture the full screen and attach it to a task as a copy. macOS prompts for
 /// Screen Recording permission the first time this app triggers a capture.
 #[tauri::command]
-fn attach_screenshot(store: State<'_, Arc<Store>>, task_id: String) -> Result<Attachment, String> {
+async fn attach_screenshot(
+    store: State<'_, Arc<Store>>,
+    task_id: String,
+) -> Result<Attachment, String> {
     let path = taskscape_common::screenshot::capture_fullscreen().map_err(err)?;
     taskscape_common::attachments::attach_copy(
         &store,
@@ -242,30 +276,41 @@ fn attach_screenshot(store: State<'_, Arc<Store>>, task_id: String) -> Result<At
         &path.to_string_lossy(),
         Some("screenshot.png"),
     )
+    .await
     .map_err(err)
 }
 
 /// Remember which list the user last had open, so the tray captures land there.
 #[tauri::command]
-fn set_active_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.set_setting("last_active_list", &id).map_err(err)
+async fn set_active_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store.set_setting("last_active_list", &id).await.map_err(err)
 }
 
 /// Remember which project the user last had open, so we can restore it on launch.
 #[tauri::command]
-fn set_active_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.set_setting("last_active_project", &id).map_err(err)
+async fn set_active_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    store
+        .set_setting("last_active_project", &id)
+        .await
+        .map_err(err)
 }
 
 /// Read a persisted setting (e.g. `last_active_project`).
 #[tauri::command]
-fn get_setting(store: State<'_, Arc<Store>>, key: String) -> Result<Option<String>, String> {
-    store.get_setting(&key).map_err(err)
+async fn get_setting(
+    store: State<'_, Arc<Store>>,
+    key: String,
+) -> Result<Option<String>, String> {
+    store.get_setting(&key).await.map_err(err)
 }
 
 #[tauri::command]
-fn set_setting(store: State<'_, Arc<Store>>, key: String, value: String) -> Result<(), String> {
-    store.set_setting(&key, &value).map_err(err)
+async fn set_setting(
+    store: State<'_, Arc<Store>>,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    store.set_setting(&key, &value).await.map_err(err)
 }
 
 /// Open an attachment with the OS default handler. Copies resolve to their file
@@ -465,7 +510,9 @@ fn set_window_theme(window: tauri::WebviewWindow, dark: bool) -> Result<(), Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let store = Arc::new(Store::open().expect("failed to open taskscape store"));
+    let store = Arc::new(
+        tauri::async_runtime::block_on(Store::open()).expect("failed to open taskscape store"),
+    );
     let server_store = store.clone();
 
     tauri::Builder::default()
@@ -484,7 +531,7 @@ pub fn run() {
                 panels::hide_traffic_lights(&window);
                 // Paint the native background to match the theme so no white
                 // frame flashes on launch before the webview has painted...
-                let dark = resolve_dark(&server_store, &window);
+                let dark = tauri::async_runtime::block_on(resolve_dark(&server_store, &window));
                 panels::set_window_background(&window, dark);
                 // ...and make the webview itself transparent while it loads, so
                 // its default white doesn't cover that themed background.

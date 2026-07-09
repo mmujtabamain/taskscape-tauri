@@ -46,7 +46,7 @@ Ports and the endpoint set live in [common-crate.md](common-crate.md).
 
 ## Tech stack
 
-- **Backend:** Rust, Tauri v2, axum (HTTP), rusqlite (SQLite), anyhow.
+- **Backend:** Rust, Tauri v2, axum (HTTP), SeaORM (async SQLite) with Atlas-generated migrations, anyhow.
 - **Frontend:** React 19, TypeScript, Vite 7, Tailwind CSS v4, Material Symbols.
 - **macOS-native glue:** `objc2` (NSPanel / window levels / collection behavior) and `window-vibrancy` (translucent background) in the tray app.
 

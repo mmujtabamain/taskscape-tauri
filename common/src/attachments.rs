@@ -7,18 +7,20 @@ use crate::storage::Store;
 
 /// Attach a file *by reference*: records a pointer (online URL, `file://` URL, or
 /// network path) without copying anything.
-pub fn attach_reference(
+pub async fn attach_reference(
     store: &Store,
     task_id: &str,
     name: &str,
     location: &str,
 ) -> Result<Attachment> {
-    store.add_attachment(task_id, name, LinkType::Reference, location)
+    store
+        .add_attachment(task_id, name, LinkType::Reference, location)
+        .await
 }
 
 /// Attach a file *by copy*: copies the source file into `~/.taskscape/attachments/`
 /// and records a location relative to the root data directory.
-pub fn attach_copy(
+pub async fn attach_copy(
     store: &Store,
     task_id: &str,
     source_path: &str,
@@ -37,22 +39,24 @@ pub fn attach_copy(
         .with_context(|| format!("copying {source_path} -> {}", dest.display()))?;
 
     let location = format!("attachments/{stored_name}");
-    store.add_attachment(task_id, &file_name, LinkType::Copy, &location)
+    store
+        .add_attachment(task_id, &file_name, LinkType::Copy, &location)
+        .await
 }
 
 /// Rename an attachment. For a **copy**, the real file on disk is renamed (its
 /// unique id prefix and original extension are preserved) and both the display
 /// name and stored location are updated. For a **reference**, only the display
 /// name is stored — the underlying URL/path is left untouched.
-pub fn rename_attachment(store: &Store, id: &str, new_name: &str) -> Result<Attachment> {
-    let att = store.get_attachment(id)?;
+pub async fn rename_attachment(store: &Store, id: &str, new_name: &str) -> Result<Attachment> {
+    let att = store.get_attachment(id).await?;
     let new_name = new_name.trim();
     if new_name.is_empty() {
         anyhow::bail!("attachment name cannot be empty");
     }
 
     match att.link_type {
-        LinkType::Reference => store.update_attachment(id, new_name, &att.location),
+        LinkType::Reference => store.update_attachment(id, new_name, &att.location).await,
         LinkType::Copy => {
             let old_abs = crate::paths::resolve(&att.location);
             let old_ext = Path::new(&att.location)
@@ -82,10 +86,10 @@ pub fn rename_attachment(store: &Store, id: &str, new_name: &str) -> Result<Atta
                 std::fs::rename(&old_abs, &new_abs).with_context(|| {
                     format!("renaming {} -> {}", old_abs.display(), new_abs.display())
                 })?;
-                store.update_attachment(id, &base, &new_location)
+                store.update_attachment(id, &base, &new_location).await
             } else {
                 // The backing file is missing — keep the pointer, update the name only.
-                store.update_attachment(id, &base, &att.location)
+                store.update_attachment(id, &base, &att.location).await
             }
         }
     }

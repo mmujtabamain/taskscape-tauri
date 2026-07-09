@@ -1,3 +1,7 @@
 .DS_Store
 dist/
 .tmp/
+
+# Throwaway dev database built from migrations for entity codegen (dev loop).
+/dev.db
+/dev.db-*

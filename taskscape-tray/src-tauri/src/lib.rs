@@ -27,9 +27,9 @@ fn screenshot_hotkey() -> Shortcut {
 
 /// The list captures should land in: the last active list if it still exists,
 /// otherwise the first list, otherwise a freshly created Inbox.
-fn target_list(store: &Store) -> Result<List, String> {
-    let lists = store.list_lists().map_err(err)?;
-    if let Some(id) = store.get_setting(ACTIVE_LIST_KEY).map_err(err)? {
+async fn target_list(store: &Store) -> Result<List, String> {
+    let lists = store.list_lists().await.map_err(err)?;
+    if let Some(id) = store.get_setting(ACTIVE_LIST_KEY).await.map_err(err)? {
         if let Some(list) = lists.iter().find(|l| l.id == id) {
             return Ok(list.clone());
         }
@@ -37,9 +37,10 @@ fn target_list(store: &Store) -> Result<List, String> {
     if let Some(first) = lists.into_iter().next() {
         return Ok(first);
     }
-    let project = store.default_project().map_err(err)?;
+    let project = store.default_project().await.map_err(err)?;
     store
         .create_list(&project.id, &names::suggest_name())
+        .await
         .map_err(err)
 }
 
@@ -270,8 +271,8 @@ fn hide_mini(window: tauri::Window) -> Result<(), String> {
 
 /// The name of the list captures will go to (shown in the mini window).
 #[tauri::command]
-fn active_list_name(store: State<'_, Arc<Store>>) -> Result<String, String> {
-    target_list(&store).map(|l| l.name)
+async fn active_list_name(store: State<'_, Arc<Store>>) -> Result<String, String> {
+    target_list(&store).await.map(|l| l.name)
 }
 
 #[tauri::command]
@@ -326,16 +327,17 @@ fn capture_and_show(app: &AppHandle) {
 
 /// Create the task in the active list, attach the screenshot if present, and hide.
 #[tauri::command]
-fn submit_capture(
+async fn submit_capture(
     store: State<'_, Arc<Store>>,
     window: tauri::Window,
     title: String,
     notes: Option<String>,
     screenshot_paths: Vec<String>,
 ) -> Result<(), String> {
-    let list = target_list(&store)?;
+    let list = target_list(&store).await?;
     let task = store
         .create_task(&list.id, &title, notes.as_deref(), None)
+        .await
         .map_err(err)?;
 
     let multiple = screenshot_paths.len() > 1;
@@ -345,7 +347,9 @@ fn submit_capture(
         } else {
             "screenshot.png".to_string()
         };
-        attachments::attach_copy(&store, &task.id, path, Some(&name)).map_err(err)?;
+        attachments::attach_copy(&store, &task.id, path, Some(&name))
+            .await
+            .map_err(err)?;
     }
 
     tauri::async_runtime::spawn(async {
@@ -358,7 +362,9 @@ fn submit_capture(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let store = Arc::new(Store::open().expect("failed to open taskscape store"));
+    let store = Arc::new(
+        tauri::async_runtime::block_on(Store::open()).expect("failed to open taskscape store"),
+    );
     let server_store = store.clone();
 
     tauri::Builder::default()
@@ -454,10 +460,8 @@ pub fn run() {
             // Dismiss when the user clicks away — but ignore the transient blur
             // that fires while the window is settling onto a full-screen Space,
             // which would otherwise hide it one frame after it appears.
-            WindowEvent::Focused(false) => {
-                if !just_revealed() {
-                    dismiss(window);
-                }
+            WindowEvent::Focused(false) if !just_revealed() => {
+                dismiss(window);
             }
             _ => {}
         })

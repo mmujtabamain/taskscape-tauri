@@ -57,7 +57,7 @@ async fn health() -> &'static str {
 }
 
 async fn get_lists(State(store): State<Arc<Store>>) -> ApiResult<Vec<List>> {
-    Ok(Json(store.list_lists()?))
+    Ok(Json(store.list_lists().await?))
 }
 
 async fn create_list(
@@ -66,32 +66,36 @@ async fn create_list(
 ) -> ApiResult<List> {
     let project_id = match body.project_id {
         Some(id) => id,
-        None => store.default_project()?.id,
+        None => store.default_project().await?.id,
     };
-    Ok(Json(store.create_list(&project_id, &body.name)?))
+    Ok(Json(store.create_list(&project_id, &body.name).await?))
 }
 
 async fn get_list_tasks(
     State(store): State<Arc<Store>>,
     Path(id): Path<String>,
 ) -> ApiResult<Vec<Task>> {
-    Ok(Json(store.list_tasks(&id)?))
+    Ok(Json(store.list_tasks(&id).await?))
 }
 
 async fn get_tasks(State(store): State<Arc<Store>>) -> ApiResult<Vec<Task>> {
-    Ok(Json(store.all_tasks()?))
+    Ok(Json(store.all_tasks().await?))
 }
 
 async fn create_task(
     State(store): State<Arc<Store>>,
     Json(body): Json<CreateTask>,
 ) -> ApiResult<Task> {
-    Ok(Json(store.create_task(
-        &body.list_id,
-        &body.title,
-        body.notes.as_deref(),
-        body.parent_id.as_deref(),
-    )?))
+    Ok(Json(
+        store
+            .create_task(
+                &body.list_id,
+                &body.title,
+                body.notes.as_deref(),
+                body.parent_id.as_deref(),
+            )
+            .await?,
+    ))
 }
 
 async fn update_task(
@@ -99,19 +103,18 @@ async fn update_task(
     Path(id): Path<String>,
     Json(body): Json<UpdateTask>,
 ) -> ApiResult<Task> {
-    Ok(Json(store.update_task(
-        &id,
-        body.title.as_deref(),
-        body.notes.as_deref(),
-        body.done,
-    )?))
+    Ok(Json(
+        store
+            .update_task(&id, body.title.as_deref(), body.notes.as_deref(), body.done)
+            .await?,
+    ))
 }
 
 async fn delete_task(
     State(store): State<Arc<Store>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    store.delete_task(&id)?;
+    store.delete_task(&id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -119,7 +122,7 @@ async fn get_attachments(
     State(store): State<Arc<Store>>,
     Path(id): Path<String>,
 ) -> ApiResult<Vec<Attachment>> {
-    Ok(Json(store.list_attachments(&id)?))
+    Ok(Json(store.list_attachments(&id).await?))
 }
 
 async fn add_reference(
@@ -127,12 +130,9 @@ async fn add_reference(
     Path(id): Path<String>,
     Json(body): Json<CreateReference>,
 ) -> ApiResult<Attachment> {
-    Ok(Json(crate::attachments::attach_reference(
-        &store,
-        &id,
-        &body.name,
-        &body.location,
-    )?))
+    Ok(Json(
+        crate::attachments::attach_reference(&store, &id, &body.name, &body.location).await?,
+    ))
 }
 
 async fn add_copy(
@@ -140,12 +140,10 @@ async fn add_copy(
     Path(id): Path<String>,
     Json(body): Json<CreateCopy>,
 ) -> ApiResult<Attachment> {
-    Ok(Json(crate::attachments::attach_copy(
-        &store,
-        &id,
-        &body.source_path,
-        body.name.as_deref(),
-    )?))
+    Ok(Json(
+        crate::attachments::attach_copy(&store, &id, &body.source_path, body.name.as_deref())
+            .await?,
+    ))
 }
 
 // ---- request bodies ------------------------------------------------------

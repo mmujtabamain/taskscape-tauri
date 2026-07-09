@@ -35,7 +35,7 @@ Run one app: `cd taskscape-tray && npm run tauri dev`.
 
 ## Conventions (short version — see .llm/conventions.md)
 
-- Rust Tauri commands return `Result<T, String>` and end with `.map_err(err)`; `common` uses `anyhow`.
+- Rust Tauri commands that touch the store are `async fn` and end with `.await.map_err(err)`; they return `Result<T, String>`. `common` uses `anyhow`; `Store` is async (SeaORM).
 - All frontend IPC goes through `src/api.ts` (one typed `invoke` wrapper per command). Components never call `invoke` directly.
 - Tailwind v4 utility classes; icons via the shared `Icon` (Material Symbols).
 - **Minimal comments** — explain non-obvious _why_, never restate the code.
@@ -44,5 +44,6 @@ Run one app: `cd taskscape-tray && npm run tauri dev`.
 ## Gotchas
 
 - Two apps, two processes. Data changes propagate by writing SQLite + POSTing `/refresh` (or `/focus`) to the other app's HTTP port.
+- **Persistence is SeaORM (async) + Atlas migrations.** The schema's source of truth is `common/schema.hcl` — never hand-write a migration or hand-edit the DB schema. To change it: edit `schema.hcl` → `atlas migrate diff` → `./common/gen-entities.sh` → map the field in `storage.rs`. See `.llm/build-and-run.md#schema-changes-the-dev-loop`. Migrations from `0002` on must preserve data. `common/src/entities/` is **generated** — don't edit by hand.
 - Ports are fixed: `MAIN_PORT`/`TRAY_PORT` in `common/src/lib.rs` (runtime), Vite `server.port` in each `vite.config.ts` (dev).
 - The mini window is a converted **NSPanel** parked off-screen while hidden — see `.llm/tray-app.md` before touching its show/hide/capture logic.

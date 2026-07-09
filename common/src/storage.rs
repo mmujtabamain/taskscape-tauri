@@ -1,277 +1,187 @@
-use std::sync::Mutex;
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, LoaderTrait,
+    QueryFilter, QueryOrder, Set, SqlxSqliteConnector, TransactionTrait,
+};
 
+use crate::entities::{attachments, lists, projects, settings, task_notes, tasks};
 use crate::models::{Attachment, LinkType, List, Note, Project, Task};
 use crate::util::{new_id, now_millis};
 
 /// A handle to the Taskscape SQLite database.
 ///
-/// Each process keeps its own connection to the shared `~/.taskscape/taskscape.db`
-/// file. WAL journaling plus a busy timeout let the main app and the tray app
-/// read and write the same database concurrently.
+/// Wraps an async SeaORM connection over an SQLx pool. Each process keeps its own
+/// pool to the shared `~/.taskscape/taskscape.db`; WAL journaling plus a busy
+/// timeout let the main app and the tray app read and write it concurrently.
 pub struct Store {
-    conn: Mutex<Connection>,
+    db: DatabaseConnection,
 }
 
 impl Store {
-    /// Open (creating if needed) the shared database and run migrations.
-    pub fn open() -> Result<Self> {
+    /// Open (creating if needed) the shared database and apply migrations.
+    pub async fn open() -> Result<Self> {
         crate::paths::ensure_dirs()?;
-        let conn = Connection::open(crate::paths::db_path())?;
-        conn.busy_timeout(Duration::from_secs(5))?;
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             PRAGMA foreign_keys = ON;",
-        )?;
-        let store = Self {
-            conn: Mutex::new(conn),
-        };
-        store.migrate()?;
-        Ok(store)
+        Self::open_at(&crate::paths::db_path()).await
     }
 
-    fn migrate(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS projects (
-                 id         TEXT PRIMARY KEY,
-                 name       TEXT NOT NULL,
-                 created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS lists (
-                 id         TEXT PRIMARY KEY,
-                 project_id TEXT,
-                 name       TEXT NOT NULL,
-                 created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS tasks (
-                 id         TEXT PRIMARY KEY,
-                 list_id    TEXT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-                 parent_id  TEXT,
-                 title      TEXT NOT NULL,
-                 notes      TEXT,
-                 done       INTEGER NOT NULL DEFAULT 0,
-                 created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS attachments (
-                 id         TEXT PRIMARY KEY,
-                 task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                 name       TEXT NOT NULL,
-                 link_type  TEXT NOT NULL,
-                 location   TEXT NOT NULL,
-                 created_at INTEGER NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS task_notes (
-                 id         TEXT PRIMARY KEY,
-                 task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                 content    TEXT NOT NULL,
-                 sort_order REAL NOT NULL,
-                 created_at INTEGER NOT NULL,
-                 updated_at INTEGER NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS settings (
-                 key   TEXT PRIMARY KEY,
-                 value TEXT NOT NULL
-             );
-             CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks(list_id);
-             CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
-             CREATE INDEX IF NOT EXISTS idx_task_notes_task ON task_notes(task_id);",
-        )?;
-        // Bring older databases up to date. `ensure_column` is a no-op when the
-        // column already exists, so this runs safely on every open.
-        ensure_column(&conn, "lists", "project_id", "TEXT")?;
-        ensure_column(&conn, "lists", "sort_order", "REAL")?;
-        ensure_column(&conn, "tasks", "parent_id", "TEXT")?;
-        ensure_column(&conn, "tasks", "sort_order", "REAL")?;
-        // Seed manual ordering from creation time so pre-migration rows keep
-        // their chronological order.
-        conn.execute(
-            "UPDATE tasks SET sort_order = created_at WHERE sort_order IS NULL",
-            [],
-        )?;
-        conn.execute(
-            "UPDATE lists SET sort_order = created_at WHERE sort_order IS NULL",
-            [],
-        )?;
-        // Indexes on the migrated columns — created after `ensure_column` so the
-        // column is guaranteed to exist on databases that predate it.
-        conn.execute_batch(
-            "CREATE INDEX IF NOT EXISTS idx_lists_project ON lists(project_id);
-             CREATE INDEX IF NOT EXISTS idx_tasks_parent  ON tasks(parent_id);",
-        )?;
-        // Adopt any project-less lists (pre-projects databases) into a default project.
-        backfill_default_project(&conn)?;
-        // Wrap each task's legacy single note into an initial rich note block.
-        backfill_task_notes(&conn)?;
-        Ok(())
+    /// Open a store at an explicit database path (the data-dir setup in
+    /// [`open`](Self::open) is skipped). Lets tests point at a temp file.
+    async fn open_at(path: &Path) -> Result<Self> {
+        let db = connect(path).await?;
+        crate::migrations::apply(&db).await?;
+        Ok(Self { db })
     }
 
     // ---- settings (shared key/value, e.g. the last active list) -----------
 
-    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
-        let conn = self.conn.lock().unwrap();
-        let value = conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = ?1",
-                params![key],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?;
-        Ok(value)
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        Ok(settings::Entity::find_by_id(key.to_string())
+            .one(&self.db)
+            .await?
+            .map(|m| m.value))
     }
 
-    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO settings (key, value) VALUES (?1, ?2)
-             ON CONFLICT(key) DO UPDATE SET value = ?2",
-            params![key, value],
-        )?;
+    pub async fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        settings::Entity::insert(settings::ActiveModel {
+            key: Set(key.to_string()),
+            value: Set(value.to_string()),
+        })
+        .on_conflict(
+            OnConflict::column(settings::Column::Key)
+                .update_column(settings::Column::Value)
+                .to_owned(),
+        )
+        .exec(&self.db)
+        .await?;
         Ok(())
     }
 
     // ---- projects --------------------------------------------------------
 
-    pub fn create_project(&self, name: &str) -> Result<Project> {
+    pub async fn create_project(&self, name: &str) -> Result<Project> {
         let now = now_millis();
-        let project = Project {
-            id: new_id(),
-            name: name.to_string(),
-            created_at: now,
-            updated_at: now,
-        };
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-            params![project.id, project.name, project.created_at, project.updated_at],
-        )?;
-        Ok(project)
+        let model = projects::ActiveModel {
+            id: Set(new_id()),
+            name: Set(name.to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&self.db)
+        .await?;
+        Ok(to_project(model))
     }
 
-    pub fn list_projects(&self) -> Result<Vec<Project>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, name, created_at, updated_at FROM projects ORDER BY created_at ASC",
-        )?;
-        let rows = stmt.query_map([], row_to_project)?;
-        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    pub async fn list_projects(&self) -> Result<Vec<Project>> {
+        Ok(projects::Entity::find()
+            .order_by_asc(projects::Column::CreatedAt)
+            .all(&self.db)
+            .await?
+            .into_iter()
+            .map(to_project)
+            .collect())
     }
 
-    pub fn rename_project(&self, id: &str, name: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "UPDATE projects SET name = ?2, updated_at = ?3 WHERE id = ?1",
-            params![id, name, now_millis()],
-        )?;
+    pub async fn rename_project(&self, id: &str, name: &str) -> Result<()> {
+        projects::Entity::update_many()
+            .col_expr(projects::Column::Name, Expr::value(name))
+            .col_expr(projects::Column::UpdatedAt, Expr::value(now_millis()))
+            .filter(projects::Column::Id.eq(id))
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
-    /// Delete a project and everything under it. Its lists are removed first so
-    /// their tasks (and attachments) cascade via the existing foreign keys.
-    pub fn delete_project(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM lists WHERE project_id = ?1", params![id])?;
-        conn.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+    /// Delete a project and everything under it. Its lists — and their tasks,
+    /// attachments and notes — are removed by the database's `ON DELETE CASCADE`
+    /// foreign keys.
+    pub async fn delete_project(&self, id: &str) -> Result<()> {
+        projects::Entity::delete_by_id(id.to_string())
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
     /// The project new lists/captures fall into when none is specified: the
     /// oldest existing project, created on demand if the database has none.
-    pub fn default_project(&self) -> Result<Project> {
+    pub async fn default_project(&self) -> Result<Project> {
+        if let Some(model) = projects::Entity::find()
+            .order_by_asc(projects::Column::CreatedAt)
+            .one(&self.db)
+            .await?
         {
-            let conn = self.conn.lock().unwrap();
-            let existing = conn
-                .query_row(
-                    "SELECT id, name, created_at, updated_at FROM projects
-                     ORDER BY created_at ASC LIMIT 1",
-                    [],
-                    row_to_project,
-                )
-                .optional()?;
-            if let Some(project) = existing {
-                return Ok(project);
-            }
+            return Ok(to_project(model));
         }
-        self.create_project(&crate::names::suggest_name())
+        self.create_project(&crate::names::suggest_name()).await
     }
 
     // ---- lists -----------------------------------------------------------
 
-    pub fn create_list(&self, project_id: &str, name: &str) -> Result<List> {
+    pub async fn create_list(&self, project_id: &str, name: &str) -> Result<List> {
         let now = now_millis();
-        let list = List {
-            id: new_id(),
-            project_id: project_id.to_string(),
-            name: name.to_string(),
-            // New lists land after existing tabs (they keep their created_at
-            // seed), so a fresh list appears last.
-            sort_order: now as f64,
-            created_at: now,
-            updated_at: now,
-        };
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO lists (id, project_id, name, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                list.id,
-                list.project_id,
-                list.name,
-                list.sort_order,
-                list.created_at,
-                list.updated_at
-            ],
-        )?;
-        Ok(list)
+        // New lists land after existing tabs (seeded with `now`), so a fresh
+        // list appears last.
+        let model = lists::ActiveModel {
+            id: Set(new_id()),
+            project_id: Set(project_id.to_string()),
+            name: Set(name.to_string()),
+            sort_order: Set(now as f64),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&self.db)
+        .await?;
+        Ok(to_list(model))
     }
 
-    pub fn list_lists(&self) -> Result<Vec<List>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, project_id, name, sort_order, created_at, updated_at
-             FROM lists ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
-        )?;
-        let rows = stmt.query_map([], row_to_list)?;
-        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    pub async fn list_lists(&self) -> Result<Vec<List>> {
+        Ok(lists::Entity::find()
+            .order_by_asc(lists::Column::SortOrder)
+            .order_by_asc(lists::Column::CreatedAt)
+            .all(&self.db)
+            .await?
+            .into_iter()
+            .map(to_list)
+            .collect())
     }
 
     /// Move a list to a new manual position among its sibling tabs.
-    pub fn reorder_list(&self, id: &str, sort_order: f64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        let updated = conn.execute(
-            "UPDATE lists SET sort_order = ?2, updated_at = ?3 WHERE id = ?1",
-            params![id, sort_order, now_millis()],
-        )?;
-        if updated == 0 {
+    pub async fn reorder_list(&self, id: &str, sort_order: f64) -> Result<()> {
+        let res = lists::Entity::update_many()
+            .col_expr(lists::Column::SortOrder, Expr::value(sort_order))
+            .col_expr(lists::Column::UpdatedAt, Expr::value(now_millis()))
+            .filter(lists::Column::Id.eq(id))
+            .exec(&self.db)
+            .await?;
+        if res.rows_affected == 0 {
             anyhow::bail!("list not found: {id}");
         }
         Ok(())
     }
 
-    pub fn rename_list(&self, id: &str, name: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "UPDATE lists SET name = ?2, updated_at = ?3 WHERE id = ?1",
-            params![id, name, now_millis()],
-        )?;
+    pub async fn rename_list(&self, id: &str, name: &str) -> Result<()> {
+        lists::Entity::update_many()
+            .col_expr(lists::Column::Name, Expr::value(name))
+            .col_expr(lists::Column::UpdatedAt, Expr::value(now_millis()))
+            .filter(lists::Column::Id.eq(id))
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
-    pub fn delete_list(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM lists WHERE id = ?1", params![id])?;
+    pub async fn delete_list(&self, id: &str) -> Result<()> {
+        lists::Entity::delete_by_id(id.to_string())
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
     // ---- tasks -----------------------------------------------------------
 
-    pub fn create_task(
+    pub async fn create_task(
         &self,
         list_id: &str,
         title: &str,
@@ -279,451 +189,478 @@ impl Store {
         parent_id: Option<&str>,
     ) -> Result<Task> {
         let now = now_millis();
-        let task = Task {
-            id: new_id(),
-            list_id: list_id.to_string(),
-            title: title.to_string(),
-            notes: notes.map(|s| s.to_string()),
-            done: false,
-            sort_order: now as f64,
-            created_at: now,
-            updated_at: now,
-            parent_id: parent_id.map(|s| s.to_string()),
-            attachments: Vec::new(),
-            note_items: Vec::new(),
-        };
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO tasks (id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![
-                task.id,
-                task.list_id,
-                task.parent_id,
-                task.title,
-                task.notes,
-                task.done as i64,
-                task.sort_order,
-                task.created_at,
-                task.updated_at
-            ],
-        )?;
+        let id = new_id();
+        let txn = self.db.begin().await?;
+        let task = tasks::ActiveModel {
+            id: Set(id.clone()),
+            list_id: Set(list_id.to_string()),
+            parent_id: Set(parent_id.map(str::to_string)),
+            title: Set(title.to_string()),
+            notes: Set(notes.map(str::to_string)),
+            done: Set(0),
+            sort_order: Set(now as f64),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&txn)
+        .await?;
         // A capture that arrives with note text (e.g. from the tray) becomes the
         // task's first rich note.
         if let Some(text) = notes.filter(|s| !s.trim().is_empty()) {
-            conn.execute(
-                "INSERT INTO task_notes (id, task_id, content, sort_order, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![new_id(), task.id, plaintext_to_html(text), now as f64, now, now],
-            )?;
+            task_notes::ActiveModel {
+                id: Set(new_id()),
+                task_id: Set(id.clone()),
+                content: Set(plaintext_to_html(text)),
+                sort_order: Set(now as f64),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&txn)
+            .await?;
         }
-        Ok(task)
+        txn.commit().await?;
+        Ok(to_task(task))
     }
 
-    pub fn list_tasks(&self, list_id: &str) -> Result<Vec<Task>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at
-             FROM tasks WHERE list_id = ?1
-             ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
-        )?;
-        let tasks = stmt
-            .query_map(params![list_id], row_to_task)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        drop(stmt);
-        drop(conn);
-        self.attach_all(tasks)
+    pub async fn list_tasks(&self, list_id: &str) -> Result<Vec<Task>> {
+        let models = tasks::Entity::find()
+            .filter(tasks::Column::ListId.eq(list_id))
+            .order_by_asc(tasks::Column::SortOrder)
+            .order_by_asc(tasks::Column::CreatedAt)
+            .all(&self.db)
+            .await?;
+        self.hydrate(models).await
     }
 
-    pub fn all_tasks(&self) -> Result<Vec<Task>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at
-             FROM tasks ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
-        )?;
-        let tasks = stmt
-            .query_map([], row_to_task)?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        drop(stmt);
-        drop(conn);
-        self.attach_all(tasks)
+    pub async fn all_tasks(&self) -> Result<Vec<Task>> {
+        let models = tasks::Entity::find()
+            .order_by_asc(tasks::Column::SortOrder)
+            .order_by_asc(tasks::Column::CreatedAt)
+            .all(&self.db)
+            .await?;
+        self.hydrate(models).await
     }
 
-    pub fn update_task(
+    pub async fn update_task(
         &self,
         id: &str,
         title: Option<&str>,
         notes: Option<&str>,
         done: Option<bool>,
     ) -> Result<Task> {
-        {
-            let conn = self.conn.lock().unwrap();
+        if let Some(model) = tasks::Entity::find_by_id(id.to_string()).one(&self.db).await? {
+            let mut active: tasks::ActiveModel = model.into();
+            let mut dirty = false;
             if let Some(title) = title {
-                conn.execute(
-                    "UPDATE tasks SET title = ?2, updated_at = ?3 WHERE id = ?1",
-                    params![id, title, now_millis()],
-                )?;
+                active.title = Set(title.to_string());
+                dirty = true;
             }
             if let Some(notes) = notes {
-                conn.execute(
-                    "UPDATE tasks SET notes = ?2, updated_at = ?3 WHERE id = ?1",
-                    params![id, notes, now_millis()],
-                )?;
+                active.notes = Set(Some(notes.to_string()));
+                dirty = true;
             }
             if let Some(done) = done {
-                conn.execute(
-                    "UPDATE tasks SET done = ?2, updated_at = ?3 WHERE id = ?1",
-                    params![id, done as i64, now_millis()],
-                )?;
+                active.done = Set(done as i32);
+                dirty = true;
+            }
+            if dirty {
+                active.updated_at = Set(now_millis());
+                active.update(&self.db).await?;
             }
         }
-        self.get_task(id)
+        self.get_task(id).await
     }
 
-    pub fn get_task(&self, id: &str) -> Result<Task> {
-        let conn = self.conn.lock().unwrap();
-        let task = conn.query_row(
-            "SELECT id, list_id, parent_id, title, notes, done, sort_order, created_at, updated_at
-             FROM tasks WHERE id = ?1",
-            params![id],
-            row_to_task,
-        )?;
-        drop(conn);
-        Ok(self.attach_all(vec![task])?.pop().unwrap())
+    pub async fn get_task(&self, id: &str) -> Result<Task> {
+        let model = tasks::Entity::find_by_id(id.to_string())
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("task not found: {id}"))?;
+        Ok(self.hydrate(vec![model]).await?.pop().unwrap())
     }
 
-    /// Delete a task and, recursively, every subtask beneath it. Subtask
-    /// cascade is done in code rather than via a self-referential foreign key so
-    /// the `parent_id` column can be added to older databases with a plain
-    /// `ALTER TABLE`.
-    pub fn delete_task(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        delete_task_tree(&conn, id)?;
+    /// Delete a task and, recursively, every subtask beneath it. The subtree is
+    /// removed by the `tasks.parent_id` self-referential `ON DELETE CASCADE`
+    /// foreign key.
+    pub async fn delete_task(&self, id: &str) -> Result<()> {
+        tasks::Entity::delete_by_id(id.to_string())
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
     /// Re-home a task: place it under `parent_id` (`None` = top level) in
     /// `list_id` (`None` = keep current / derive from parent). Descendants
     /// follow across lists.
-    pub fn move_task(
+    pub async fn move_task(
         &self,
         id: &str,
         parent_id: Option<&str>,
         list_id: Option<&str>,
         sort_order: Option<f64>,
     ) -> Result<Task> {
-        {
-            let conn = self.conn.lock().unwrap();
-            let current_list: String = conn
-                .query_row(
-                    "SELECT list_id FROM tasks WHERE id = ?1",
-                    params![id],
-                    |r| r.get(0),
-                )
-                .optional()?
-                .ok_or_else(|| anyhow::anyhow!("task not found: {id}"))?;
+        let txn = self.db.begin().await?;
+        let current = tasks::Entity::find_by_id(id.to_string())
+            .one(&txn)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("task not found: {id}"))?;
+        let current_list = current.list_id.clone();
 
-            let target_list = match parent_id {
-                Some(parent) => {
-                    if parent == id {
-                        anyhow::bail!("cannot move a task under itself");
-                    }
-                    let (parent_list, mut ancestor): (String, Option<String>) = conn
-                        .query_row(
-                            "SELECT list_id, parent_id FROM tasks WHERE id = ?1",
-                            params![parent],
-                            |r| Ok((r.get(0)?, r.get(1)?)),
-                        )
-                        .optional()?
-                        .ok_or_else(|| anyhow::anyhow!("parent task not found: {parent}"))?;
-                    // Walk the parent chain up from the target parent; reaching
-                    // `id` means the parent lives inside this task's subtree.
-                    while let Some(above) = ancestor {
-                        if above == id {
-                            anyhow::bail!("cannot move a task under its own subtask");
-                        }
-                        ancestor = conn
-                            .query_row(
-                                "SELECT parent_id FROM tasks WHERE id = ?1",
-                                params![above],
-                                |r| r.get(0),
-                            )
-                            .optional()?
-                            .flatten();
-                    }
-                    parent_list
+        let target_list = match parent_id {
+            Some(parent) => {
+                if parent == id {
+                    anyhow::bail!("cannot move a task under itself");
                 }
-                None => list_id.map(str::to_string).unwrap_or(current_list.clone()),
-            };
-
-            let now = now_millis();
-            conn.execute(
-                "UPDATE tasks SET parent_id = ?2, list_id = ?3, sort_order = ?4, updated_at = ?5
-                 WHERE id = ?1",
-                params![
-                    id,
-                    parent_id,
-                    target_list,
-                    sort_order.unwrap_or(now as f64),
-                    now
-                ],
-            )?;
-            if target_list != current_list {
-                relist_task_tree(&conn, id, &target_list, now)?;
+                let parent_model = tasks::Entity::find_by_id(parent.to_string())
+                    .one(&txn)
+                    .await?
+                    .ok_or_else(|| anyhow::anyhow!("parent task not found: {parent}"))?;
+                let parent_list = parent_model.list_id.clone();
+                // Walk the parent chain up from the target parent; reaching `id`
+                // means the parent lives inside this task's subtree.
+                let mut ancestor = parent_model.parent_id.clone();
+                while let Some(above) = ancestor {
+                    if above == id {
+                        anyhow::bail!("cannot move a task under its own subtask");
+                    }
+                    ancestor = tasks::Entity::find_by_id(above)
+                        .one(&txn)
+                        .await?
+                        .and_then(|m| m.parent_id);
+                }
+                parent_list
             }
+            None => list_id.map(str::to_string).unwrap_or_else(|| current_list.clone()),
+        };
+
+        let now = now_millis();
+        let mut active: tasks::ActiveModel = current.into();
+        active.parent_id = Set(parent_id.map(str::to_string));
+        active.list_id = Set(target_list.clone());
+        active.sort_order = Set(sort_order.unwrap_or(now as f64));
+        active.updated_at = Set(now);
+        active.update(&txn).await?;
+
+        if target_list != current_list {
+            relist_task_tree(&txn, id, &target_list, now).await?;
         }
-        self.get_task(id)
+        txn.commit().await?;
+        self.get_task(id).await
     }
 
-    pub fn reorder_task(&self, id: &str, sort_order: f64) -> Result<Task> {
-        {
-            let conn = self.conn.lock().unwrap();
-            let updated = conn.execute(
-                "UPDATE tasks SET sort_order = ?2, updated_at = ?3 WHERE id = ?1",
-                params![id, sort_order, now_millis()],
-            )?;
-            if updated == 0 {
-                anyhow::bail!("task not found: {id}");
-            }
+    pub async fn reorder_task(&self, id: &str, sort_order: f64) -> Result<Task> {
+        let res = tasks::Entity::update_many()
+            .col_expr(tasks::Column::SortOrder, Expr::value(sort_order))
+            .col_expr(tasks::Column::UpdatedAt, Expr::value(now_millis()))
+            .filter(tasks::Column::Id.eq(id))
+            .exec(&self.db)
+            .await?;
+        if res.rows_affected == 0 {
+            anyhow::bail!("task not found: {id}");
         }
-        self.get_task(id)
+        self.get_task(id).await
     }
 
     // ---- attachments -----------------------------------------------------
 
-    pub fn add_attachment(
+    pub async fn add_attachment(
         &self,
         task_id: &str,
         name: &str,
         link_type: LinkType,
         location: &str,
     ) -> Result<Attachment> {
-        let attachment = Attachment {
-            id: new_id(),
-            task_id: task_id.to_string(),
-            name: name.to_string(),
-            link_type,
-            location: location.to_string(),
-            created_at: now_millis(),
-        };
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "INSERT INTO attachments (id, task_id, name, link_type, location, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                attachment.id,
-                attachment.task_id,
-                attachment.name,
-                attachment.link_type.as_str(),
-                attachment.location,
-                attachment.created_at
-            ],
-        )?;
-        Ok(attachment)
+        let model = attachments::ActiveModel {
+            id: Set(new_id()),
+            task_id: Set(task_id.to_string()),
+            name: Set(name.to_string()),
+            link_type: Set(link_type.as_str().to_string()),
+            location: Set(location.to_string()),
+            created_at: Set(now_millis()),
+        }
+        .insert(&self.db)
+        .await?;
+        Ok(to_attachment(model))
     }
 
-    pub fn list_attachments(&self, task_id: &str) -> Result<Vec<Attachment>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, task_id, name, link_type, location, created_at
-             FROM attachments WHERE task_id = ?1 ORDER BY created_at ASC",
-        )?;
-        let rows = stmt.query_map(params![task_id], row_to_attachment)?;
-        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    pub async fn list_attachments(&self, task_id: &str) -> Result<Vec<Attachment>> {
+        Ok(attachments::Entity::find()
+            .filter(attachments::Column::TaskId.eq(task_id))
+            .order_by_asc(attachments::Column::CreatedAt)
+            .all(&self.db)
+            .await?
+            .into_iter()
+            .map(to_attachment)
+            .collect())
     }
 
-    pub fn get_attachment(&self, id: &str) -> Result<Attachment> {
-        let conn = self.conn.lock().unwrap();
-        Ok(conn.query_row(
-            "SELECT id, task_id, name, link_type, location, created_at
-             FROM attachments WHERE id = ?1",
-            params![id],
-            row_to_attachment,
-        )?)
+    pub async fn get_attachment(&self, id: &str) -> Result<Attachment> {
+        let model = attachments::Entity::find_by_id(id.to_string())
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("attachment not found: {id}"))?;
+        Ok(to_attachment(model))
     }
 
     /// Update an attachment's display name and stored location (the latter
     /// changes only when a copy's on-disk file is renamed).
-    pub fn update_attachment(&self, id: &str, name: &str, location: &str) -> Result<Attachment> {
-        {
-            let conn = self.conn.lock().unwrap();
-            let updated = conn.execute(
-                "UPDATE attachments SET name = ?2, location = ?3 WHERE id = ?1",
-                params![id, name, location],
-            )?;
-            if updated == 0 {
-                anyhow::bail!("attachment not found: {id}");
-            }
+    pub async fn update_attachment(
+        &self,
+        id: &str,
+        name: &str,
+        location: &str,
+    ) -> Result<Attachment> {
+        let res = attachments::Entity::update_many()
+            .col_expr(attachments::Column::Name, Expr::value(name))
+            .col_expr(attachments::Column::Location, Expr::value(location))
+            .filter(attachments::Column::Id.eq(id))
+            .exec(&self.db)
+            .await?;
+        if res.rows_affected == 0 {
+            anyhow::bail!("attachment not found: {id}");
         }
-        self.get_attachment(id)
+        self.get_attachment(id).await
     }
 
-    pub fn delete_attachment(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM attachments WHERE id = ?1", params![id])?;
+    pub async fn delete_attachment(&self, id: &str) -> Result<()> {
+        attachments::Entity::delete_by_id(id.to_string())
+            .exec(&self.db)
+            .await?;
         Ok(())
     }
 
     // ---- notes -----------------------------------------------------------
 
-    pub fn list_notes(&self, task_id: &str) -> Result<Vec<Note>> {
-        let conn = self.conn.lock().unwrap();
-        list_notes_conn(&conn, task_id)
+    pub async fn list_notes(&self, task_id: &str) -> Result<Vec<Note>> {
+        Ok(notes_of(&self.db, task_id)
+            .await?
+            .into_iter()
+            .map(to_note)
+            .collect())
     }
 
     /// Append a rich-text note to a task (`content` is sanitized HTML from the
     /// caller). Refreshes the task's derived plaintext.
-    pub fn create_note(&self, task_id: &str, content: &str) -> Result<Note> {
+    pub async fn create_note(&self, task_id: &str, content: &str) -> Result<Note> {
         let now = now_millis();
-        let note = Note {
-            id: new_id(),
-            task_id: task_id.to_string(),
-            content: content.to_string(),
-            sort_order: now as f64,
-            created_at: now,
-            updated_at: now,
-        };
-        {
-            let conn = self.conn.lock().unwrap();
-            conn.execute(
-                "INSERT INTO task_notes (id, task_id, content, sort_order, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![note.id, note.task_id, note.content, note.sort_order, note.created_at, note.updated_at],
-            )?;
-            recompute_task_notes(&conn, task_id)?;
+        let txn = self.db.begin().await?;
+        let model = task_notes::ActiveModel {
+            id: Set(new_id()),
+            task_id: Set(task_id.to_string()),
+            content: Set(content.to_string()),
+            sort_order: Set(now as f64),
+            created_at: Set(now),
+            updated_at: Set(now),
         }
-        Ok(note)
+        .insert(&txn)
+        .await?;
+        recompute_task_notes(&txn, task_id).await?;
+        txn.commit().await?;
+        Ok(to_note(model))
     }
 
-    pub fn update_note(&self, id: &str, content: &str) -> Result<Note> {
-        {
-            let conn = self.conn.lock().unwrap();
-            let task_id: String = conn
-                .query_row("SELECT task_id FROM task_notes WHERE id = ?1", params![id], |r| r.get(0))
-                .optional()?
-                .ok_or_else(|| anyhow::anyhow!("note not found: {id}"))?;
-            conn.execute(
-                "UPDATE task_notes SET content = ?2, updated_at = ?3 WHERE id = ?1",
-                params![id, content, now_millis()],
-            )?;
-            recompute_task_notes(&conn, &task_id)?;
-        }
-        self.get_note(id)
+    pub async fn update_note(&self, id: &str, content: &str) -> Result<Note> {
+        let txn = self.db.begin().await?;
+        let model = task_notes::Entity::find_by_id(id.to_string())
+            .one(&txn)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("note not found: {id}"))?;
+        let task_id = model.task_id.clone();
+        let mut active: task_notes::ActiveModel = model.into();
+        active.content = Set(content.to_string());
+        active.updated_at = Set(now_millis());
+        let model = active.update(&txn).await?;
+        recompute_task_notes(&txn, &task_id).await?;
+        txn.commit().await?;
+        Ok(to_note(model))
     }
 
-    pub fn delete_note(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        let task_id: Option<String> = conn
-            .query_row("SELECT task_id FROM task_notes WHERE id = ?1", params![id], |r| r.get(0))
-            .optional()?;
-        conn.execute("DELETE FROM task_notes WHERE id = ?1", params![id])?;
+    pub async fn delete_note(&self, id: &str) -> Result<()> {
+        let txn = self.db.begin().await?;
+        let task_id = task_notes::Entity::find_by_id(id.to_string())
+            .one(&txn)
+            .await?
+            .map(|m| m.task_id);
+        task_notes::Entity::delete_by_id(id.to_string())
+            .exec(&txn)
+            .await?;
         if let Some(task_id) = task_id {
-            recompute_task_notes(&conn, &task_id)?;
+            recompute_task_notes(&txn, &task_id).await?;
         }
+        txn.commit().await?;
         Ok(())
     }
 
-    fn get_note(&self, id: &str) -> Result<Note> {
-        let conn = self.conn.lock().unwrap();
-        Ok(conn.query_row(
-            "SELECT id, task_id, content, sort_order, created_at, updated_at
-             FROM task_notes WHERE id = ?1",
-            params![id],
-            row_to_note,
-        )?)
-    }
-
-    /// Populate the `attachments` and `note_items` fields of each task.
-    fn attach_all(&self, mut tasks: Vec<Task>) -> Result<Vec<Task>> {
-        for task in &mut tasks {
-            task.attachments = self.list_attachments(&task.id)?;
-            task.note_items = self.list_notes(&task.id)?;
+    /// Populate the `attachments` and `note_items` fields of each task with two
+    /// batched queries (one for all attachments, one for all notes) rather than
+    /// a query per task.
+    async fn hydrate(&self, models: Vec<tasks::Model>) -> Result<Vec<Task>> {
+        let attachments = models
+            .load_many(
+                attachments::Entity::find().order_by_asc(attachments::Column::CreatedAt),
+                &self.db,
+            )
+            .await?;
+        let notes = models
+            .load_many(
+                task_notes::Entity::find()
+                    .order_by_asc(task_notes::Column::SortOrder)
+                    .order_by_asc(task_notes::Column::CreatedAt),
+                &self.db,
+            )
+            .await?;
+        let mut out = Vec::with_capacity(models.len());
+        for ((task, atts), nts) in models.into_iter().zip(attachments).zip(notes) {
+            let mut task = to_task(task);
+            task.attachments = atts.into_iter().map(to_attachment).collect();
+            task.note_items = nts.into_iter().map(to_note).collect();
+            out.push(task);
         }
-        Ok(tasks)
+        Ok(out)
     }
 }
 
-fn row_to_project(row: &Row) -> rusqlite::Result<Project> {
-    Ok(Project {
-        id: row.get("id")?,
-        name: row.get("name")?,
-        created_at: row.get("created_at")?,
-        updated_at: row.get("updated_at")?,
-    })
+/// Build a SeaORM connection over an SQLx SQLite pool whose every connection
+/// has WAL journaling, a 5s busy timeout, and foreign keys enabled — the last
+/// is required for the schema's `ON DELETE CASCADE` rules to fire.
+async fn connect(path: &Path) -> Result<DatabaseConnection> {
+    use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
+
+    let options = SqliteConnectOptions::new()
+        .filename(path)
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .busy_timeout(Duration::from_secs(5))
+        .foreign_keys(true);
+    let pool = SqlitePoolOptions::new()
+        .max_connections(4)
+        .connect_with(options)
+        .await?;
+    Ok(SqlxSqliteConnector::from_sqlx_sqlite_pool(pool))
 }
 
-fn row_to_list(row: &Row) -> rusqlite::Result<List> {
-    let created_at: i64 = row.get("created_at")?;
-    Ok(List {
-        id: row.get("id")?,
-        project_id: row.get::<_, Option<String>>("project_id")?.unwrap_or_default(),
-        name: row.get("name")?,
-        sort_order: row
-            .get::<_, Option<f64>>("sort_order")?
-            .unwrap_or(created_at as f64),
-        created_at,
-        updated_at: row.get("updated_at")?,
-    })
+// ---- entity → domain mapping ---------------------------------------------
+//
+// Domain models are the JSON/wire contract the frontend depends on; SeaORM
+// entities never cross that boundary (see `.plans/orm-migration.md` §7).
+
+fn to_project(m: projects::Model) -> Project {
+    Project {
+        id: m.id,
+        name: m.name,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+    }
 }
 
-fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
-    let created_at: i64 = row.get("created_at")?;
-    Ok(Task {
-        id: row.get("id")?,
-        list_id: row.get("list_id")?,
-        parent_id: row.get("parent_id")?,
-        title: row.get("title")?,
-        notes: row.get("notes")?,
-        done: row.get::<_, i64>("done")? != 0,
-        sort_order: row
-            .get::<_, Option<f64>>("sort_order")?
-            .unwrap_or(created_at as f64),
-        created_at,
-        updated_at: row.get("updated_at")?,
+fn to_list(m: lists::Model) -> List {
+    List {
+        id: m.id,
+        project_id: m.project_id,
+        name: m.name,
+        sort_order: m.sort_order,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+    }
+}
+
+fn to_task(m: tasks::Model) -> Task {
+    Task {
+        id: m.id,
+        list_id: m.list_id,
+        parent_id: m.parent_id,
+        title: m.title,
+        notes: m.notes,
+        done: m.done != 0,
+        sort_order: m.sort_order,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
         attachments: Vec::new(),
         note_items: Vec::new(),
-    })
+    }
 }
 
-fn row_to_note(row: &Row) -> rusqlite::Result<Note> {
-    let created_at: i64 = row.get("created_at")?;
-    Ok(Note {
-        id: row.get("id")?,
-        task_id: row.get("task_id")?,
-        content: row.get("content")?,
-        sort_order: row
-            .get::<_, Option<f64>>("sort_order")?
-            .unwrap_or(created_at as f64),
-        created_at,
-        updated_at: row.get("updated_at")?,
-    })
+fn to_note(m: task_notes::Model) -> Note {
+    Note {
+        id: m.id,
+        task_id: m.task_id,
+        content: m.content,
+        sort_order: m.sort_order,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+    }
 }
 
-fn list_notes_conn(conn: &Connection, task_id: &str) -> Result<Vec<Note>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, task_id, content, sort_order, created_at, updated_at
-         FROM task_notes WHERE task_id = ?1
-         ORDER BY COALESCE(sort_order, created_at) ASC, created_at ASC",
-    )?;
-    let rows = stmt.query_map(params![task_id], row_to_note)?;
-    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+fn to_attachment(m: attachments::Model) -> Attachment {
+    Attachment {
+        id: m.id,
+        task_id: m.task_id,
+        name: m.name,
+        link_type: LinkType::from_db(&m.link_type),
+        location: m.location,
+        created_at: m.created_at,
+    }
+}
+
+// ---- shared query helpers (work over a connection or a transaction) -------
+
+async fn notes_of<C: ConnectionTrait>(db: &C, task_id: &str) -> Result<Vec<task_notes::Model>> {
+    Ok(task_notes::Entity::find()
+        .filter(task_notes::Column::TaskId.eq(task_id))
+        .order_by_asc(task_notes::Column::SortOrder)
+        .order_by_asc(task_notes::Column::CreatedAt)
+        .all(db)
+        .await?)
 }
 
 /// Rebuild a task's `notes` column (its list-row preview + search text) from the
 /// plaintext of all its note blocks.
-fn recompute_task_notes(conn: &Connection, task_id: &str) -> Result<()> {
-    let notes = list_notes_conn(conn, task_id)?;
-    let plain = notes
+async fn recompute_task_notes<C: ConnectionTrait>(db: &C, task_id: &str) -> Result<()> {
+    let plain = notes_of(db, task_id)
+        .await?
         .iter()
         .map(|n| strip_html(&n.content))
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("  ·  ");
-    let value: Option<String> = if plain.trim().is_empty() { None } else { Some(plain) };
-    conn.execute(
-        "UPDATE tasks SET notes = ?2, updated_at = ?3 WHERE id = ?1",
-        params![task_id, value, now_millis()],
-    )?;
+    let value: Option<String> = if plain.trim().is_empty() {
+        None
+    } else {
+        Some(plain)
+    };
+    tasks::Entity::update_many()
+        .col_expr(tasks::Column::Notes, Expr::value(value))
+        .col_expr(tasks::Column::UpdatedAt, Expr::value(now_millis()))
+        .filter(tasks::Column::Id.eq(task_id))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
+/// Move every descendant subtask into `list_id`, mirroring the subtree so a
+/// task's children always live in its list. Iterative to avoid boxed async
+/// recursion.
+async fn relist_task_tree<C: ConnectionTrait>(
+    db: &C,
+    root: &str,
+    list_id: &str,
+    now: i64,
+) -> Result<()> {
+    let mut queue = vec![root.to_string()];
+    while let Some(parent) = queue.pop() {
+        let children = tasks::Entity::find()
+            .filter(tasks::Column::ParentId.eq(parent))
+            .all(db)
+            .await?;
+        for child in children {
+            let child_id = child.id.clone();
+            let mut active: tasks::ActiveModel = child.into();
+            active.list_id = Set(list_id.to_string());
+            active.updated_at = Set(now);
+            active.update(db).await?;
+            queue.push(child_id);
+        }
+    }
     Ok(())
 }
 
@@ -766,138 +703,155 @@ fn strip_html(html: &str) -> String {
     out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// One-time: wrap each task's pre-existing plaintext note into an initial rich
-/// note block. Guarded by a settings flag so it runs only once.
-fn backfill_task_notes(conn: &Connection) -> Result<()> {
-    let done: Option<String> = conn
-        .query_row(
-            "SELECT value FROM settings WHERE key = 'task_notes_backfilled'",
-            [],
-            |r| r.get(0),
-        )
-        .optional()?;
-    if done.is_some() {
-        return Ok(());
-    }
-    let rows: Vec<(String, String, i64)> = {
-        let mut stmt = conn.prepare(
-            "SELECT id, notes, created_at FROM tasks
-             WHERE notes IS NOT NULL AND TRIM(notes) != ''
-               AND id NOT IN (SELECT task_id FROM task_notes)",
-        )?;
-        let collected = stmt
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        collected
-    };
-    let now = now_millis();
-    for (task_id, notes, created) in rows {
-        conn.execute(
-            "INSERT INTO task_notes (id, task_id, content, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![new_id(), task_id, plaintext_to_html(&notes), created as f64, created, now],
-        )?;
-    }
-    conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES ('task_notes_backfilled', '1')",
-        [],
-    )?;
-    Ok(())
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Depth-first delete of a task and all of its descendant subtasks.
-fn delete_task_tree(conn: &Connection, id: &str) -> Result<()> {
-    let children: Vec<String> = {
-        let mut stmt = conn.prepare("SELECT id FROM tasks WHERE parent_id = ?1")?;
-        let ids = stmt
-            .query_map(params![id], |row| row.get::<_, String>(0))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        ids
-    };
-    for child in children {
-        delete_task_tree(conn, &child)?;
+    struct TempStore {
+        store: Store,
+        dir: std::path::PathBuf,
     }
-    conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
-    Ok(())
-}
 
-/// Depth-first move of every descendant subtask into `list_id`, mirroring
-/// [`delete_task_tree`]: a task's subtree always lives in its list.
-fn relist_task_tree(conn: &Connection, id: &str, list_id: &str, now: i64) -> Result<()> {
-    let children: Vec<String> = {
-        let mut stmt = conn.prepare("SELECT id FROM tasks WHERE parent_id = ?1")?;
-        let ids = stmt
-            .query_map(params![id], |row| row.get::<_, String>(0))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        ids
-    };
-    for child in children {
-        conn.execute(
-            "UPDATE tasks SET list_id = ?2, updated_at = ?3 WHERE id = ?1",
-            params![child, list_id, now],
-        )?;
-        relist_task_tree(conn, &child, list_id, now)?;
-    }
-    Ok(())
-}
-
-/// Assign any project-less lists (created before projects existed) to a default
-/// project, creating that project only if some orphan list needs one.
-fn backfill_default_project(conn: &Connection) -> Result<()> {
-    let orphans: i64 =
-        conn.query_row("SELECT COUNT(*) FROM lists WHERE project_id IS NULL", [], |r| {
-            r.get(0)
-        })?;
-    if orphans == 0 {
-        return Ok(());
-    }
-    let existing: Option<String> = conn
-        .query_row(
-            "SELECT id FROM projects ORDER BY created_at ASC LIMIT 1",
-            [],
-            |r| r.get(0),
-        )
-        .optional()?;
-    let project_id = match existing {
-        Some(id) => id,
-        None => {
-            let now = now_millis();
-            let id = new_id();
-            conn.execute(
-                "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                params![id, crate::names::suggest_name(), now, now],
-            )?;
-            id
+    impl std::ops::Deref for TempStore {
+        type Target = Store;
+        fn deref(&self) -> &Store {
+            &self.store
         }
-    };
-    conn.execute(
-        "UPDATE lists SET project_id = ?1 WHERE project_id IS NULL",
-        params![project_id],
-    )?;
-    Ok(())
-}
-
-fn ensure_column(conn: &Connection, table: &str, column: &str, decl: &str) -> Result<()> {
-    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
-    let has_column = stmt
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<rusqlite::Result<Vec<String>>>()?
-        .iter()
-        .any(|name| name == column);
-    if !has_column {
-        conn.execute(&format!("ALTER TABLE {table} ADD COLUMN {column} {decl}"), [])?;
     }
-    Ok(())
-}
 
-fn row_to_attachment(row: &Row) -> rusqlite::Result<Attachment> {
-    let link_type: String = row.get("link_type")?;
-    Ok(Attachment {
-        id: row.get("id")?,
-        task_id: row.get("task_id")?,
-        name: row.get("name")?,
-        link_type: LinkType::from_db(&link_type),
-        location: row.get("location")?,
-        created_at: row.get("created_at")?,
-    })
+    impl Drop for TempStore {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    /// A store backed by a throwaway on-disk SQLite DB (WAL needs a real file),
+    /// built through the runtime migration applier — the same path `open` takes.
+    async fn temp_store() -> TempStore {
+        let dir = std::env::temp_dir().join(format!("taskscape-test-{}", new_id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = Store::open_at(&dir.join("test.db")).await.unwrap();
+        TempStore { store, dir }
+    }
+
+    #[tokio::test]
+    async fn migrations_build_a_working_schema_and_are_idempotent() {
+        let dir = std::env::temp_dir().join(format!("taskscape-test-{}", new_id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("test.db");
+
+        // Opening twice re-runs the applier against an already-migrated DB.
+        let first = Store::open_at(&path).await.unwrap();
+        let project = first.create_project("Work").await.unwrap();
+        drop(first);
+        let second = Store::open_at(&path).await.unwrap();
+
+        // The clean baseline (no IF NOT EXISTS) must not re-run, and the row
+        // written by the first open must survive.
+        let projects = second.list_projects().await.unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].id, project.id);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn deleting_a_project_cascades_to_lists_tasks_notes_attachments() {
+        let store = temp_store().await;
+        let project = store.create_project("P").await.unwrap();
+        let list = store.create_list(&project.id, "L").await.unwrap();
+        let task = store
+            .create_task(&list.id, "T", Some("hi"), None)
+            .await
+            .unwrap();
+        store
+            .add_attachment(&task.id, "a", LinkType::Reference, "http://x")
+            .await
+            .unwrap();
+        store.create_note(&task.id, "<p>note</p>").await.unwrap();
+
+        store.delete_project(&project.id).await.unwrap();
+
+        // Everything under the project is gone via DB `ON DELETE CASCADE`.
+        assert!(store.list_projects().await.unwrap().is_empty());
+        assert!(store.list_lists().await.unwrap().is_empty());
+        assert!(store.all_tasks().await.unwrap().is_empty());
+        assert!(store.list_attachments(&task.id).await.unwrap().is_empty());
+        assert!(store.list_notes(&task.id).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn deleting_a_task_cascades_to_its_subtree() {
+        let store = temp_store().await;
+        let project = store.create_project("P").await.unwrap();
+        let list = store.create_list(&project.id, "L").await.unwrap();
+        let parent = store.create_task(&list.id, "parent", None, None).await.unwrap();
+        let child = store
+            .create_task(&list.id, "child", None, Some(&parent.id))
+            .await
+            .unwrap();
+        store
+            .create_task(&list.id, "grandchild", None, Some(&child.id))
+            .await
+            .unwrap();
+
+        // Deleting the root removes the whole subtree via the self-ref FK.
+        store.delete_task(&parent.id).await.unwrap();
+        assert!(store.all_tasks().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn moving_a_task_across_lists_relists_its_subtree() {
+        let store = temp_store().await;
+        let project = store.create_project("P").await.unwrap();
+        let l1 = store.create_list(&project.id, "L1").await.unwrap();
+        let l2 = store.create_list(&project.id, "L2").await.unwrap();
+        let parent = store.create_task(&l1.id, "parent", None, None).await.unwrap();
+        let child = store
+            .create_task(&l1.id, "child", None, Some(&parent.id))
+            .await
+            .unwrap();
+
+        store
+            .move_task(&parent.id, None, Some(&l2.id), None)
+            .await
+            .unwrap();
+
+        // The child follows its parent into the new list.
+        let moved_child = store.get_task(&child.id).await.unwrap();
+        assert_eq!(moved_child.list_id, l2.id);
+    }
+
+    #[tokio::test]
+    async fn moving_a_task_under_its_own_descendant_is_rejected() {
+        let store = temp_store().await;
+        let project = store.create_project("P").await.unwrap();
+        let list = store.create_list(&project.id, "L").await.unwrap();
+        let parent = store.create_task(&list.id, "parent", None, None).await.unwrap();
+        let child = store
+            .create_task(&list.id, "child", None, Some(&parent.id))
+            .await
+            .unwrap();
+
+        assert!(store
+            .move_task(&parent.id, Some(&child.id), None, None)
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn notes_recompute_the_task_plaintext_preview() {
+        let store = temp_store().await;
+        let project = store.create_project("P").await.unwrap();
+        let list = store.create_list(&project.id, "L").await.unwrap();
+        let task = store.create_task(&list.id, "T", None, None).await.unwrap();
+
+        store
+            .create_note(&task.id, "<p>Hello <b>world</b></p>")
+            .await
+            .unwrap();
+        let refreshed = store.get_task(&task.id).await.unwrap();
+        assert_eq!(refreshed.notes.as_deref(), Some("Hello world"));
+        assert_eq!(refreshed.note_items.len(), 1);
+    }
 }

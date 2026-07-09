@@ -12,7 +12,12 @@ path = "src/lib.rs"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
-rusqlite = { version = "0.32", features = ["bundled"] }
+sea-orm = { version = "1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+# Direct handle to SeaORM's own SQLite driver so we can build a pool whose every
+# connection has WAL + busy_timeout + foreign_keys set (SeaORM's ConnectOptions
+# can't set per-connection SQLite pragmas). Unified to one 0.8.x with SeaORM.
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
+include_dir = "0.7"
 uuid = { version = "1", features = ["v4"] }
 dirs = "5"
 axum = "0.8"
