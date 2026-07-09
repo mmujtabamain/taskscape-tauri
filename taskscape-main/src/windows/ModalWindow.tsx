@@ -1,5 +1,5 @@
 import { listen } from '@tauri-apps/api/event';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { Icon } from '../components/Icon';
 import {
@@ -164,23 +164,31 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
   // the field.
   const valueRef = useRef(value);
 
-  function resolve(buttonId: string | null, timedOut = false) {
-    if (resolvedRef.current) return;
-    resolvedRef.current = true;
-    const trimmed = valueRef.current.trim();
-    const value = trimmed ? trimmed + (props.input?.suffix ?? '') : undefined;
-    const result: ModalResult = { buttonId, value };
-    if (timedOut) result.timedOut = true;
-    void api.closeModal(id, result);
-  }
+  const resolve = useCallback(
+    (buttonId: string | null, timedOut = false) => {
+      if (resolvedRef.current) return;
+      resolvedRef.current = true;
 
-  function press(btn: ModalButton, isDefault: boolean) {
+      const trimmed = valueRef.current.trim();
+      const value = trimmed
+        ? trimmed + (props.input?.suffix ?? "")
+        : undefined;
+
+      const result: ModalResult = { buttonId, value };
+      if (timedOut) result.timedOut = true;
+
+      void api.closeModal(id, result);
+    },
+    [id, props.input?.suffix]
+  );
+
+  const press = useCallback((btn: ModalButton, isDefault: boolean) => {
     if (isDefault && props.input && !valueRef.current.trim()) {
       inputRef.current?.focus();
       return;
     }
     resolve(btn.id);
-  }
+  }, [props.input, resolve]);
 
   function cancelDrain() {
     if (drainCancelledRef.current) return;
@@ -234,7 +242,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [props]);
+  }, [press, props, resolve]);
 
   const tone = props.tone === 'danger' ? 'danger' : 'default';
 
@@ -285,7 +293,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
           <div className="flex items-start gap-3.5 px-5 pt-1.5 pb-5">
             {props.icon && (
               <div
-                className={`grid size-9 shrink-0 place-items-center rounded-control ${BADGE_TONE[tone]}`}
+                className={`rounded-control grid size-9 shrink-0 place-items-center ${BADGE_TONE[tone]}`}
               >
                 <Icon name={props.icon} size={20} />
               </div>
@@ -338,7 +346,8 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                               if (!text.includes('.')) return;
                               e.preventDefault();
                               const el = e.currentTarget;
-                              const start = el.selectionStart ?? el.value.length;
+                              const start =
+                                el.selectionStart ?? el.value.length;
                               const end = el.selectionEnd ?? el.value.length;
                               setInputValue(
                                 el.value.slice(0, start) +
