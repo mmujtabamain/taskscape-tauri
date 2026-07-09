@@ -354,7 +354,7 @@ function App() {
       title: `Delete “${list.name}”?`,
       message:
         taskCount > 0
-          ? `Its ${taskCount} task${taskCount === 1 ? '' : 's'} are deleted with it. This cannot be undone.`
+          ? `Its ${taskCount} task${taskCount === 1 ? ' is' : 's are'} deleted with it. This cannot be undone.`
           : 'The list is empty. This cannot be undone.',
       confirmLabel: 'Delete list',
     });
