@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { List, Task } from '../api';
 import { Icon } from './Icon';
 import { TaskRow, type RowCtx } from './TaskRow';
@@ -35,7 +35,6 @@ export function TaskPane({
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [rootDropOver, setRootDropOver] = useState(false);
-  const [tick, setTick] = useState<{ top: number; left: number } | null>(null);
 
   const visibleRoots = roots.filter(ctx.isVisible);
   const open = roots.filter((t) => !t.done).length;
@@ -60,35 +59,6 @@ export function TaskPane({
     });
     return () => registerComposer(list.id, null);
   }, [list.id, registerComposer]);
-
-  // The traveling index: one accent tick in the left gutter that glides to the
-  // selected row instead of blinking between rows. Runs every render (row
-  // heights shift with notes/expansion), so it must bail out on equal values
-  // or the setState → render → measure cycle never terminates.
-  useLayoutEffect(() => {
-    const content = contentRef.current;
-    const sel = ctx.selectedTaskId;
-    const el =
-      content && sel
-        ? (content.querySelector(
-            `[data-task-id="${CSS.escape(sel)}"]`
-          ) as HTMLElement | null)
-        : null;
-    if (!content || !el) {
-      setTick((prev) => (prev === null ? prev : null));
-      return;
-    }
-    const cr = content.getBoundingClientRect();
-    const er = el.getBoundingClientRect();
-    const depth = Math.round(parseFloat(el.style.paddingLeft || '0') / 24);
-    const next = {
-      top: er.top - cr.top + er.height / 2 - 10,
-      left: depth * 24 + 17,
-    };
-    setTick((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next
-    );
-  }, [ctx.selectedTaskId]);
 
   const submit = () => {
     const el = composerRef.current;
@@ -158,12 +128,6 @@ export function TaskPane({
         }}
       >
         <div ref={contentRef} className="relative pb-6">
-          {tick && (
-            <span
-              className="z-raised bg-accent-500l dark:bg-accent-500d ease-standard pointer-events-none absolute h-5 w-0.5 rounded-full transition-[top,left] duration-100"
-              style={{ top: tick.top, left: tick.left }}
-            />
-          )}
           {visibleRoots.map((task) => (
             <TaskRow key={task.id} task={task} depth={0} ctx={ctx} />
           ))}
