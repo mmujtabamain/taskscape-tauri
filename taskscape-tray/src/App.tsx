@@ -138,16 +138,17 @@ function App() {
 
       <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
 
-      <div className="px-3 py-2.5">
-        <RichTextEditor
-          ref={editorRef}
-          attachments={[]}
-          placeholder="Notes ..."
-          minHeightClass="min-h-16"
-          onSubmit={save}
-          onEscape={() => api.hideMini()}
-        />
-      </div>
+      <RichTextEditor
+        ref={editorRef}
+        attachments={[]}
+        placeholder="Notes ..."
+        minHeightClass="min-h-16"
+        floatingToolbar={false}
+        wrapperClassName=""
+        toolbarClassName="border-edge-1l dark:border-edge-1d gap-1 border-t px-2 py-1.5"
+        onSubmit={save}
+        onEscape={() => api.hideMini()}
+      />
 
       <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
 

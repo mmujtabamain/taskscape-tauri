@@ -1,8 +1,8 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { Icon } from '@ui/Icon';
 import { useEffect, useRef } from 'react';
 import { api, type List, type Project } from '../api';
 import { cmd, isMac } from '../lib/platform';
-import { Icon } from '@ui/Icon';
 import { ListTabs } from './ListTabs';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { WindowControls } from './WindowControls';
@@ -62,6 +62,13 @@ export function TitleBar(props: Props) {
       className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d relative flex h-13 shrink-0 items-stretch border-b"
     >
       {isMac ? <WindowControls /> : <span className="w-3" />}
+
+      <div
+        data-tauri-drag-region
+        className="pointer-events-none mr-2 flex h-full w-6 items-center justify-center"
+      >
+        <Icon name="drag_indicator" size={20} className="pointer-events-none" />
+      </div>
 
       <div className="flex items-center pr-4">
         <ProjectSwitcher

@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { fileKindFor } from './fileKind';
 import { Icon } from './Icon';
 import { sanitizeNoteHtml } from './sanitizeHtml';
@@ -35,10 +36,16 @@ interface Props {
   onRequestLink?: () => Promise<string | null>;
   /** Escape pressed with no mention popup open (used by the tray to dismiss). */
   onEscape?: () => void;
-  /** 'floating' (default) shows the toolbar as a fixed popover above the editor,
-   *  needed inside scroll containers. 'inline' docks it in the editor's flow (no
-   *  popup) — for surfaces like the tray mini bar. */
-  toolbar?: 'floating' | 'inline';
+  /** When true (default) the toolbar is a fixed popover above the editor (needed
+   *  inside scroll containers). When false it docks in the editor's flow — no
+   *  popup — for surfaces like the tray mini bar. */
+  floatingToolbar?: boolean;
+  /** Extra classes for the docked toolbar (twMerge'd) so each caller styles it. */
+  toolbarClassName?: string;
+  /** Overrides the wrapper's box chrome (border, rounding, background, focus
+   *  ring). Pass '' for a flat, chromeless surface like the tray mini bar; omit
+   *  to keep the default inset-field look. */
+  wrapperClassName?: string;
 }
 
 const escapeHtml = (s: string) =>
@@ -122,7 +129,9 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
       autoFocus,
       onRequestLink,
       onEscape,
-      toolbar = 'floating',
+      floatingToolbar = true,
+      toolbarClassName,
+      wrapperClassName,
     },
     ref
   ) {
@@ -169,9 +178,12 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     // editor shows a blank line. A single <br> is WebKit's bogus break (left in
     // an emptied contenteditable) and renders nothing; two or more are a real,
     // visible blank line — so a Shift+Enter steps the placeholder aside even
-    // though the note is still "empty" and clearable.
+    // though the note is still "empty" and clearable. An empty list still paints
+    // a bullet/number, so a present <ul>/<ol> hides the placeholder as well.
     const placeholderVisible = (el: HTMLElement): boolean =>
-      isEmpty(el) && el.querySelectorAll('br').length <= 1;
+      isEmpty(el) &&
+      el.querySelectorAll('br').length <= 1 &&
+      !el.querySelector('ul, ol');
 
     const sync = () => {
       const el = edRef.current;
@@ -225,7 +237,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     // it above the editor. Fixed coords are viewport-relative, so recompute them
     // from the wrapper on every scroll/resize while the editor is focused.
     useEffect(() => {
-      if (toolbar !== 'floating' || !toolbarShown) return;
+      if (!floatingToolbar || !toolbarShown) return;
       const place = () => {
         const el = wrapRef.current;
         if (!el) return;
@@ -239,7 +251,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
         window.removeEventListener('scroll', place, true);
         window.removeEventListener('resize', place);
       };
-    }, [toolbar, toolbarShown]);
+    }, [floatingToolbar, toolbarShown]);
 
     useImperativeHandle(ref, () => ({
       getHtml: () => sanitizeNoteHtml(edRef.current?.innerHTML ?? '', names),
@@ -394,6 +406,43 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
       return true;
     };
 
+    // Markdown-style list shortcut: a lone `-`/`*` (unordered) or `N.` (ordered)
+    // marker at the very start of a line, followed by the space that triggers
+    // this, is dropped and the matching list toggled on. execCommand keeps both
+    // steps on the native undo stack. Returns true when it fired.
+    const listifyBeforeCaret = (): boolean => {
+      const el = edRef.current;
+      const sel = window.getSelection();
+      if (!el || !sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE || !el.contains(node)) return false;
+      const parent = node.parentElement;
+      if (!parent || parent.closest('ul, ol, a, .att-chip')) return false;
+      // Only at a line's start: nothing precedes this text node on the line
+      // (start of the editor, or immediately after a <br>).
+      const prev = node.previousSibling;
+      if (
+        prev &&
+        !(prev.nodeType === Node.ELEMENT_NODE && (prev as Element).tagName === 'BR')
+      )
+        return false;
+      const before = (node.textContent ?? '').slice(0, range.startOffset);
+      const ordered = /^\d+\.$/.test(before);
+      if (!ordered && before !== '-' && before !== '*') return false;
+
+      const marker = document.createRange();
+      marker.setStart(node, 0);
+      marker.setEnd(node, range.startOffset);
+      sel.removeAllRanges();
+      sel.addRange(marker);
+      document.execCommand('delete');
+      document.execCommand(
+        ordered ? 'insertOrderedList' : 'insertUnorderedList'
+      );
+      return true;
+    };
+
     // Detect an `@query` immediately before the caret and, if present, open the
     // attachment autocomplete anchored at the caret.
     const detectMention = () => {
@@ -498,7 +547,13 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
             </button>
           </>
         )}
-        <span className="bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px" />
+        <span
+          className={
+            floatingToolbar
+              ? 'bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px'
+              : 'bg-edge-1l dark:bg-edge-1d ml-auto mr-1 h-4 w-px'
+          }
+        />
         <span
           className={`px-0.5 text-[10.5px] tabular-nums ${
             len > maxLength * 0.9
@@ -514,12 +569,16 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     return (
       <div
         ref={wrapRef}
-        className="group rounded-control border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring-accent-500l dark:focus-within:ring-accent-500d relative border transition-colors focus-within:ring"
+        className={
+          wrapperClassName === undefined
+            ? 'group rounded-control border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring-accent-500l dark:focus-within:ring-accent-500d relative border transition-colors focus-within:ring'
+            : twMerge('group relative', wrapperClassName)
+        }
       >
         {/* Floating controls: position:fixed (coords from the wrapper) so a
           scroll container can't clip them above the box, and showing/hiding them
           never relayouts the note content. */}
-        {toolbar === 'floating' && (
+        {floatingToolbar && (
           <div
             style={{ left: toolbarPos.left, bottom: toolbarPos.bottom }}
             className={`z-popover rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu fixed flex origin-bottom items-center gap-0.5 border px-1.5 py-1 transition-[opacity,transform] duration-75 ${
@@ -533,7 +592,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
         )}
 
         {showPlaceholder && placeholder && (
-          <span className="text-content-3l dark:text-content-3d pointer-events-none absolute top-2.5 left-3 text-[13.5px]">
+          <span className="text-content-3l dark:text-content-3d pointer-events-none absolute py-2.5 px-3 text-[13.5px]">
             {placeholder}
           </span>
         )}
@@ -654,15 +713,19 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
                 }
               }
             }
-            if (
-              e.key === ' ' &&
-              !e.shiftKey &&
-              !mentionOpen &&
-              linkifyBeforeCaret()
-            ) {
-              e.preventDefault();
-              document.execCommand('insertText', false, ' ');
-              handleInput();
+            if (e.key === ' ' && !e.shiftKey && !mentionOpen) {
+              // The marker becomes a list, so the triggering space is consumed.
+              if (listifyBeforeCaret()) {
+                e.preventDefault();
+                handleInput();
+                return;
+              }
+              // A linkified word keeps its trailing space.
+              if (linkifyBeforeCaret()) {
+                e.preventDefault();
+                document.execCommand('insertText', false, ' ');
+                handleInput();
+              }
             }
           }}
           onKeyUp={detectMention}
@@ -699,9 +762,15 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
           className={`note-rt ${minHeightClass} text-content-1l dark:text-content-1d w-full overflow-x-hidden overflow-y-auto px-3 py-2.5 text-[13.5px] leading-5 wrap-anywhere outline-none`}
         />
 
-        {/* Inline (docked) controls for surfaces without a scroll container. */}
-        {toolbar === 'inline' && (
-          <div className="border-edge-1l dark:border-edge-1d flex flex-wrap items-center gap-0.5 border-t px-1.5 py-1">
+        {/* Docked controls for surfaces without a scroll container; the caller
+          supplies the appearance via toolbarClassName. */}
+        {!floatingToolbar && (
+          <div
+            className={twMerge(
+              'flex flex-wrap items-center gap-0.5',
+              toolbarClassName
+            )}
+          >
             {toolbarInner}
           </div>
         )}

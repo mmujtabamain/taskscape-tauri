@@ -19,7 +19,7 @@ export default defineConfig(async () => ({
     alias: { "@ui": uiSrc },
     // The shared sources sit outside this app's node_modules; force their
     // bare deps to resolve here (also keeps React a single instance).
-    dedupe: ["react", "react-dom", "@tauri-apps/api"],
+    dedupe: ["react", "react-dom", "@tauri-apps/api", "tailwind-merge"],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

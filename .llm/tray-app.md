@@ -40,11 +40,17 @@ Showing the bar over a full-screen Space causes a transient `Focused(false)` blu
 
 A screenshot must not include the bar, yet the ⌘⇧Return path should feel
 instant **and** the bar should stay on screen (showing its spinner) while the
-grab runs. `spawn_capture` (in `lib.rs`) gets all three:
+grab runs — and the bar must still be capturable by **OS screenshot tools and
+the main app** at every other moment. `spawn_capture` (in `lib.rs`) gets all
+four:
 
-1. The panel is excluded from screen captures once at setup via
-   `exclude_from_capture` (`NSWindowSharingNone`), so it never appears in a shot
-   no matter where it sits — no parking needed.
+1. The panel's `NSWindowSharingType` is flipped to `None` **only for the grab**
+   (`set_sharing_type`, on the capture's background thread, blocking until the
+   change lands), then restored to the default `ReadOnly` right after by the
+   `SharingRestore` RAII guard — even on error or panic. Because the exclusion is
+   scoped to the tray's own capture, the bar appears normally in ⌘⇧4 shots and in
+   screenshots the main app takes; it's hidden only from the shot the tray itself
+   triggers.
 2. The trigger (button `capture_and_attach`, or `capture_and_show` for the
    hotkey — which **shows the bar first** if it was hidden) emits
    `screenshot-pending` and hands off to a **background thread** (the blocking
@@ -56,9 +62,10 @@ grab runs. `spawn_capture` (in `lib.rs`) gets all three:
 A `capturing` `AtomicBool` (released by the `CaptureFlag` RAII guard, even on
 panic) makes overlapping captures a no-op, so two triggers can't collide.
 
-> If a future macOS ever stops honoring `NSWindowSharingNone` for `screencapture`
-> the bar would reappear in shots; the fallback is to park it off-screen for the
-> grab (the pre-exclusion approach), trading the on-screen spinner for a clean shot.
+> The bar is deliberately **not** excluded from capture at setup: a permanent
+> `NSWindowSharingNone` would also hide it from OS screenshot tools and the main
+> app. The exclusion is applied only around the tray's own grab and lifted
+> immediately after, so the bar stays capturable everywhere else.
 
 ## Hotkeys
 

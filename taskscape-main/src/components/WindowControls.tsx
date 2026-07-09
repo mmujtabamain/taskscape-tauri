@@ -52,7 +52,7 @@ function MacControls() {
           key={l.label}
           onClick={l.act}
           title={l.label}
-          className="block size-3.25"
+          className="block size-4"
         >
           <svg
             viewBox="0 0 85.4 85.4"
@@ -71,6 +71,7 @@ function MacControls() {
             {focused && (
               <g
                 fill={l.glyphColor}
+                transform="translate(42.7 42.7) scale(1.12) translate(-42.7 -42.7)"
                 className="opacity-0 transition-opacity duration-100 group-hover:opacity-100"
               >
                 {GLYPHS[l.glyph]}

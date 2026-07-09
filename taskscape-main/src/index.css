@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+/* Scan the shared common-ui sources so their Tailwind classes generate here too.
+   This app's large src happens to use them all today, but the shared lib is the
+   real source — keep it scanned so a common-ui-only class can't silently drop. */
+@source '../../common-ui/src';
 @import '../../common-ui/styles/tokens.css';
 @import '../../common-ui/styles/note-rt.css';
 

@@ -138,25 +138,57 @@ fn order_front_regardless(window: &tauri::WebviewWindow) {
     }
 }
 
-/// macOS: exclude the mini panel's contents from screen captures
-/// (`NSWindowSharingNone`), so a ⌘⇧Return / button screenshot never contains the
-/// bar. This lets the bar stay on screen — showing its capture spinner — during
-/// the grab, instead of being slid off-screen (which read as the window
-/// vanishing mid-capture). Set once; the property persists for the window.
+/// macOS: set the mini panel's `NSWindowSharingType`. `false` → `None`, so the
+/// bar's contents are excluded from *every* screen capture; `true` → `ReadOnly`
+/// (the window default), so OS screenshot tools and the main app include the bar
+/// again. The exclusion is applied only for the duration of a capture the tray
+/// itself triggers (see [`spawn_capture`]); at every other moment the bar must
+/// be capturable like any other window.
+///
+/// `setSharingType:` touches AppKit, so it's hopped onto the main thread. With
+/// `block` set the caller waits until it has actually run, so an about-to-launch
+/// `screencapture` can't grab the frame before the exclusion lands.
 #[cfg(target_os = "macos")]
-fn exclude_from_capture(window: &tauri::WebviewWindow) {
+fn set_sharing_type(window: &tauri::WebviewWindow, shared: bool, block: bool) {
     use objc2::{msg_send, runtime::AnyObject};
+    use std::sync::mpsc;
 
-    // NSWindowSharingType::None — the window's content is not shared with screen
-    // capture, screen recording, or screen sharing.
+    // NSWindowSharingType: None = 0 (never shared), ReadOnly = 1 (the default).
     const NS_WINDOW_SHARING_NONE: isize = 0;
-
-    let Ok(ns_window) = window.ns_window() else {
-        return;
+    const NS_WINDOW_SHARING_READ_ONLY: isize = 1;
+    let value = if shared {
+        NS_WINDOW_SHARING_READ_ONLY
+    } else {
+        NS_WINDOW_SHARING_NONE
     };
-    let ns_window = ns_window as *mut AnyObject;
-    unsafe {
-        let _: () = msg_send![ns_window, setSharingType: NS_WINDOW_SHARING_NONE];
+
+    let win = window.clone();
+    let (tx, rx) = mpsc::channel();
+    let posted = window.run_on_main_thread(move || {
+        if let Ok(ns_window) = win.ns_window() {
+            let ns_window = ns_window as *mut AnyObject;
+            unsafe {
+                let _: () = msg_send![ns_window, setSharingType: value];
+            }
+        }
+        let _ = tx.send(());
+    });
+    if block && posted.is_ok() {
+        let _ = rx.recv_timeout(Duration::from_millis(500));
+    }
+}
+
+/// Restores the bar to the default, capturable sharing type when the capture
+/// thread unwinds — on success, error, or panic — so an exclusion set for one
+/// shot can never leak past it and keep the bar hidden from OS tools / the main
+/// app.
+#[cfg(target_os = "macos")]
+struct SharingRestore(tauri::WebviewWindow);
+
+#[cfg(target_os = "macos")]
+impl Drop for SharingRestore {
+    fn drop(&mut self) {
+        set_sharing_type(&self.0, true, false);
     }
 }
 
@@ -254,8 +286,7 @@ fn dismiss(window: &tauri::Window) {
 }
 
 /// Where the mini bar is anchored when summoned: just up-and-left of the cursor
-/// so the title field lands under it. Used both when revealing the bar and when
-/// restoring it after a screenshot capture parked it off-screen.
+/// so the title field lands under it.
 fn cursor_anchor(app: &AppHandle) -> Option<PhysicalPosition<i32>> {
     app.cursor_position()
         .ok()
@@ -365,8 +396,10 @@ impl Drop for CaptureFlag {
 ///  - then `screenshot-captured` (PNG path) on success, or `screenshot-error`
 ///    (message) on failure.
 ///
-/// The bar can stay on screen throughout: it's excluded from captures via
-/// [`exclude_from_capture`], so it never lands in the shot and needn't be parked.
+/// The bar stays on screen (showing its spinner) throughout: it's excluded from
+/// *this* grab only by flipping its sharing type to `None` for the capture and
+/// restoring it right after ([`set_sharing_type`] / [`SharingRestore`]), so it
+/// never lands in the shot yet stays capturable by OS tools and the main app.
 /// The blocking `screencapture` shell-out never runs on the UI/hotkey thread. If
 /// a capture is already running this is a no-op.
 fn spawn_capture(window: &tauri::WebviewWindow) {
@@ -377,6 +410,15 @@ fn spawn_capture(window: &tauri::WebviewWindow) {
     let window = window.clone();
     std::thread::spawn(move || {
         let _flag = CaptureFlag;
+        // Exclude the bar from this grab only, then restore it (even on
+        // error/panic) so OS tools and the main app still capture it.
+        #[cfg(target_os = "macos")]
+        let _restore = {
+            set_sharing_type(&window, false, true);
+            // Let the window server commit the exclusion before the grab.
+            std::thread::sleep(Duration::from_millis(60));
+            SharingRestore(window.clone())
+        };
         match screenshot::capture_fullscreen().map_err(err) {
             Ok(path) => {
                 let _ = window.emit("screenshot-captured", path.to_string_lossy().into_owned());
@@ -481,14 +523,13 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             // Turn the window into a non-activating NSPanel so it can float over
-            // other apps' native-fullscreen Spaces without pulling us out of them,
-            // and exclude it from screen captures so a screenshot never contains
-            // the bar itself — letting it stay on screen (with its spinner) during
-            // the grab instead of being parked off-screen.
+            // other apps' native-fullscreen Spaces without pulling us out of them.
+            // The bar is deliberately NOT excluded from capture here: a permanent
+            // exclusion would also hide it from OS screenshot tools and the main
+            // app. It's excluded only around the tray's own grab (`spawn_capture`).
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
                 convert_to_panel(&window);
-                exclude_from_capture(&window);
             }
 
             // The mini bar is an opaque card now — no vibrancy. The window keeps
