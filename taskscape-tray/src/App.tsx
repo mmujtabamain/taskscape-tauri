@@ -1,41 +1,40 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Icon } from "./components/Icon";
-import { api } from "./api";
+import { Spinner } from "./components/Spinner";
+import { api, type CaptureTarget } from "./api";
 
-const fieldClasses =
-  "rounded-control border px-3 py-2 text-sm outline-none " +
-  "border-edge-2l bg-surface-1l text-content-1l placeholder:text-content-4l focus:border-edge-3l " +
-  "dark:border-edge-2d dark:bg-surface-1d dark:text-content-1d dark:placeholder:text-content-4d dark:focus:border-edge-3d";
+const inputClasses =
+  "min-w-0 bg-transparent text-sm outline-none " +
+  "text-content-1l placeholder:text-content-3l " +
+  "dark:text-content-1d dark:placeholder:text-content-3d";
 
-const iconButtonClasses =
-  "grid h-9 w-9 shrink-0 place-items-center rounded-control border transition " +
-  "border-edge-1l bg-surface-1l text-content-2l hover:text-content-1l " +
-  "dark:border-edge-1d dark:bg-surface-1d dark:text-content-2d dark:hover:text-content-1d";
+const ghostButtonBase =
+  "flex shrink-0 items-center gap-1.5 rounded-control px-2 py-1 text-xs transition " +
+  "hover:bg-surface-1l dark:hover:bg-surface-1d " +
+  "disabled:cursor-default disabled:hover:bg-transparent";
 
 function App() {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [screenshots, setScreenshots] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [listName, setListName] = useState("");
+  const [pending, setPending] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [target, setTarget] = useState<CaptureTarget | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
-  const refreshListName = () => {
-    api
-      .activeListName()
-      .then(setListName)
-      .catch(() => {});
+  const refreshTarget = () => {
+    api.captureTarget().then(setTarget).catch(() => {});
   };
   const focusTitle = () =>
     requestAnimationFrame(() => titleRef.current?.focus());
 
   useEffect(() => {
-    refreshListName();
+    refreshTarget();
     const subs = [
-      // Summoned: refocus the title field and refresh the target-list name.
+      // Summoned: refocus the title field and refresh the target name.
       listen("mini-shown", () => {
-        refreshListName();
+        refreshTarget();
         focusTitle();
       }),
       // Dismissed/submitted: the draft is gone, so reset the form.
@@ -43,10 +42,24 @@ function App() {
         setTitle("");
         setNotes("");
         setScreenshots([]);
+        setPending(0);
+        setError(null);
       }),
-      // ⌘⇧Return captured a screenshot in the background — attach it.
+      // A capture is in flight (button or ⌘⇧Return) — show the spinner.
+      listen("screenshot-pending", () => {
+        setError(null);
+        setPending((n) => n + 1);
+      }),
+      // Capture landed — attach it and drop the spinner.
       listen<string>("screenshot-captured", (e) => {
+        setPending((n) => Math.max(0, n - 1));
         setScreenshots((prev) => [...prev, e.payload]);
+        focusTitle();
+      }),
+      // Capture failed (e.g. Screen Recording permission) — surface it briefly.
+      listen<string>("screenshot-error", (e) => {
+        setPending((n) => Math.max(0, n - 1));
+        setError(e.payload || "Screenshot failed");
         focusTitle();
       }),
     ];
@@ -54,6 +67,13 @@ function App() {
       subs.forEach((s) => s.then((fn) => fn()));
     };
   }, []);
+
+  // Clear a surfaced capture error after a few seconds.
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(t);
+  }, [error]);
 
   const save = async () => {
     const t = title.trim();
@@ -68,16 +88,10 @@ function App() {
     setScreenshots([]);
   };
 
-  // Not a toggle: every click captures and attaches another screenshot.
-  const addScreenshot = async () => {
-    setBusy(true);
-    try {
-      const path = await api.captureAndAttach();
-      setScreenshots((prev) => [...prev, path]);
-      focusTitle();
-    } finally {
-      setBusy(false);
-    }
+  // Not a toggle: every trigger captures and attaches another screenshot. The
+  // work happens in the background and reports back via the `screenshot-*` events.
+  const addScreenshot = () => {
+    api.captureAndAttach().catch(() => {});
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -91,64 +105,109 @@ function App() {
   };
 
   const count = screenshots.length;
+  const capturing = pending > 0;
+
+  const shotTextColor = error
+    ? "text-red-500 dark:text-red-400"
+    : count && !capturing
+      ? "text-accent-500 dark:text-accent-400"
+      : "text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d";
 
   return (
     <div
       data-tauri-drag-region
-      className="flex h-screen w-screen flex-col justify-center gap-2 rounded-panel p-2.5 text-content-1l dark:text-content-1d"
+      className="flex h-screen w-screen flex-col overflow-hidden rounded-panel border border-edge-2l bg-surface-2l text-content-1l dark:border-edge-2d dark:bg-surface-2d dark:text-content-1d"
       onKeyDown={onKeyDown}
     >
-      <div className="flex items-center gap-2">
-        <button
-          onClick={addScreenshot}
-          disabled={busy}
-          tabIndex={-1}
-          className={`relative ${
-            count
-              ? "grid h-9 w-9 shrink-0 place-items-center rounded-control border border-accent-400 bg-accent-500 text-on-accent transition disabled:opacity-50"
-              : `${iconButtonClasses} disabled:opacity-50`
-          }`}
-          title={
-            count
-              ? `${count} screenshot${count > 1 ? "s" : ""} attached — click to add another (⌘⇧⏎)`
-              : "Attach a full-screen screenshot (⌘⇧⏎)"
-          }
-        >
-          <Icon name="screenshot_monitor" size={18} filled={count > 0} />
-          {count > 0 && (
-            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent-500 px-1 text-[10px] font-semibold leading-none text-on-accent ring-2 ring-halo-1l dark:ring-halo-1d">
-              {count}
-            </span>
-          )}
-        </button>
-
+      {/* Title row — just the task title now; the screenshot control lives in
+          the footer so there's one clear home for it (and its spinner/count). */}
+      <div data-tauri-drag-region className="flex items-center px-3 py-2">
         <input
           ref={titleRef}
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Capture a task ..."
-          className={`min-w-0 flex-1 ${fieldClasses}`}
+          className={`flex-1 ${inputClasses}`}
         />
       </div>
+
+      <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
 
       <input
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        placeholder="Press Tab to add notes"
-        className={`w-full ${fieldClasses}`}
+        placeholder="Notes ..."
+        className={`w-full px-3 py-2.5 ${inputClasses}`}
       />
 
-      <button
-        onClick={() => api.openMain()}
-        tabIndex={-1}
-        className="flex w-full items-center gap-1 pl-1 text-xs text-content-3l transition hover:text-content-1l dark:text-content-3d dark:hover:text-content-1d"
-        title="Open the main Taskscape window"
+      <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
+
+      {/* Footer — target (project / list, opens main) + the screenshot button. */}
+      <div
+        data-tauri-drag-region
+        className="flex items-center justify-between gap-2 px-3 py-2"
       >
-        <Icon name="open_in_new" size={13} />
-        <span className="max-w-95 truncate">{listName || "Taskscape"}</span>
-        <Icon name="chevron_right" size={13} />
-      </button>
+        <button
+          onClick={() => api.openMain()}
+          tabIndex={-1}
+          className="flex min-w-0 items-center gap-1 text-xs text-content-2l transition hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d"
+          title="Open the main Taskscape window"
+        >
+          <Icon name="open_in_new" size={12} />
+          <span className="truncate">
+            {target ? (
+              <>
+                {target.project && (
+                  <span className="text-content-3l dark:text-content-3d">
+                    {target.project}
+                    <span className="px-1 opacity-60">/</span>
+                  </span>
+                )}
+                {target.list}
+              </>
+            ) : (
+              "Taskscape"
+            )}
+          </span>
+        </button>
+
+        <button
+          onClick={addScreenshot}
+          disabled={capturing}
+          tabIndex={-1}
+          className={`${ghostButtonBase} ${shotTextColor}`}
+          title={
+            capturing
+              ? "Capturing screenshot …"
+              : error
+                ? error
+                : count
+                  ? `${count} screenshot${count > 1 ? "s" : ""} attached — add another (⌘⇧⏎)`
+                  : "Attach a full-screen screenshot (⌘⇧⏎)"
+          }
+        >
+          {capturing ? (
+            <>
+              <Spinner size={13} />
+              <span>Capturing …</span>
+            </>
+          ) : error ? (
+            <>
+              <Icon name="error" size={15} />
+              <span>Capture failed</span>
+            </>
+          ) : (
+            <>
+              <Icon name="screenshot_monitor" size={15} filled={count > 0} />
+              <span>{count ? `${count} shot${count > 1 ? "s" : ""}` : "Screenshot"}</span>
+              <kbd className="font-sans text-[11px] not-italic text-content-3l dark:text-content-3d">
+                ⌘⇧⏎
+              </kbd>
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

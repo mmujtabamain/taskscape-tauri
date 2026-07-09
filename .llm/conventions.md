@@ -14,7 +14,7 @@ Patterns to match when editing. Keep new code consistent with what's here.
 
 - **All IPC goes through `src/api.ts`.** One typed wrapper per Tauri command: `foo: (args) => invoke<Ret>("foo", { ... })`. Components never call `invoke` directly — add to `api.ts` and import `api`.
 - **Rust `snake_case` args ⇄ camelCase call sites.** Tauri converts automatically; `api.ts` is where the two naming worlds meet (e.g. `screenshotPath` → `screenshot_path`).
-- **Tailwind v4 utility classes**, no component library. The design language is small, rounded, translucent (`bg-white/10`, `rounded-lg`, `border-white/10`).
+- **Tailwind v4 utility classes**, no component library. The design language is small, rounded, and **opaque**, built from each app's semantic role-tokens (`bg-surface-*`, `border-edge-*`, `text-content-*`, `rounded-panel`/`rounded-control`) defined in `index.css` — not raw palette colors.
 - **Icons:** the shared `Icon` component (Material Symbols, self-hosted for offline use). Pass `name`, `size`, `filled`.
 - **Cross-process events:** the frontend `listen(...)`s for events the Rust side `emit`s — tray listens for `mini-shown`; main listens for `refresh`. Clean up the listener in the `useEffect` return.
 

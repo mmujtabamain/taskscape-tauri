@@ -1,10 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export interface CaptureTarget {
+  project: string;
+  list: string;
+}
+
 export const api = {
   hideMini: () => invoke<void>("hide_mini"),
-  activeListName: () => invoke<string>("active_list_name"),
+  captureTarget: () => invoke<CaptureTarget>("capture_target"),
   openMain: () => invoke<void>("open_main"),
-  captureAndAttach: () => invoke<string>("capture_and_attach"),
+  // Fire-and-forget: the capture runs in the background and reports progress via
+  // the `screenshot-pending` / `screenshot-captured` / `screenshot-error` events.
+  captureAndAttach: () => invoke<void>("capture_and_attach"),
   submitCapture: (args: {
     title: string;
     notes?: string | null;

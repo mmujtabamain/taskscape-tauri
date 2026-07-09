@@ -19,52 +19,53 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DESIGN TOKENS  (same role-numbered convention as the main app, but with the
-   mini bar's own values — it floats on native vibrancy, so neutrals are simple
-   black/white scrims rather than opaque surfaces).
+   DESIGN TOKENS  (same role-numbered convention as the main app). The mini bar
+   is now an OPAQUE card — no native vibrancy — so its neutrals are the main
+   app's opaque surface/edge/content values rather than black/white scrims, to
+   keep the bar reminiscent of the main window.
 
    Dark mode here follows the SYSTEM appearance via Tailwind's default `dark:`
    (a prefers-color-scheme media query) — there is no `.dark` class. Each token
    is spelled out as an explicit light/dark pair used as  text-content-1l
-   dark:text-content-1d.  Values are the mini bar's previous stock-palette
-   colors, verbatim (Tailwind v4 palette + black/white opacity scrims).
+   dark:text-content-1d.
    ═══════════════════════════════════════════════════════════════════════════ */
 @theme {
   --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", "Montserrat", ui-sans-serif, system-ui, sans-serif;
 
-  /* ── Content (text) ─────────────────────────────────────── light │ dark */
-  --color-content-1l: oklch(20.5% 0 0);
-  --color-content-1d: #fff; /* neutral-900 │ white  */
-  --color-content-2l: oklch(43.9% 0 0);
-  --color-content-2d: rgb(255 255 255 / 0.7); /* neutral-600 │ white/70 */
-  --color-content-3l: oklch(55.6% 0 0);
-  --color-content-3d: rgb(255 255 255 / 0.55); /* neutral-500 │ white/55 */
-  --color-content-4l: oklch(55.6% 0 0);
-  --color-content-4d: rgb(
-    255 255 255 / 0.4
-  ); /* placeholder — neutral-500 │ white/40 */
+  /* ── Content (text) ──────────────────── light │ dark (from the main app) */
+  --color-content-1l: oklch(0.26 0.012 262);
+  --color-content-1d: oklch(0.94 0.004 260);
+  --color-content-2l: oklch(0.46 0.013 262);
+  --color-content-2d: oklch(0.74 0.008 260);
+  --color-content-3l: oklch(0.62 0.013 264);
+  --color-content-3d: oklch(0.57 0.011 262);
+  --color-content-4l: oklch(0.62 0.013 264); /* placeholder */
+  --color-content-4d: oklch(0.57 0.011 262);
 
-  /* ── Surface (field / button fill) ──────────────────────── light │ dark */
-  --color-surface-1l: rgb(0 0 0 / 0.05);
-  --color-surface-1d: rgb(255 255 255 / 0.1); /* black/5 │ white/10 */
+  /* ── Surface — opaque, matching the main app (1 = button well · 2 = card) ── */
+  --color-surface-1l: oklch(0.968 0.002 255);
+  --color-surface-1d: oklch(0.205 0.004 260);
+  --color-surface-2l: oklch(0.995 0.001 255);
+  --color-surface-2d: oklch(0.24 0.005 260);
 
   /* ── Edges (borders) ────────────────────────────────────── light │ dark */
-  --color-edge-1l: rgb(0 0 0 / 0.1);
-  --color-edge-1d: rgb(255 255 255 / 0.1); /* black/10 │ white/10 */
-  --color-edge-2l: rgb(0 0 0 / 0.15);
-  --color-edge-2d: rgb(255 255 255 / 0.4); /* black/15 │ white/40 */
-  --color-edge-3l: rgb(0 0 0 / 0.4);
-  --color-edge-3d: rgb(255 255 255 / 0.3); /* focus — black/40 │ white/30 */
+  --color-edge-1l: oklch(0.32 0.02 260 / 0.075);
+  --color-edge-1d: oklch(0.98 0.01 260 / 0.06);
+  --color-edge-2l: oklch(0.32 0.02 260 / 0.14);
+  --color-edge-2d: oklch(0.98 0.01 260 / 0.11);
+  --color-edge-3l: oklch(0.32 0.02 260 / 0.3);
+  --color-edge-3d: oklch(0.98 0.01 260 / 0.24);
 
-  /* ── Accent (indigo, invariant across themes) ───────────────────────────── */
-  --color-accent-400: oklch(67.3% 0.182 276.935); /* indigo-400 */
-  --color-accent-500: oklch(58.5% 0.233 277.117); /* indigo-500 */
-  --color-on-accent: #fff;
+  /* ── Accent (brand blue, matching the main app; invariant across themes) ── */
+  --color-accent-400: oklch(0.68 0.17 252);
+  --color-accent-500: oklch(0.6 0.2 255);
+  --color-on-accent: oklch(0.99 0.005 255);
 
-  /* ── Halo (contrast ring around the count badge) ────────── light │ dark */
-  --color-halo-1l: rgb(255 255 255 / 0.7);
-  --color-halo-1d: rgb(0 0 0 / 0.4); /* white/70 │ black/40 */
+  /* ── Halo (ring around the count badge — the card surface, so the badge reads
+     as a cutout) ──────────────────────────────────────────── light │ dark */
+  --color-halo-1l: oklch(0.995 0.001 255);
+  --color-halo-1d: oklch(0.24 0.005 260);
 
   /* ── Corner radius — one --rounding knob (same convention as the main app) →
      rounded-field / rounded-control / rounded-panel. --rounding: 0 squares all. */
@@ -74,7 +75,9 @@
   --radius-panel: calc(var(--rounding) * 1.5);
 }
 
-/* Let the native vibrancy (window-vibrancy) show through the webview. */
+/* The window backing stays transparent (there is no native vibrancy anymore) so
+   the opaque card's rounded corners render against nothing — the card itself
+   paints the solid surface. */
 html,
 body,
 #root {

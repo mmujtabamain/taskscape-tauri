@@ -24,6 +24,7 @@ import {
   RichTextEditor,
   type RichTextHandle,
 } from './RichTextEditor';
+import { Spinner } from './Spinner';
 
 interface PreviewPanelProps {
   task: Task | null;
@@ -150,6 +151,7 @@ function TaskInspector({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
   const [addingNote, setAddingNote] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const addNoteRef = useRef<RichTextHandle>(null);
   const savingNote = useRef(false);
   const menu = useContextMenu();
@@ -239,8 +241,14 @@ function TaskInspector({
   };
 
   const addScreenshot = async () => {
-    await api.attachScreenshot(task.id);
-    onRefresh();
+    if (capturing) return;
+    setCapturing(true);
+    try {
+      await api.attachScreenshot(task.id);
+      onRefresh();
+    } finally {
+      setCapturing(false);
+    }
   };
 
   const addLink = async () => {
@@ -516,11 +524,20 @@ function TaskInspector({
               <div className="flex items-center gap-0.5">
                 <button
                   onClick={addScreenshot}
-                  title="Capture the full screen and attach it"
-                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
+                  disabled={capturing}
+                  title={
+                    capturing
+                      ? 'Capturing …'
+                      : 'Capture the full screen and attach it'
+                  }
+                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d disabled:cursor-default disabled:hover:bg-transparent flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
                 >
-                  <Icon name="screenshot_monitor" size={14} />
-                  Shot
+                  {capturing ? (
+                    <Spinner size={12} />
+                  ) : (
+                    <Icon name="screenshot_monitor" size={14} />
+                  )}
+                  {capturing ? 'Capturing …' : 'Shot'}
                 </button>
                 <button
                   onClick={addLink}

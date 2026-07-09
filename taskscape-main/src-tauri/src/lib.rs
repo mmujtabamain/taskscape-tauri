@@ -269,7 +269,11 @@ async fn attach_screenshot(
     store: State<'_, Arc<Store>>,
     task_id: String,
 ) -> Result<Attachment, String> {
-    let path = taskscape_common::screenshot::capture_fullscreen().map_err(err)?;
+    // `screencapture` is a blocking shell-out — keep it off the async runtime.
+    let path = tauri::async_runtime::spawn_blocking(taskscape_common::screenshot::capture_fullscreen)
+        .await
+        .map_err(err)?
+        .map_err(err)?;
     taskscape_common::attachments::attach_copy(
         &store,
         &task_id,

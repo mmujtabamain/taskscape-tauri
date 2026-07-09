@@ -275,7 +275,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
           <div
             data-tauri-drag-region
             className={`flex min-w-0 flex-1 items-center ${
-              isMac ? 'pr-4' : 'pr-2 pl-4'
+              "isMac ? 'pr-4' : 'pr-2 pl-4'"
             }`}
           >
             <h1
@@ -290,7 +290,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
         </div>
 
         {(props.message || props.input) && (
-          <div className="flex items-start gap-3.5 px-5 pt-1.5 pb-5">
+          <div className="flex items-start gap-3.5 px-4 pt-1.5 pb-5">
             {props.icon && (
               <div
                 className={`rounded-control grid size-9 shrink-0 place-items-center ${BADGE_TONE[tone]}`}
@@ -405,7 +405,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
           </div>
         )}
 
-        <div className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d flex items-center justify-end gap-2 border-t px-5 py-2.5">
+        <div className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d flex items-center justify-end gap-2 border-t px-2 py-2.5">
           {props.buttons.map((b, i) => (
             <button
               key={b.id}

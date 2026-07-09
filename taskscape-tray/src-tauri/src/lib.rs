@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -44,18 +45,26 @@ async fn target_list(store: &Store) -> Result<List, String> {
         .map_err(err)
 }
 
-/// Focus the main app if it's running (HTTP), otherwise launch the installed app.
+/// Bring the main app forward: ask a running instance to focus (HTTP), otherwise
+/// launch the installed app. Returns whether a running instance answered (so
+/// callers can tell "already up and focused" from "just kicked off a launch").
+async fn focus_or_launch_main_async() -> bool {
+    if server::client::post_json(MAIN_PORT, "/focus", &serde_json::json!({}))
+        .await
+        .is_ok()
+    {
+        return true;
+    }
+    let _ = std::process::Command::new("open")
+        .args(["-b", "com.taskscape.main.app"])
+        .status();
+    false
+}
+
+/// Fire-and-forget [`focus_or_launch_main_async`] (for the tray menu, which has
+/// no bar to coordinate with).
 fn focus_or_launch_main() {
-    tauri::async_runtime::spawn(async {
-        if server::client::post_json(MAIN_PORT, "/focus", &serde_json::json!({}))
-            .await
-            .is_err()
-        {
-            let _ = std::process::Command::new("open")
-                .args(["-b", "com.taskscape.main.app"])
-                .status();
-        }
-    });
+    tauri::async_runtime::spawn(focus_or_launch_main_async());
 }
 
 /// Quit everything: ask the main app's process to exit too (best effort, it may
@@ -126,6 +135,28 @@ fn order_front_regardless(window: &tauri::WebviewWindow) {
     let ns_window = ns_window as *mut AnyObject;
     unsafe {
         let _: () = msg_send![ns_window, orderFrontRegardless];
+    }
+}
+
+/// macOS: exclude the mini panel's contents from screen captures
+/// (`NSWindowSharingNone`), so a ⌘⇧Return / button screenshot never contains the
+/// bar. This lets the bar stay on screen — showing its capture spinner — during
+/// the grab, instead of being slid off-screen (which read as the window
+/// vanishing mid-capture). Set once; the property persists for the window.
+#[cfg(target_os = "macos")]
+fn exclude_from_capture(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    // NSWindowSharingType::None — the window's content is not shared with screen
+    // capture, screen recording, or screen sharing.
+    const NS_WINDOW_SHARING_NONE: isize = 0;
+
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window as *mut AnyObject;
+    unsafe {
+        let _: () = msg_send![ns_window, setSharingType: NS_WINDOW_SHARING_NONE];
     }
 }
 
@@ -222,16 +253,22 @@ fn dismiss(window: &tauri::Window) {
     let _ = window.emit("mini-reset", ());
 }
 
+/// Where the mini bar is anchored when summoned: just up-and-left of the cursor
+/// so the title field lands under it. Used both when revealing the bar and when
+/// restoring it after a screenshot capture parked it off-screen.
+fn cursor_anchor(app: &AppHandle) -> Option<PhysicalPosition<i32>> {
+    app.cursor_position()
+        .ok()
+        .map(|p| PhysicalPosition::new((p.x - 24.0) as i32, (p.y - 20.0) as i32))
+}
+
 /// Reveal the mini window at the cursor, focused and pinned onto the current
 /// (possibly full-screen) Space.
 fn show_mini(app: &AppHandle, window: &tauri::WebviewWindow) {
     // Move to the cursor first, THEN reveal. Because the window rests off-screen
     // while hidden, there is no old on-screen frame to flash.
-    if let Ok(pos) = app.cursor_position() {
-        let _ = window.set_position(PhysicalPosition::new(
-            (pos.x - 24.0) as i32,
-            (pos.y - 20.0) as i32,
-        ));
+    if let Some(pos) = cursor_anchor(app) {
+        let _ = window.set_position(pos);
     }
     // Re-assert the Space-joining behavior right before showing: it must be in
     // effect at the moment we reveal/focus, or macOS shows the window on the
@@ -269,60 +306,108 @@ fn hide_mini(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-/// The name of the list captures will go to (shown in the mini window).
-#[tauri::command]
-async fn active_list_name(store: State<'_, Arc<Store>>) -> Result<String, String> {
-    target_list(&store).await.map(|l| l.name)
+/// Where captures land — the project and list names, shown in the mini bar footer.
+#[derive(serde::Serialize)]
+struct CaptureTarget {
+    project: String,
+    list: String,
 }
 
 #[tauri::command]
-fn open_main(window: tauri::Window) {
+async fn capture_target(store: State<'_, Arc<Store>>) -> Result<CaptureTarget, String> {
+    let list = target_list(&store).await?;
+    let project = store
+        .list_projects()
+        .await
+        .map_err(err)?
+        .into_iter()
+        .find(|p| p.id == list.project_id)
+        .map(|p| p.name)
+        .unwrap_or_default();
+    Ok(CaptureTarget {
+        project,
+        list: list.name,
+    })
+}
+
+/// Open the main window, then dismiss the bar *after* main is up so there's no
+/// empty gap where neither is on screen. If main is already running the `/focus`
+/// POST brings it forward and returns before we hide; otherwise we launch it and
+/// hide once the launch is under way.
+#[tauri::command]
+async fn open_main(window: tauri::Window) {
+    focus_or_launch_main_async().await;
     dismiss(&window);
-    focus_or_launch_main();
 }
 
-/// Grab the full screen *without the bar in the shot*. If the bar is visible it's
-/// slid off-screen first (staying focused so the blur auto-hide doesn't fire),
-/// captured, then restored; if it's already hidden the screen is grabbed as-is.
-fn capture_no_bar(window: &tauri::WebviewWindow) -> Result<std::path::PathBuf, String> {
-    let visible = window.is_visible().unwrap_or(false);
-    let restore = if visible { window.outer_position().ok() } else { None };
-    if visible {
-        let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
-        std::thread::sleep(Duration::from_millis(120));
-    }
-    let path = screenshot::capture_fullscreen().map_err(err)?;
-    if let Some(pos) = restore {
-        let _ = window.set_position(pos);
-        let _ = window.set_focus();
-    }
-    Ok(path)
+/// A screenshot capture in flight. [`spawn_capture`] parks and restores the mini
+/// window, so two overlapping captures would fight over its position — a second
+/// trigger is ignored until the first finishes.
+fn capturing() -> &'static AtomicBool {
+    static CAPTURING: OnceLock<AtomicBool> = OnceLock::new();
+    CAPTURING.get_or_init(|| AtomicBool::new(false))
 }
 
-/// Screenshot button: capture the screen and return the PNG path for the
-/// frontend to hold until submit. Each click adds another screenshot.
+/// Clears the [`capturing`] flag when the capture thread unwinds — on success,
+/// error, or panic — so a failed shot can never wedge the flag `true` and block
+/// every future capture.
+struct CaptureFlag;
+impl Drop for CaptureFlag {
+    fn drop(&mut self) {
+        capturing().store(false, Ordering::Release);
+    }
+}
+
+/// Capture the full screen off the caller's thread, driving the mini bar's UI
+/// with events:
+///
+///  - `screenshot-pending` immediately (the button shows a spinner),
+///  - then `screenshot-captured` (PNG path) on success, or `screenshot-error`
+///    (message) on failure.
+///
+/// The bar can stay on screen throughout: it's excluded from captures via
+/// [`exclude_from_capture`], so it never lands in the shot and needn't be parked.
+/// The blocking `screencapture` shell-out never runs on the UI/hotkey thread. If
+/// a capture is already running this is a no-op.
+fn spawn_capture(window: &tauri::WebviewWindow) {
+    if capturing().swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let _ = window.emit("screenshot-pending", ());
+    let window = window.clone();
+    std::thread::spawn(move || {
+        let _flag = CaptureFlag;
+        match screenshot::capture_fullscreen().map_err(err) {
+            Ok(path) => {
+                let _ = window.emit("screenshot-captured", path.to_string_lossy().into_owned());
+            }
+            Err(e) => {
+                eprintln!("[taskscape-tray] screenshot failed: {e}");
+                let _ = window.emit("screenshot-error", e);
+            }
+        }
+    });
+}
+
+/// Screenshot button: capture the screen and attach it. Fire-and-forget — the
+/// frontend shows a spinner and attaches the result when the `screenshot-*`
+/// events arrive, exactly like the ⌘⇧Return path. Each click adds another shot.
 #[tauri::command]
-fn capture_and_attach(window: tauri::WebviewWindow) -> Result<String, String> {
-    Ok(capture_no_bar(&window)?.to_string_lossy().into_owned())
+fn capture_and_attach(window: tauri::WebviewWindow) {
+    spawn_capture(&window);
 }
 
-/// ⌘⇧Return handler: capture a screenshot, summon the bar if it's hidden, and
-/// tell the frontend to attach the new capture.
+/// ⌘⇧Return handler: summon the bar *instantly* (so the keypress has immediate
+/// feedback), then capture in the background. The bar shows a spinner until the
+/// shot lands and is attached, staying on screen the whole time.
 fn capture_and_show(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
-    let path = match capture_no_bar(&window) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[taskscape-tray] screenshot failed: {e}");
-            return;
-        }
-    };
     if !window.is_visible().unwrap_or(false) {
         show_mini(app, &window);
     }
-    let _ = window.emit("screenshot-captured", path.to_string_lossy().into_owned());
+    spawn_capture(&window);
 }
 
 /// Create the task in the active list, attach the screenshot if present, and hide.
@@ -390,25 +475,19 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             // Turn the window into a non-activating NSPanel so it can float over
-            // other apps' native-fullscreen Spaces without pulling us out of them.
+            // other apps' native-fullscreen Spaces without pulling us out of them,
+            // and exclude it from screen captures so a screenshot never contains
+            // the bar itself — letting it stay on screen (with its spinner) during
+            // the grab instead of being parked off-screen.
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
                 convert_to_panel(&window);
+                exclude_from_capture(&window);
             }
 
-            // Native translucent (vibrancy) background for the frameless window.
-            // `Popover` follows the system appearance (frosted-light in Light Mode,
-            // frosted-dark in Dark Mode); `HudWindow` would force a dark bar always.
-            #[cfg(target_os = "macos")]
-            if let Some(window) = app.get_webview_window("main") {
-                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
-                let _ = apply_vibrancy(
-                    &window,
-                    NSVisualEffectMaterial::Popover,
-                    Some(NSVisualEffectState::Active),
-                    Some(16.0),
-                );
-            }
+            // The mini bar is an opaque card now — no vibrancy. The window keeps
+            // its transparent backing (`transparent: true`) only so the card's
+            // rounded corners render; the webview paints the solid surface.
 
             // Rest the hidden window off-screen so its first reveal doesn't flash.
             if let Some(window) = app.get_webview_window("main") {
@@ -467,7 +546,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             hide_mini,
-            active_list_name,
+            capture_target,
             open_main,
             capture_and_attach,
             submit_capture,
