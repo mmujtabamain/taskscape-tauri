@@ -454,7 +454,7 @@ function TaskInspector({
               <RichTextEditor
                 ref={addNoteRef}
                 autoFocus
-                placeholder="Write a note…  (drop an attachment to @mention it)"
+                placeholder="Write a note ... (drop an attachment to @mention it)"
                 minHeightClass="min-h-24"
                 attachments={task.attachments}
                 onOpenMention={openMention}

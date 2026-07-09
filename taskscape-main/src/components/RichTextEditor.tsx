@@ -119,7 +119,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     const wrapRef = useRef<HTMLDivElement>(null);
     const lastHtml = useRef('');
     const savedRange = useRef<Range | null>(null);
-    const [empty, setEmpty] = useState(true);
+    const [showPlaceholder, setShowPlaceholder] = useState(true);
     const [len, setLen] = useState(0);
     const [toolbarShown, setToolbarShown] = useState(false);
     const [toolbarPos, setToolbarPos] = useState({ left: 0, bottom: 0 });
@@ -148,13 +148,24 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     const plainText = (el: HTMLElement) =>
       (el.textContent ?? '').replace(/\u200B/g, '');
 
-    const isEmpty = (el: HTMLElement) =>
-      plainText(el).trim() === '' && !el.querySelector('.att-chip');
+    // Bare line breaks are never content: the sanitizer strips trailing <br>s on
+    // save, so any number of them (with no text and no chips) is empty — matching
+    // that keeps the editor clearable no matter how many Shift+Enters are left.
+    const isEmpty = (el: HTMLElement): boolean =>
+      !el.querySelector('.att-chip') && plainText(el).trim() === '';
+
+    // Placeholder visibility is stricter than isEmpty: it hides the moment the
+    // editor shows a blank line. A single <br> is WebKit's bogus break (left in
+    // an emptied contenteditable) and renders nothing; two or more are a real,
+    // visible blank line — so a Shift+Enter steps the placeholder aside even
+    // though the note is still "empty" and clearable.
+    const placeholderVisible = (el: HTMLElement): boolean =>
+      isEmpty(el) && el.querySelectorAll('br').length <= 1;
 
     const sync = () => {
       const el = edRef.current;
       if (!el) return;
-      setEmpty(isEmpty(el));
+      setShowPlaceholder(placeholderVisible(el));
       setLen(plainText(el).length);
     };
 
@@ -504,7 +515,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
           </span>
         </div>
 
-        {empty && placeholder && (
+        {showPlaceholder && placeholder && (
           <span className="text-content-3l dark:text-content-3d pointer-events-none absolute top-2.5 left-3 text-[13.5px]">
             {placeholder}
           </span>
@@ -646,7 +657,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
             }
             insertChip(name);
           }}
-          className={`note-rt ${minHeightClass} text-content-1l dark:text-content-1d w-full overflow-y-auto px-3 py-2.5 text-[13.5px] leading-5 outline-none`}
+          className={`note-rt ${minHeightClass} text-content-1l dark:text-content-1d w-full overflow-x-hidden overflow-y-auto px-3 py-2.5 text-[13.5px] leading-5 wrap-anywhere outline-none`}
         />
 
         {mentionOpen && (
