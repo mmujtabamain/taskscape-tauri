@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { List, Task } from '../api';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 import { TaskRow, type RowCtx } from './TaskRow';
 
 interface Props {

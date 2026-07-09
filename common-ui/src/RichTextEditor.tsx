@@ -5,11 +5,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { Attachment } from '../api';
-import { fileKindFor } from '../lib/fileKind';
-import { openModal } from '../lib/modal';
-import { sanitizeNoteHtml } from '../lib/sanitizeHtml';
+import { fileKindFor } from './fileKind';
 import { Icon } from './Icon';
+import { sanitizeNoteHtml } from './sanitizeHtml';
+import type { Attachment } from './types';
 
 /** Drag payload used to drop an attachment into a note as a mention chip. */
 export const ATTACHMENT_MIME = 'application/x-attachment';
@@ -31,6 +30,15 @@ interface Props {
   onBlur?: () => void;
   onSubmit?: () => void;
   autoFocus?: boolean;
+  /** Resolve a URL for the toolbar's link button; return null to cancel. When
+   *  omitted the link button is hidden (e.g. the tray has no modal window). */
+  onRequestLink?: () => Promise<string | null>;
+  /** Escape pressed with no mention popup open (used by the tray to dismiss). */
+  onEscape?: () => void;
+  /** 'floating' (default) shows the toolbar as a fixed popover above the editor,
+   *  needed inside scroll containers. 'inline' docks it in the editor's flow (no
+   *  popup) — for surfaces like the tray mini bar. */
+  toolbar?: 'floating' | 'inline';
 }
 
 const escapeHtml = (s: string) =>
@@ -112,6 +120,9 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
       onBlur,
       onSubmit,
       autoFocus,
+      onRequestLink,
+      onEscape,
+      toolbar = 'floating',
     },
     ref
   ) {
@@ -214,7 +225,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     // it above the editor. Fixed coords are viewport-relative, so recompute them
     // from the wrapper on every scroll/resize while the editor is focused.
     useEffect(() => {
-      if (!toolbarShown) return;
+      if (toolbar !== 'floating' || !toolbarShown) return;
       const place = () => {
         const el = wrapRef.current;
         if (!el) return;
@@ -228,7 +239,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
         window.removeEventListener('scroll', place, true);
         window.removeEventListener('resize', place);
       };
-    }, [toolbarShown]);
+    }, [toolbar, toolbarShown]);
 
     useImperativeHandle(ref, () => ({
       getHtml: () => sanitizeNoteHtml(edRef.current?.innerHTML ?? '', names),
@@ -301,21 +312,14 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
 
     const addLink = async () => {
       const el = edRef.current;
-      if (!el) return;
+      if (!el || !onRequestLink) return;
       const sel = window.getSelection();
       savedRange.current =
         sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-      const res = await openModal({
-        icon: 'add_link',
-        title: 'Add link',
-        input: { placeholder: 'https://…' },
-        buttons: [
-          { id: 'cancel', label: 'Cancel', variant: 'ghost' },
-          { id: 'add', label: 'Add link', variant: 'primary' },
-        ],
-      });
-      const url = res.value?.trim();
-      if (res.buttonId !== 'add' || !url) return;
+      // The host resolves the URL (a native modal in the main app); either that
+      // flow or an app switch drops focus, so the caret range is restored below.
+      const url = (await onRequestLink())?.trim();
+      if (!url) return;
       el.focus();
       const s = window.getSelection();
       if (savedRange.current && s) {
@@ -438,82 +442,95 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
       if (att) insertChip(att.name);
     };
 
+    // Shared toolbar content; the wrapper differs by `toolbar` mode.
+    const toolbarInner = (
+      <>
+        <ToolButton
+          cmd="bold"
+          icon="format_bold"
+          title="Bold  ⌘B"
+          onExec={exec}
+        />
+        <ToolButton
+          cmd="italic"
+          icon="format_italic"
+          title="Italic  ⌘I"
+          onExec={exec}
+        />
+        <ToolButton
+          cmd="underline"
+          icon="format_underlined"
+          title="Underline  ⌘U"
+          onExec={exec}
+        />
+        <ToolButton
+          cmd="strikeThrough"
+          icon="strikethrough_s"
+          title="Strikethrough  ⌘⇧S"
+          onExec={exec}
+        />
+        <span className="bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px" />
+        <ToolButton
+          cmd="insertUnorderedList"
+          icon="format_list_bulleted"
+          title="Bulleted list"
+          onExec={exec}
+        />
+        <ToolButton
+          cmd="insertOrderedList"
+          icon="format_list_numbered"
+          title="Numbered list"
+          onExec={exec}
+        />
+        {onRequestLink && (
+          <>
+            <span className="bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px" />
+            <button
+              type="button"
+              title="Add link"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                addLink();
+              }}
+              className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center transition-colors"
+            >
+              <Icon name="link" size={16} weight={400} />
+            </button>
+          </>
+        )}
+        <span className="bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px" />
+        <span
+          className={`px-0.5 text-[10.5px] tabular-nums ${
+            len > maxLength * 0.9
+              ? 'text-danger-500l dark:text-danger-500d'
+              : 'text-content-3l dark:text-content-3d'
+          }`}
+        >
+          {len}/{maxLength}
+        </span>
+      </>
+    );
+
     return (
       <div
         ref={wrapRef}
         className="group rounded-control border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d focus-within:border-accent-500l dark:focus-within:border-accent-500d focus-within:ring-accent-500l dark:focus-within:ring-accent-500d relative border transition-colors focus-within:ring"
       >
-        {/* Floating controls: position:fixed (coords computed from the wrapper)
-          so the inspector's scroll container never clips them above the box, and
-          revealing or hiding them never relayouts the note content. */}
-        <div
-          style={{ left: toolbarPos.left, bottom: toolbarPos.bottom }}
-          className={`z-popover rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu fixed flex origin-bottom items-center gap-0.5 border px-1.5 py-1 transition-[opacity,transform] duration-75 ${
-            toolbarShown
-              ? 'pointer-events-auto scale-100 opacity-100'
-              : 'pointer-events-none scale-95 opacity-0'
-          }`}
-        >
-          <ToolButton
-            cmd="bold"
-            icon="format_bold"
-            title="Bold  ⌘B"
-            onExec={exec}
-          />
-          <ToolButton
-            cmd="italic"
-            icon="format_italic"
-            title="Italic  ⌘I"
-            onExec={exec}
-          />
-          <ToolButton
-            cmd="underline"
-            icon="format_underlined"
-            title="Underline  ⌘U"
-            onExec={exec}
-          />
-          <ToolButton
-            cmd="strikeThrough"
-            icon="strikethrough_s"
-            title="Strikethrough"
-            onExec={exec}
-          />
-          <span className="bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px" />
-          <ToolButton
-            cmd="insertUnorderedList"
-            icon="format_list_bulleted"
-            title="Bulleted list"
-            onExec={exec}
-          />
-          <ToolButton
-            cmd="insertOrderedList"
-            icon="format_list_numbered"
-            title="Numbered list"
-            onExec={exec}
-          />
-          <span className="bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px" />
-          <button
-            type="button"
-            title="Add link"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              addLink();
-            }}
-            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center transition-colors"
-          >
-            <Icon name="link" size={16} weight={400} />
-          </button>
-          <span className="bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px" />
-          <span
-            className={`px-0.5 text-[10.5px] tabular-nums ${
-              len > maxLength * 0.9
-                ? 'text-danger-500l dark:text-danger-500d'
-                : 'text-content-3l dark:text-content-3d'
+        {/* Floating controls: position:fixed (coords from the wrapper) so a
+          scroll container can't clip them above the box, and showing/hiding them
+          never relayouts the note content. */}
+        {toolbar === 'floating' && (
+          <div
+            style={{ left: toolbarPos.left, bottom: toolbarPos.bottom }}
+            className={`z-popover rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu fixed flex origin-bottom items-center gap-0.5 border px-1.5 py-1 transition-[opacity,transform] duration-75 ${
+              toolbarShown
+                ? 'pointer-events-auto scale-100 opacity-100'
+                : 'pointer-events-none scale-95 opacity-0'
             }`}
           >
-            {len}/{maxLength}
-          </span>
-        </div>
+            {toolbarInner}
+          </div>
+        )}
 
         {showPlaceholder && placeholder && (
           <span className="text-content-3l dark:text-content-3d pointer-events-none absolute top-2.5 left-3 text-[13.5px]">
@@ -536,6 +553,23 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
           }}
           onKeyDown={(e) => {
             e.stopPropagation();
+            // Formatting shortcuts. preventDefault stops WebKit's own bold/italic/
+            // underline so the command isn't applied twice.
+            if (e.metaKey || e.ctrlKey) {
+              const key = e.key.toLowerCase();
+              if (!e.shiftKey && (key === 'b' || key === 'i' || key === 'u')) {
+                e.preventDefault();
+                exec(
+                  key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline'
+                );
+                return;
+              }
+              if (e.shiftKey && key === 's') {
+                e.preventDefault();
+                exec('strikeThrough');
+                return;
+              }
+            }
             if (mentionOpen) {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -570,6 +604,11 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
                 setMention(null);
                 return;
               }
+            }
+            if (e.key === 'Escape' && onEscape) {
+              e.preventDefault();
+              onEscape();
+              return;
             }
             if (e.key === 'Enter') {
               // Plain Enter submits when the parent wants a submit action (the
@@ -659,6 +698,13 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
           }}
           className={`note-rt ${minHeightClass} text-content-1l dark:text-content-1d w-full overflow-x-hidden overflow-y-auto px-3 py-2.5 text-[13.5px] leading-5 wrap-anywhere outline-none`}
         />
+
+        {/* Inline (docked) controls for surfaces without a scroll container. */}
+        {toolbar === 'inline' && (
+          <div className="border-edge-1l dark:border-edge-1d flex flex-wrap items-center gap-0.5 border-t px-1.5 py-1">
+            {toolbarInner}
+          </div>
+        )}
 
         {mentionOpen && (
           <div

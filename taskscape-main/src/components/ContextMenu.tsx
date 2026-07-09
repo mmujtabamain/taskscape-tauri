@@ -6,7 +6,7 @@ import {
   type MenuItem,
   type OpenMenu,
 } from './contextMenuContext';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 
 /** App-wide context-menu layer. Wrap the window root once; open menus from
  *  anywhere via useContextMenu().open({ items, x, y, onPick }). */

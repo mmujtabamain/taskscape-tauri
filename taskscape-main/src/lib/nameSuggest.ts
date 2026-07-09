@@ -1,5 +1,70 @@
-// GitHub-style two-word name suggestions, themed around landscapes to suit
-// "Taskscape". Purely cosmetic defaults the user can overwrite.
+// Default name suggestions. Purely cosmetic defaults the user can overwrite.
+// Projects draw single celestial names (`PROJECT_NAMES`); lists draw
+// GitHub-style two-word landscape names (`ADJECTIVES` + `NOUNS`).
+
+const PROJECT_NAMES = [
+  'Acheron',
+  'Adrastea',
+  'Aegir',
+  'Albiorix',
+  'Altair',
+  'Amalthea',
+  'Andromeda',
+  'Ariel',
+  'Arrokoth',
+  'Atlas',
+  'Bellatrix',
+  'Callisto',
+  'Calypso',
+  'Capella',
+  'Carina',
+  'Cassiopeia',
+  'Ceres',
+  'Charon',
+  'Cordelia',
+  'Deimos',
+  'Despina',
+  'Dione',
+  'Draco',
+  'Elara',
+  'Enceladus',
+  'Eris',
+  'Europa',
+  'Fomalhaut',
+  'Ganymede',
+  'Haumea',
+  'Helene',
+  'Hyperion',
+  'Hydra',
+  'Iapetus',
+  'Io',
+  'Janus',
+  'Larissa',
+  'Makemake',
+  'Mimas',
+  'Miranda',
+  'Nereid',
+  'Nix',
+  'Oberon',
+  'Orion',
+  'Pallas',
+  'Pandora',
+  'Phobos',
+  'Phoebe',
+  'Pluto',
+  'Proteus',
+  'Rhea',
+  'Rigel',
+  'Sedna',
+  'Sirius',
+  'Tethys',
+  'Titan',
+  'Titania',
+  'Triton',
+  'Umbriel',
+  'Vega',
+  'Vesta',
+];
 
 const ADJECTIVES = [
   'Amber',
@@ -109,6 +174,12 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function suggestName(): string {
+/** A single celestial name (e.g. "Callisto") for a new project. */
+export function suggestProjectName(): string {
+  return pick(PROJECT_NAMES);
+}
+
+/** A two-word landscape name (e.g. "Amber Valley") for a new list. */
+export function suggestListName(): string {
   return `${pick(ADJECTIVES)} ${pick(NOUNS)}`;
 }

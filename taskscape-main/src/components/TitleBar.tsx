@@ -2,7 +2,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef } from 'react';
 import { api, type List, type Project } from '../api';
 import { cmd, isMac } from '../lib/platform';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 import { ListTabs } from './ListTabs';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { WindowControls } from './WindowControls';

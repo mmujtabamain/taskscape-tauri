@@ -5,9 +5,9 @@ import {
   fileKindFor,
   isRemote,
   previewKindFor,
-} from '../lib/fileKind';
+} from '@ui/fileKind';
 import { confirmModal } from '../lib/modal';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 
 interface AttachmentViewerProps {
   attachment: Attachment;

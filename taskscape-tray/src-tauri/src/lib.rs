@@ -40,7 +40,7 @@ async fn target_list(store: &Store) -> Result<List, String> {
     }
     let project = store.default_project().await.map_err(err)?;
     store
-        .create_list(&project.id, &names::suggest_name())
+        .create_list(&project.id, &names::suggest_list_name())
         .await
         .map_err(err)
 }
@@ -421,9 +421,15 @@ async fn submit_capture(
 ) -> Result<(), String> {
     let list = target_list(&store).await?;
     let task = store
-        .create_task(&list.id, &title, notes.as_deref(), None)
+        .create_task(&list.id, &title, None, None)
         .await
         .map_err(err)?;
+
+    // The tray editor sends sanitized rich-text HTML; store it verbatim as the
+    // task's first note (create_task's `notes` path HTML-escapes plain text).
+    if let Some(html) = notes.as_deref().filter(|s| !s.trim().is_empty()) {
+        store.create_note(&task.id, html).await.map_err(err)?;
+    }
 
     let multiple = screenshot_paths.len() > 1;
     for (i, path) in screenshot_paths.iter().enumerate() {

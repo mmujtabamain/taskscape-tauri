@@ -115,7 +115,8 @@ impl Store {
         {
             return Ok(to_project(model));
         }
-        self.create_project(&crate::names::suggest_name()).await
+        self.create_project(&crate::names::suggest_project_name())
+            .await
     }
 
     // ---- lists -----------------------------------------------------------

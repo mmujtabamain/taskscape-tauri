@@ -1,78 +1,54 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+@import '../../common-ui/styles/tokens.css';
+@import '../../common-ui/styles/note-rt.css';
 
 @font-face {
-  font-family: "Montserrat";
-  src: url("./assets/fonts/Montserrat-VariableFont_wght.ttf")
-    format("truetype-variations");
+  font-family: 'Montserrat';
+  src: url('./assets/fonts/Montserrat-VariableFont_wght.ttf')
+    format('truetype-variations');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Outfit";
-  src: url("./assets/fonts/Outfit-VariableFont_wght.ttf")
-    format("truetype-variations");
+  font-family: 'Outfit';
+  src: url('./assets/fonts/Outfit-VariableFont_wght.ttf')
+    format('truetype-variations');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   DESIGN TOKENS  (same role-numbered convention as the main app). The mini bar
-   is now an OPAQUE card — no native vibrancy — so its neutrals are the main
-   app's opaque surface/edge/content values rather than black/white scrims, to
-   keep the bar reminiscent of the main window.
-
-   Dark mode here follows the SYSTEM appearance via Tailwind's default `dark:`
-   (a prefers-color-scheme media query) — there is no `.dark` class. Each token
-   is spelled out as an explicit light/dark pair used as  text-content-1l
-   dark:text-content-1d.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* Tokens unique to the tray (not in the shared file): the single-value accent
+   used by the capture button + spinner, the count-badge halo, content-4. */
 @theme {
-  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", "Montserrat", ui-sans-serif, system-ui, sans-serif;
-
-  /* ── Content (text) ──────────────────── light │ dark (from the main app) */
-  --color-content-1l: oklch(0.26 0.012 262);
-  --color-content-1d: oklch(0.94 0.004 260);
-  --color-content-2l: oklch(0.46 0.013 262);
-  --color-content-2d: oklch(0.74 0.008 260);
-  --color-content-3l: oklch(0.62 0.013 264);
-  --color-content-3d: oklch(0.57 0.011 262);
   --color-content-4l: oklch(0.62 0.013 264); /* placeholder */
   --color-content-4d: oklch(0.57 0.011 262);
-
-  /* ── Surface — opaque, matching the main app (1 = button well · 2 = card) ── */
-  --color-surface-1l: oklch(0.968 0.002 255);
-  --color-surface-1d: oklch(0.205 0.004 260);
-  --color-surface-2l: oklch(0.995 0.001 255);
-  --color-surface-2d: oklch(0.24 0.005 260);
-
-  /* ── Edges (borders) ────────────────────────────────────── light │ dark */
-  --color-edge-1l: oklch(0.32 0.02 260 / 0.075);
-  --color-edge-1d: oklch(0.98 0.01 260 / 0.06);
-  --color-edge-2l: oklch(0.32 0.02 260 / 0.14);
-  --color-edge-2d: oklch(0.98 0.01 260 / 0.11);
-  --color-edge-3l: oklch(0.32 0.02 260 / 0.3);
-  --color-edge-3d: oklch(0.98 0.01 260 / 0.24);
-
-  /* ── Accent (brand blue, matching the main app; invariant across themes) ── */
   --color-accent-400: oklch(0.68 0.17 252);
   --color-accent-500: oklch(0.6 0.2 255);
-  --color-on-accent: oklch(0.99 0.005 255);
-
-  /* ── Halo (ring around the count badge — the card surface, so the badge reads
-     as a cutout) ──────────────────────────────────────────── light │ dark */
   --color-halo-1l: oklch(0.995 0.001 255);
   --color-halo-1d: oklch(0.24 0.005 260);
+}
 
-  /* ── Corner radius — one --rounding knob (same convention as the main app) →
-     rounded-field / rounded-control / rounded-panel. --rounding: 0 squares all. */
-  --rounding: 0.5rem;
-  --radius-field: calc(var(--rounding) * 0.625);
-  --radius-control: var(--rounding);
-  --radius-panel: calc(var(--rounding) * 1.5);
+/* No `.dark` class here — the tray follows the system appearance. Give the
+   shared theme-swap aliases (used by the injected .note-rt/.att-chip CSS) and
+   the Material Symbols optical weight their light defaults, dark under system. */
+:root {
+  --icon-wght: 350;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-1: var(--surface-1d);
+    --edge-2: var(--edge-2d);
+    --edge-3: var(--edge-3d);
+    --content-1: var(--content-1d);
+    --content-3: var(--content-3d);
+    --accent-500: var(--accent-500d);
+    --selection-1: var(--selection-1d);
+    --focus-1: var(--focus-1d);
+    --icon-wght: 300;
+  }
 }
 
 /* The window backing stays transparent (there is no native vibrancy anymore) so
@@ -81,6 +57,7 @@
 html,
 body,
 #root {
+  overscroll-behavior: none;
   background: transparent;
 }
 

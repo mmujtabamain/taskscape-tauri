@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { Icon } from '../components/Icon';
+import { Icon } from '@ui/Icon';
 import {
   GLYPHS,
   INNER,
@@ -9,10 +9,17 @@ import {
   useWindowFocused,
 } from '../components/windowChrome';
 import type { ModalButton, ModalProps, ModalResult } from '../lib/modal';
-import { suggestName } from '../lib/nameSuggest';
+import { suggestProjectName, suggestListName } from '../lib/nameSuggest';
 import { isMac } from '../lib/platform';
 
 const WIDTH = 400;
+
+/** The default name the dice fills in, by pool. Empty when suggestion is off. */
+function suggestFor(kind: 'project' | 'list' | undefined): string {
+  if (kind === 'project') return suggestProjectName();
+  if (kind === 'list') return suggestListName();
+  return '';
+}
 
 const BTN =
   'inline-flex h-8 items-center justify-center rounded-control px-4 text-[12.5px] font-semibold tracking-[0.01em] transition duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-1l dark:focus-visible:ring-focus-1d';
@@ -155,12 +162,12 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
 
   const [value, setValue] = useState(() =>
     props.input
-      ? (props.input.initialValue ?? (props.input.suggest ? suggestName() : ''))
+      ? (props.input.initialValue ?? suggestFor(props.input.suggest))
       : ''
   );
   // Mirror the committed initial state. Never assign this ref inside the
   // useState initializer: StrictMode double-invokes initializers, so a second
-  // (unshown) suggestName() would leak in and the applied name wouldn't match
+  // (unshown) suggestFor() would leak in and the applied name wouldn't match
   // the field.
   const valueRef = useRef(value);
 
@@ -202,7 +209,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
   }
 
   function rollSuggestion() {
-    setInputValue(suggestName());
+    setInputValue(suggestFor(props.input?.suggest));
     const el = inputRef.current;
     if (!el) return;
     el.focus();

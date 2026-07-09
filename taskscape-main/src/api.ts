@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { Attachment, LinkType } from '@ui/types';
 
-export type LinkType = 'reference' | 'copy';
+export type { Attachment, LinkType };
 
 export interface Project {
   id: string;
@@ -16,15 +17,6 @@ export interface List {
   sort_order: number;
   created_at: number;
   updated_at: number;
-}
-
-export interface Attachment {
-  id: string;
-  task_id: string;
-  name: string;
-  link_type: LinkType;
-  location: string;
-  created_at: number;
 }
 
 export interface Note {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { List, Task } from '../api';
 import { absoluteDateTime, relativeTime } from '../time';
 import { useContextMenu } from './contextMenuContext';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 
 export type DropZone = 'before' | 'after' | 'nest';
 

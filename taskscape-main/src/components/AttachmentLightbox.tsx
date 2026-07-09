@@ -6,11 +6,11 @@ import {
   isRemote,
   previewKindFor,
   splitFileName,
-} from '../lib/fileKind';
+} from '@ui/fileKind';
 import { propagateAttachmentRename } from '../lib/mentions';
 import { confirmModal, promptName } from '../lib/modal';
 import { setOverlay } from '../lib/overlays';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 
 const TEXT_PREVIEW_CAP = 262144;
 

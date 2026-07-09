@@ -2,7 +2,7 @@ import { emit } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { Icon } from '../components/Icon';
+import { Icon } from '@ui/Icon';
 import { setTheme, type ThemePref } from '../lib/theme';
 
 const WIDTH = 520;

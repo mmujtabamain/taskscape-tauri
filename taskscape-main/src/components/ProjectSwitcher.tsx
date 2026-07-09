@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Project } from '../api';
 import { setOverlay } from '../lib/overlays';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 
 interface Props {
   projects: Project[];

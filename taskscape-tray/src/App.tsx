@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Icon } from "./components/Icon";
-import { Spinner } from "./components/Spinner";
+import { Icon } from "@ui/Icon";
+import { RichTextEditor, type RichTextHandle } from "@ui/RichTextEditor";
+import { Spinner } from "@ui/Spinner";
 import { api, type CaptureTarget } from "./api";
 
 const inputClasses =
@@ -16,12 +17,12 @@ const ghostButtonBase =
 
 function App() {
   const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const [pending, setPending] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<CaptureTarget | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<RichTextHandle>(null);
 
   const refreshTarget = () => {
     api.captureTarget().then(setTarget).catch(() => {});
@@ -40,7 +41,7 @@ function App() {
       // Dismissed/submitted: the draft is gone, so reset the form.
       listen("mini-reset", () => {
         setTitle("");
-        setNotes("");
+        editorRef.current?.clear();
         setScreenshots([]);
         setPending(0);
         setError(null);
@@ -78,13 +79,16 @@ function App() {
   const save = async () => {
     const t = title.trim();
     if (!t) return;
+    const notesHtml = editorRef.current?.isEmpty()
+      ? null
+      : (editorRef.current?.getHtml() ?? null);
     await api.submitCapture({
       title: t,
-      notes: notes.trim() || null,
+      notes: notesHtml,
       screenshotPaths: screenshots,
     });
     setTitle("");
-    setNotes("");
+    editorRef.current?.clear();
     setScreenshots([]);
   };
 
@@ -134,12 +138,16 @@ function App() {
 
       <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
 
-      <input
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        placeholder="Notes ..."
-        className={`w-full px-3 py-2.5 ${inputClasses}`}
-      />
+      <div className="px-3 py-2.5">
+        <RichTextEditor
+          ref={editorRef}
+          attachments={[]}
+          placeholder="Notes ..."
+          minHeightClass="min-h-16"
+          onSubmit={save}
+          onEscape={() => api.hideMini()}
+        />
+      </div>
 
       <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
 

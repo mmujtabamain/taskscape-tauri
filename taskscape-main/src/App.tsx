@@ -1,14 +1,13 @@
 import { listen } from '@tauri-apps/api/event';
+import { Spinner } from '@ui/Spinner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type List, type Project, type Task, type TaskPatch } from './api';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { PreviewPanel } from './components/PreviewPanel';
-import { Spinner } from './components/Spinner';
 import { TaskPane } from './components/TaskPane';
 import type { DropZone, RowCtx } from './components/TaskRow';
 import { TitleBar } from './components/TitleBar';
 import { confirmModal, promptName } from './lib/modal';
-import { suggestName } from './lib/nameSuggest';
 import { overlayOpen } from './lib/overlays';
 import { cmdKey } from './lib/platform';
 
@@ -263,7 +262,7 @@ function App() {
     const name = await promptName({
       title: 'New project',
       icon: 'create_new_folder',
-      placeholder: suggestName(),
+      suggestKind: 'project',
     });
     if (!name) return;
     const project = await api.createProject(name);
@@ -311,7 +310,7 @@ function App() {
     const name = await promptName({
       title: 'New list',
       icon: 'list_alt_add',
-      placeholder: suggestName(),
+      suggestKind: 'list',
     });
     if (!name) return;
     const list = await api.createList(selectedProjectId, name);

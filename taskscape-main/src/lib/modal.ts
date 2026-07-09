@@ -11,8 +11,10 @@ export interface ModalInput {
   label?: string;
   placeholder?: string;
   initialValue?: string;
-  /** Show a "suggest another name" dice button that fills GitHub-style names. */
-  suggest?: boolean;
+  /** Show a "suggest another name" dice button that fills a random default
+   *  name. The value picks which pool: celestial names for a project, or
+   *  two-word landscape names for a list. */
+  suggest?: 'project' | 'list';
   /** A locked, greyed suffix (e.g. a file extension `.png`) shown after the
    *  field. The user can't type `.` and the suffix is appended to the result. */
   suffix?: string;
@@ -87,6 +89,9 @@ export async function promptName(opts: {
   initialValue?: string;
   placeholder?: string;
   confirmLabel?: string;
+  /** Which default-name pool the dice suggests from. Only shown for a fresh
+   *  name (no `initialValue`); defaults to the list pool. */
+  suggestKind?: 'project' | 'list';
   /** Locked, greyed suffix appended to the returned name (e.g. `.png`). */
   suffix?: string;
 }): Promise<string | null> {
@@ -98,7 +103,7 @@ export async function promptName(opts: {
       placeholder: opts.placeholder,
       initialValue: opts.initialValue,
       suffix: opts.suffix,
-      suggest: !opts.initialValue,
+      suggest: opts.initialValue ? undefined : (opts.suggestKind ?? 'list'),
     },
     buttons: [
       { id: 'cancel', label: 'Cancel', variant: 'ghost' },

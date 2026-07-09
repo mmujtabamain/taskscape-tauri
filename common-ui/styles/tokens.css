@@ -1,0 +1,285 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS  (convention adopted from punkt_xii: semantic, role-numbered)
+
+   Every color role is a single token named by role + depth-rank. Because this
+   app is dual-theme, each token is spelled out as an explicit light/dark pair:
+   the `…l` value applies in light mode, the `…d` value under `.dark`.
+
+     surface-0…3   backgrounds, sunken → elevated (0 recessed · 1 page · 3 raised)
+     edge-1…3      hairlines/borders, faint → strong
+     content-1…3   text/foreground, strongest → faintest
+     accent-500…   brand blue ramp (500 base · 600 hover · 700 active)
+     danger-*      status red (500 base · 600 hover · 100 soft fill)
+     wash-1/2      translucent neutral overlays (hover wells)
+
+   Utilities are always explicit per theme:  bg-surface-1l dark:bg-surface-1d
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Surfaces ──────────────────────────────────────────────── light │ dark */
+  --surface-0l: oklch(0.944 0.003 255);
+  --surface-0d: oklch(0.172 0.004 260);
+  --surface-1l: oklch(0.968 0.002 255);
+  --surface-1d: oklch(0.205 0.004 260);
+  --surface-2l: oklch(0.995 0.001 255);
+  --surface-2d: oklch(0.24 0.005 260);
+  --surface-3l: oklch(1 0 0);
+  --surface-3d: oklch(0.288 0.006 260);
+
+  /* ── Edges ─────────────────────────────────────────────────── light │ dark */
+  --edge-1l: oklch(0.32 0.02 260 / 0.075);
+  --edge-1d: oklch(0.98 0.01 260 / 0.06);
+  --edge-2l: oklch(0.32 0.02 260 / 0.14);
+  --edge-2d: oklch(0.98 0.01 260 / 0.11);
+  --edge-3l: oklch(0.32 0.02 260 / 0.3);
+  --edge-3d: oklch(0.98 0.01 260 / 0.24);
+
+  /* ── Content (text) ────────────────────────────────────────── light │ dark */
+  --content-1l: oklch(0.26 0.012 262);
+  --content-1d: oklch(0.94 0.004 260);
+  --content-2l: oklch(0.46 0.013 262);
+  --content-2d: oklch(0.74 0.008 260);
+  --content-3l: oklch(0.62 0.013 264);
+  --content-3d: oklch(0.57 0.011 262);
+
+  /* ── Accent (brand blue ramp) ──────────────────────────────── light │ dark */
+  --accent-500l: oklch(0.6 0.2 255);
+  --accent-500d: oklch(0.68 0.17 252);
+  --accent-600l: oklch(0.55 0.21 255);
+  --accent-600d: oklch(0.73 0.16 252);
+  --accent-700l: oklch(0.5 0.21 256);
+  --accent-700d: oklch(0.63 0.17 252);
+  --on-accent: oklch(0.99 0.005 255); /* invariant — same in both themes */
+
+  /* ── Selection / Focus ─────────────────────────────────────── light │ dark */
+  --selection-1l: oklch(0.6 0.2 255 / 0.1);
+  --selection-1d: oklch(0.68 0.17 252 / 0.16);
+  --focus-1l: oklch(0.6 0.2 255 / 0.5);
+  --focus-1d: oklch(0.68 0.17 252 / 0.6);
+
+  /* ── Wash (translucent overlays) ───────────────────────────── light │ dark */
+  --wash-1l: oklch(0.32 0.02 262 / 0.05);
+  --wash-1d: oklch(0.98 0.01 260 / 0.045);
+  --wash-2l: oklch(0.32 0.02 262 / 0.09);
+  --wash-2d: oklch(0.98 0.01 260 / 0.08);
+
+  /* ── Danger / Success ──────────────────────────────────────── light │ dark */
+  --danger-500l: oklch(0.55 0.2 27);
+  --danger-500d: oklch(0.68 0.19 25);
+  --danger-600l: oklch(0.5 0.2 27);
+  --danger-600d: oklch(0.72 0.18 25);
+  --danger-100l: oklch(0.55 0.2 27 / 0.1);
+  --danger-100d: oklch(0.68 0.19 25 / 0.15);
+  --success-500l: oklch(0.6 0.14 150);
+  --success-500d: oklch(0.72 0.13 150);
+
+  /* ── Done lamp ─────────────────────────────────────────────── light │ dark */
+  --done-lamp-1l: oklch(0.62 0.13 255);
+  --done-lamp-1d: oklch(0.6 0.15 252);
+
+  /* ── Theme-swapping aliases ────────────────────────────────────────────────
+     For consumers that can't use Tailwind's `dark:` variant — raw CSS rules and
+     inline `style` var() refs. These resolve to the light value here and the
+     dark value under `.dark` below. */
+  --surface-1: var(--surface-1l);
+  --edge-2: var(--edge-2l);
+  --edge-3: var(--edge-3l);
+  --content-1: var(--content-1l);
+  --content-3: var(--content-3l);
+  --accent-500: var(--accent-500l);
+  --selection-1: var(--selection-1l);
+  --focus-1: var(--focus-1l);
+}
+
+/* ── Tailwind utility bridge ──────────────────────────────────────────────────
+   `inline` keeps the var() reference in the generated utility, so both the light
+   (`bg-surface-1l`) and dark (`bg-surface-1d`) utilities exist and resolve to the
+   fixed values above. */
+@theme inline {
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Outfit', 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+
+  --color-surface-0l: var(--surface-0l);
+  --color-surface-0d: var(--surface-0d);
+  --color-surface-1l: var(--surface-1l);
+  --color-surface-1d: var(--surface-1d);
+  --color-surface-2l: var(--surface-2l);
+  --color-surface-2d: var(--surface-2d);
+  --color-surface-3l: var(--surface-3l);
+  --color-surface-3d: var(--surface-3d);
+
+  --color-edge-1l: var(--edge-1l);
+  --color-edge-1d: var(--edge-1d);
+  --color-edge-2l: var(--edge-2l);
+  --color-edge-2d: var(--edge-2d);
+  --color-edge-3l: var(--edge-3l);
+  --color-edge-3d: var(--edge-3d);
+
+  --color-content-1l: var(--content-1l);
+  --color-content-1d: var(--content-1d);
+  --color-content-2l: var(--content-2l);
+  --color-content-2d: var(--content-2d);
+  --color-content-3l: var(--content-3l);
+  --color-content-3d: var(--content-3d);
+
+  --color-accent-500l: var(--accent-500l);
+  --color-accent-500d: var(--accent-500d);
+  --color-accent-600l: var(--accent-600l);
+  --color-accent-600d: var(--accent-600d);
+  --color-accent-700l: var(--accent-700l);
+  --color-accent-700d: var(--accent-700d);
+  --color-on-accent: var(--on-accent);
+
+  --color-selection-1l: var(--selection-1l);
+  --color-selection-1d: var(--selection-1d);
+  --color-focus-1l: var(--focus-1l);
+  --color-focus-1d: var(--focus-1d);
+
+  --color-wash-1l: var(--wash-1l);
+  --color-wash-1d: var(--wash-1d);
+  --color-wash-2l: var(--wash-2l);
+  --color-wash-2d: var(--wash-2d);
+
+  --color-danger-500l: var(--danger-500l);
+  --color-danger-500d: var(--danger-500d);
+  --color-danger-600l: var(--danger-600l);
+  --color-danger-600d: var(--danger-600d);
+  --color-danger-100l: var(--danger-100l);
+  --color-danger-100d: var(--danger-100d);
+  --color-success-500l: var(--success-500l);
+  --color-success-500d: var(--success-500d);
+
+  --color-done-lamp-1l: var(--done-lamp-1l);
+  --color-done-lamp-1d: var(--done-lamp-1d);
+
+  --shadow-menu:
+    0 10px 28px oklch(0.2 0.02 262 / 0.2), 0 1px 3px oklch(0.2 0.02 262 / 0.12);
+  --shadow-lift: 0 2px 8px oklch(0.2 0.02 262 / 0.2);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+
+  /* Motion is kept short and functional — a native app snaps, it doesn't glide. */
+  --animate-rise: rise 110ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-panel-in: panel-in 120ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATIC TOKENS  (ported from punkt_xii): radius knob · z-layers · motion
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme {
+  /* Corner radius — one --rounding knob drives three role radii, surfaced as the
+     rounded-field / rounded-control / rounded-panel utilities. Set --rounding: 0
+     to square every corner on the app at once. */
+  --rounding: 0.5rem;
+  --radius-field: calc(
+    var(--rounding) * 0.625
+  ); /* tight controls: inputs, small chips */
+  --radius-control: var(--rounding); /* buttons, tabs, menu items */
+  --radius-panel: calc(
+    var(--rounding) * 1.5
+  ); /* cards, dialogs, menus, the mini bar */
+
+  /* Named stacking layers — the single source of truth for z-order, mirrored in
+     lib/zLayers.ts. Tailwind turns these into z-base / z-raised / z-modal / …; a
+     raw z-<number> in src fails `npm run typecheck` (scripts/check-z-layers.mjs). */
+  --z-index-base: 0;
+  --z-index-raised: 10;
+  --z-index-popover: 20;
+  --z-index-dropdown: 40;
+  --z-index-overlay: 50;
+  --z-index-modal: 60;
+  --z-index-tooltip: 70;
+
+  /* Motion tokens ported from punkt_xii for later use — the CSS twins below and
+     the JS mirror in src/motion/lib/motion.ts share them. Not yet wired to any
+     component. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 0.18s;
+  --duration-base: 0.28s;
+  --duration-slow: 0.5s;
+}
+
+/* Hide the scrollbar while keeping the element scrollable (ported from punkt_xii)
+   — for rows/overlays whose scroll affordance is something else. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(3px);
+    opacity: 0;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    transform: translateX(6px);
+    opacity: 0;
+  }
+}
+
+/* Auto-dismiss drain inside a modal's default button (duration set inline). */
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ── Motion CSS twins (ported from punkt_xii for later use; NOT yet applied to
+   any component). JS equivalents live in src/motion/lib/motion.ts. All share the
+   --ease-out curve and are neutralized by the reduced-motion block below. ── */
+.animate-fade-in-up {
+  animation: fade-in-up var(--duration-base) var(--ease-out) both;
+}
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.animate-fade-in {
+  animation: fade-in var(--duration-slow) var(--ease-out) both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.animate-scale-in {
+  animation: scale-in var(--duration-base) var(--ease-out) both;
+}
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* Done-task strikethrough draws left→right (animated background-size). */
+.strike {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0% 1px;
+  transition: background-size 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+.strike-on {
+  background-size: 100% 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

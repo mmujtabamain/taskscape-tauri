@@ -1,6 +1,6 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { homeDir, join } from '@tauri-apps/api/path';
-import type { Attachment } from '../api';
+import type { Attachment } from './types';
 
 export type FileKindLabel =
   | 'pdf'

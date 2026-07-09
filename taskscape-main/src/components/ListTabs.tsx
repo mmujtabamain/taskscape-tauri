@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import type { List } from '../api';
 import { useContextMenu } from './contextMenuContext';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 
 const TAB_MIME = 'application/x-list-tab';
 

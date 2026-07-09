@@ -12,19 +12,19 @@ import {
   fileKindFor,
   isRemote,
   splitFileName,
-} from '../lib/fileKind';
+} from '@ui/fileKind';
 import { propagateAttachmentRename } from '../lib/mentions';
 import { confirmModal, openModal, promptName } from '../lib/modal';
 import { absoluteDateTime, relativeTime } from '../time';
 import { AttachmentLightbox } from './AttachmentLightbox';
 import { useContextMenu } from './contextMenuContext';
-import { Icon } from './Icon';
+import { Icon } from '@ui/Icon';
 import {
   ATTACHMENT_MIME,
   RichTextEditor,
   type RichTextHandle,
-} from './RichTextEditor';
-import { Spinner } from './Spinner';
+} from '@ui/RichTextEditor';
+import { Spinner } from '@ui/Spinner';
 
 interface PreviewPanelProps {
   task: Task | null;
@@ -37,6 +37,22 @@ interface PreviewPanelProps {
   onRequestDelete: (task: Task) => void;
   onRefresh: () => void;
   onClose: () => void;
+}
+
+/** Prompt for a URL via the native modal; resolves the trimmed URL or null.
+ *  Given to the note editor so its link button works in the main window. */
+async function requestNoteLink(): Promise<string | null> {
+  const res = await openModal({
+    icon: 'add_link',
+    title: 'Add link',
+    input: { placeholder: 'https://…' },
+    buttons: [
+      { id: 'cancel', label: 'Cancel', variant: 'ghost' },
+      { id: 'add', label: 'Add link', variant: 'primary' },
+    ],
+  });
+  const url = res.value?.trim();
+  return res.buttonId === 'add' && url ? url : null;
 }
 
 function referenceName(location: string): string {
@@ -93,6 +109,7 @@ function NoteCard({
         minHeightClass="min-h-14"
         attachments={attachments}
         onOpenMention={onOpenMention}
+        onRequestLink={requestNoteLink}
         onBlur={() => onCommit(ref.current?.getHtml() ?? '')}
       />
       <button
@@ -458,6 +475,7 @@ function TaskInspector({
                 minHeightClass="min-h-24"
                 attachments={task.attachments}
                 onOpenMention={openMention}
+                onRequestLink={requestNoteLink}
                 onBlur={() => {
                   // The link toolbar opens a native modal window (and the user
                   // may just switch apps); either drops window focus. Keep the
