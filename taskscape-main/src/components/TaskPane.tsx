@@ -13,6 +13,7 @@ interface Props {
   onCreateTask: (listId: string, title: string) => void;
   onRootDrop: (draggedId: string, listId: string) => void;
   registerComposer: (listId: string, focus: ((seed?: string) => void) | null) => void;
+  onFocusPane: (listId: string) => void;
 }
 
 export function TaskPane({
@@ -25,6 +26,7 @@ export function TaskPane({
   onCreateTask,
   onRootDrop,
   registerComposer,
+  onFocusPane,
 }: Props) {
   const composerRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,7 @@ export function TaskPane({
     setTick((prev) =>
       prev && prev.top === next.top && prev.left === next.left ? prev : next,
     );
-  });
+  }, [ctx.selectedTaskId]);
 
   const submit = () => {
     const el = composerRef.current;
@@ -89,12 +91,16 @@ export function TaskPane({
   };
 
   return (
-    <section className="flex h-full min-w-0 flex-1 flex-col bg-surface-2l dark:bg-surface-2d">
+    <section
+      className="flex h-full min-w-0 flex-1 flex-col bg-surface-2l dark:bg-surface-2d"
+      onMouseDown={() => onFocusPane(list.id)}
+    >
       <div className="mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 rounded-control bg-surface-0l dark:bg-surface-0d px-3 transition-shadow focus-within:ring-1 focus-within:ring-focus-1l dark:focus-within:ring-focus-1d">
         <Icon name="add" size={18} weight={300} className="shrink-0 text-content-3l dark:text-content-3d" />
         <input
           ref={composerRef}
           placeholder="Add a task — Enter to save"
+          onFocus={() => onFocusPane(list.id)}
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === "Enter") submit();
@@ -139,7 +145,7 @@ export function TaskPane({
         <div ref={contentRef} className="relative pb-6">
           {tick && (
             <span
-              className="pointer-events-none absolute z-raised h-5 w-[2px] rounded-full bg-accent-500l dark:bg-accent-500d transition-[top,left] duration-100 ease-[cubic-bezier(0.2,0,0,1)]"
+              className="pointer-events-none absolute z-raised h-5 w-0.5 rounded-full bg-accent-500l dark:bg-accent-500d transition-[top,left] duration-100 ease-standard"
               style={{ top: tick.top, left: tick.left }}
             />
           )}
@@ -147,8 +153,8 @@ export function TaskPane({
             <TaskRow key={task.id} task={task} depth={0} ctx={ctx} />
           ))}
           {rootDropOver && ctx.draggingId && (
-            <div className="relative mx-3 mt-1 h-[2px] rounded-field bg-accent-500l dark:bg-accent-500d">
-              <span className="absolute top-1/2 -left-[3px] h-[6px] w-[6px] -translate-y-1/2 rounded-full bg-accent-500l dark:bg-accent-500d" />
+            <div className="relative mx-3 mt-1 h-0.5 rounded-field bg-accent-500l dark:bg-accent-500d">
+              <span className="absolute top-1/2 -left-0.75 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-accent-500l dark:bg-accent-500d" />
             </div>
           )}
           {visibleRoots.length === 0 && (
@@ -162,7 +168,7 @@ export function TaskPane({
               <p className="font-display text-[16px] font-medium text-content-2l dark:text-content-2d">
                 {searching ? `No matches in ${list.name}` : "Nothing here yet"}
               </p>
-              <p className="text-[13px] tracking-[0.01em] text-content-3l dark:text-content-3d">
+              <p className="px-4 text-center text-[13px] tracking-[0.01em] text-content-3l dark:text-content-3d">
                 {searching
                   ? "Try a different search"
                   : "Add a task above, or press ⌘⏎ anywhere to capture one"}

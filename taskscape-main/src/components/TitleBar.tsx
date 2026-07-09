@@ -17,6 +17,7 @@ interface Props {
   lists: List[];
   activeListId: string | null;
   splitListId: string | null;
+  focusedListId: string | null;
   counts: Record<string, number>;
   onSelectList: (id: string) => void;
   onCreateList: () => void;
@@ -64,6 +65,7 @@ export function TitleBar(props: Props) {
         lists={props.lists}
         activeListId={props.activeListId}
         splitListId={props.splitListId}
+        focusedListId={props.focusedListId}
         counts={props.counts}
         onSelect={props.onSelectList}
         onCreate={props.onCreateList}

@@ -26,6 +26,9 @@ function App() {
     () => localStorage.getItem("ui.split") || null,
   );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  // Which pane the user last worked in. Drives the active-tab highlight and
+  // keyboard targeting when split view is open.
+  const [paneFocus, setPaneFocus] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [showCompleted, setShowCompleted] = useState(true);
@@ -218,6 +221,14 @@ function App() {
   const splitList = listsInProject.find((l) => l.id === splitListId) ?? null;
   const selectedTask = selectedTaskId ? (taskById[selectedTaskId] ?? null) : null;
 
+  // The focused pane's list — one of the two visible panes, falling back to the
+  // left (active) pane whenever `paneFocus` points at a list that isn't on
+  // screen (e.g. after a project switch or closing the split).
+  const focusedListId =
+    paneFocus != null && (paneFocus === activeListId || paneFocus === splitListId)
+      ? paneFocus
+      : activeListId;
+
   // ----- mutations -----
   const createProject = async () => {
     const name = await promptName({
@@ -311,6 +322,7 @@ function App() {
   };
 
   const createTask = async (listId: string, title: string) => {
+    setPaneFocus(listId);
     const task = await api.createTask(listId, title);
     setSelectedTaskId(task.id);
     await load();
@@ -427,12 +439,21 @@ function App() {
   };
 
   const selectList = (id: string) => {
-    if (id === splitListId) {
-      // Clicking the pinned list's tab swaps the two panes.
-      setSplitListId(activeListId);
+    // Each pane is independent and panes never swap sides. Clicking a tab
+    // already shown in a pane just focuses that pane; clicking any other tab
+    // loads it into whichever pane the user is currently working in, leaving the
+    // other pane untouched.
+    if (id === activeListId || id === splitListId) {
+      setPaneFocus(id);
+      return;
     }
-    listIdRef.current = id;
-    setActiveListId(id);
+    if (splitListId != null && focusedListId === splitListId) {
+      setSplitListId(id);
+    } else {
+      listIdRef.current = id;
+      setActiveListId(id);
+    }
+    setPaneFocus(id);
   };
 
   const toggleSplit = (id: string) => {
@@ -511,7 +532,7 @@ function App() {
         }
         if (e.key === "n") {
           e.preventDefault();
-          const target = selectedTask?.list_id ?? activeListId;
+          const target = focusedListId;
           if (target) composers.current.get(target)?.();
           return;
         }
@@ -543,7 +564,7 @@ function App() {
       if (typing) return;
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        const listId = selectedTask?.list_id ?? activeListId;
+        const listId = focusedListId;
         if (!listId) return;
         const flat = flattenVisible(listId);
         if (flat.length === 0) return;
@@ -576,7 +597,7 @@ function App() {
       ) {
         // Type-to-capture: a printable key with nothing else consuming it drops
         // straight into the pane's composer, seeded with that character.
-        const target = selectedTask?.list_id ?? activeListId;
+        const target = focusedListId;
         const composer = target ? composers.current.get(target) : undefined;
         if (composer) {
           e.preventDefault();
@@ -610,6 +631,7 @@ function App() {
           lists={listsInProject}
           activeListId={activeListId}
           splitListId={splitListId}
+          focusedListId={focusedListId}
           counts={counts}
           onSelectList={selectList}
           onCreateList={createList}
@@ -641,6 +663,7 @@ function App() {
                   onCreateTask={createTask}
                   onRootDrop={dropOnRoot}
                   registerComposer={registerComposer}
+                  onFocusPane={setPaneFocus}
                 />
               </div>
               {splitList && (
@@ -663,6 +686,7 @@ function App() {
                       onCreateTask={createTask}
                       onRootDrop={dropOnRoot}
                       registerComposer={registerComposer}
+                      onFocusPane={setPaneFocus}
                     />
                   </div>
                 </>

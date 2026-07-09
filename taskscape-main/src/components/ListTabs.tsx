@@ -8,8 +8,12 @@ const TAB_MIME = 'application/x-list-tab';
 
 interface Props {
   lists: List[];
+  // The two panes are positional: `activeListId` is the left pane, `splitListId`
+  // the right. `focusedListId` is whichever pane the user is working in — it
+  // drives the highlighted tab, independent of side.
   activeListId: string | null;
   splitListId: string | null;
+  focusedListId: string | null;
   counts: Record<string, number>;
   onSelect: (id: string) => void;
   onCreate: () => void;
@@ -24,6 +28,7 @@ export function ListTabs({
   lists,
   activeListId,
   splitListId,
+  focusedListId,
   counts,
   onSelect,
   onCreate,
@@ -42,7 +47,7 @@ export function ListTabs({
     before: boolean;
   } | null>(null);
   const [tabOverEnd, setTabOverEnd] = useState(false);
-  const activeIdx = lists.findIndex((l) => l.id === activeListId);
+  const focusedIdx = lists.findIndex((l) => l.id === focusedListId);
   const inSplit = splitListId != null;
 
   const openMenu = (e: React.MouseEvent, list: List) => {
@@ -80,13 +85,15 @@ export function ListTabs({
       data-no-drag
     >
       {lists.map((list, i) => {
-        const active = list.id === activeListId;
-        const split = list.id === splitListId;
+        const isLeft = list.id === activeListId;
+        const isRight = list.id === splitListId;
+        const focused = list.id === focusedListId;
         const open = counts[list.id] ?? 0;
-        const sepAdjacentActive = i === activeIdx || i - 1 === activeIdx;
-        // The split indicator marks the two panes on screen — shown on BOTH the
-        // active tab and the split tab, and only while split view is on.
-        const paneDot = inSplit && (active || split);
+        const sepAdjacentActive = i === focusedIdx || i - 1 === focusedIdx;
+        // The split indicator marks the two panes on screen — shown on BOTH
+        // panes, and only while split view is on. The icon points to the side
+        // each pane sits on (left = active list, right = split list).
+        const paneDot = inSplit && (isLeft || isRight);
         // This separator sits to the LEFT of `list`, so it marks the drop point
         // between the previous tab and this one: light it when dropping BEFORE
         // this tab, or AFTER the previous tab.
@@ -110,7 +117,7 @@ export function ListTabs({
               draggable={renaming !== list.id}
               className={twMerge(
                 'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-2 border-b border-transparent px-4 transition-colors',
-                active && 'bg-surface-2l dark:bg-surface-2d',
+                focused && 'bg-surface-2l dark:bg-surface-2d',
                 dropOver === list.id && 'bg-selection-1l dark:bg-selection-1d',
                 draggingTab === list.id ? 'opacity-40' : ''
               )}
@@ -174,7 +181,7 @@ export function ListTabs({
             >
               {paneDot && (
                 <Icon
-                  name={active ? 'split_scene_left' : 'split_scene_right'}
+                  name={isLeft ? 'line_start_circle' : 'line_end_circle'}
                   className="text-accent-500l dark:text-accent-500d"
                 />
               )}
@@ -189,7 +196,7 @@ export function ListTabs({
               ) : (
                 <span
                   className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
-                    active
+                    focused
                       ? 'text-content-1l dark:text-content-1d font-medium'
                       : 'text-content-2l dark:text-content-2d font-medium'
                   }`}
@@ -246,7 +253,7 @@ export function ListTabs({
           <span
             className={twMerge(
               'bg-edge-1l dark:bg-edge-1d my-auto h-4 w-px shrink-0',
-              activeIdx === lists.length - 1 &&
+              focusedIdx === lists.length - 1 &&
                 'bg-edge-2l dark:bg-edge-2d h-full',
               (tabOverEnd ||
                 (tabOver != null &&
