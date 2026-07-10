@@ -71,3 +71,11 @@ body,
 :root {
   color-scheme: light dark;
 }
+
+/* Toggled from App.tsx while the user is typing to hide the mouse pointer (it
+   opens right over the title field). Removed on the next mouse move. The
+   `:root.cursor-hidden` compound out-specifies the input's UA text cursor and
+   any `cursor-*` utility, so no `!important` is needed. */
+:root.cursor-hidden * {
+  cursor: none;
+}

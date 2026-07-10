@@ -12,7 +12,7 @@ The always-on agent. No dock icon; its only window is a small, frameless, **opaq
 | `src-tauri/src/main.rs`               | One-line entry point → `taskscape_tray_lib::run()`.                                                                       |
 | `src-tauri/tauri.conf.json`           | Window config (480×180 — sized for the notes panel expanded, frameless, `transparent: true`, always-on-top, hidden at start). `macOSPrivateApi: true` is required for the transparent backing, which now only lets the opaque card's rounded corners render — there is no vibrancy. |
 | `src-tauri/capabilities/default.json` | Permissions for the `main` window.                                                                                        |
-| `src/App.tsx`                         | The mini bar UI (React). Title + notes fields, and a footer with the target (project / list, opens main) on the left and the screenshot **ghost button** (spinner while capturing, shot count, ⌘⇧⏎ hint) on the right. |
+| `src/App.tsx`                         | The mini bar UI (React). Title + notes fields, and a footer with the target (project / list, opens main) on the left and, on the right, a **Clear** button (⌘⇧⌫, shown only when the draft has content) + the screenshot **ghost button** (spinner while capturing, shot count, ⌘⇧⏎ hint). Holds the draft state, which persists across dismissal. |
 | `src/api.ts`                          | Thin typed wrappers over `invoke(...)` for each Tauri command.                                                            |
 | `src/components/Icon.tsx`             | Material Symbols glyph component (self-hosted, offline).                                                                  |
 | `src/components/Spinner.tsx`          | Small indeterminate spinner (mini-bar palette) shown in the screenshot button while a capture is in flight.               |
@@ -30,11 +30,15 @@ The mini bar has to do something unusual: appear **instantly at the cursor** and
 
 ### Parking, not hiding
 
-While hidden, the window is **moved off-screen to `PARK` (-10000,-10000)** rather than only `hide()`n so the next reveal can move it to the cursor _before_ showing, and no stale on-screen frame flashes at the old position. (Parking is **not** used during capture — the bar is excluded from the shot instead; see [The capture flow](#the-capture-flow).)
+While hidden, the window is **moved off-screen to `PARK` (-10000,-10000)** rather than only `hide()`n so the next reveal can move it to the cursor _before_ showing, and no stale on-screen frame flashes at the old position. (Parking is **not** used during capture — the bar is excluded from the shot instead; see [The capture flow](#the-capture-flow).) Hiding **keeps the draft** (title / notes / screenshots) — it survives dismissal and returns on the next reveal; only submitting or an explicit clear empties it.
 
-### The reveal-grace window
+### Anchoring on screen
 
-Showing the bar over a full-screen Space causes a transient `Focused(false)` blur. `just_revealed()` / `REVEAL_GRACE` (500ms) ignore blurs that arrive right after a reveal, so the bar isn't auto-dismissed one frame after appearing. A real click-away (later than the grace) still dismisses it.
+`cursor_anchor` places the bar just down-and-right of the cursor. If that would push the frame past the **right or bottom edge** of the monitor the cursor is on, it **flips to the opposite side** of the cursor; a final clamp to that monitor's **work area** (menu bar / dock excluded) keeps the whole frame on screen even near a corner or on a small display. The monitor is resolved from the cursor position (`monitor_from_point`), so multi-display setups anchor to the right screen.
+
+### No dismiss-on-blur; visible across every Space
+
+The bar is **not** auto-dismissed when it loses focus. It stays up until it's explicitly closed — Escape, ⌘Return again, submitting a capture, or opening the main window. Combined with `CanJoinAllSpaces` (already set for the full-screen float), that means **switching desktops leaves the bar in place on the new Space** rather than flashing it shut. This deliberately replaced the old dismiss-on-blur: no event (`Focused(false)`, a `blur`, or a Space-change notification) fires until *after* the compositor has already drawn the sticky window on the new Space, so any reactive hide left a one-frame blink — the only way to avoid it is to not hide at all. (Because there's no blur-dismiss, the former `REVEAL_GRACE` / `just_revealed()` transient-blur guard is gone too.)
 
 ### The capture flow
 
@@ -104,15 +108,13 @@ this process.
 ## Window events
 
 - `CloseRequested` → `prevent_close()` + dismiss (never destroy — the agent must stay alive).
-- `Focused(false)` → dismiss, unless `just_revealed()`.
+- `Focused(false)` is **not** handled — the bar is never dismissed on blur (see [No dismiss-on-blur; visible across every Space](#no-dismiss-on-blur-visible-across-every-space)).
 
 ## Events (Rust → webview)
 
 The frontend `listen`s for these (emitted from `lib.rs`):
 
 - `mini-shown` — bar was revealed; refocus the title field, refresh the target.
-- `mini-reset` — bar was dismissed/submitted (fired from `dismiss` + the hide
-  branch of `toggle_mini`); clear the draft (title, notes, screenshots, spinner).
 - `screenshot-pending` — a capture just started (button or ⌘⇧Return); the button
   shows a spinner.
 - `screenshot-captured` (payload: PNG path) — the capture landed; attach it and
@@ -129,19 +131,41 @@ The frontend `listen`s for these (emitted from `lib.rs`):
   via `data-tauri-drag-region` on the card and its chrome rows.
 - The bar has a title field (autofocused), a **collapsed** notes editor below it,
   and a footer with the **target** (project / list — click to open main) on the
-  left and the **screenshot ghost button** on the right.
+  left and, on the right, the **Clear** ghost button (shown only when the draft
+  has content) followed by the **screenshot ghost button**.
+- **Pointer hidden on open and while typing.** The bar appears right under the
+  mouse, so the pointer sits on the title field and hides what you type. The
+  `mini-shown` reveal and every `keydown` add `cursor-hidden` to `<html>` (→
+  `cursor: none` on everything); a `mousemove` removes it. So the pointer is
+  hidden **when the bar opens and mid-keystroke**, and returns the instant the
+  mouse actually moves — never hidden while you're reaching for a control. A
+  ~250 ms grace after each reveal ignores the settling mouse events macOS emits
+  as the panel appears under a stationary pointer, so "hidden until the mouse
+  moves" holds. The class is toggled imperatively (no React re-render), and
+  `mousemove` only ever *shows*, which keeps it snappy (an earlier static
+  `cursor: none` on the field lagged because WebKit only re-evaluates a hovered
+  cursor on mouse-move). Done in CSS, not `NSCursor` — the tray is a
+  non-activating accessory, where native cursor hiding has no effect.
 - **Notes are hidden until Tab.** The card sizes to its content and the window
   stays a fixed 480×180, so the collapsed card simply leaves the lower part of the
   (transparent) window empty. Tab from the title sets `notesOpen`, which animates
   the panel's `grid-template-rows` from `0fr` to `1fr` (expands to the editor's
   natural height without measuring it) and then focuses the editor. While
   collapsed the panel is `inert`, so nothing inside it is tabbable. It re-collapses
-  only on `mini-reset` — content typed into it survives until the draft is
-  dismissed or submitted. The footer buttons are `tabIndex={-1}`, so Tab only ever
-  goes title → notes.
+  when the draft is emptied (submit or clear) **and** whenever focus leaves the
+  editor while it's empty (its `onBlur` → `isEmpty()` check — docked-toolbar
+  clicks `preventDefault` their blur, so they don't trip it); non-empty notes
+  stay open and survive dismissing the bar. The footer buttons are `tabIndex={-1}`,
+  so Tab only ever goes title → notes.
 - Screenshots live in a React array; the footer button is state-driven off the
   `screenshot-*` events: **spinner** ("Capturing …") while a shot is in flight,
   the shot **count** once attached, or a brief **"Capture failed"** on error. It
-  adds one capture per trigger. Dismissing (Escape/click-away) clears everything
-  via `mini-reset`.
+  adds one capture per trigger.
+- **The draft persists across dismissal.** Escape / click-away only hide the bar
+  (Rust no longer emits a reset event). The form is emptied by `clearDraft()` in
+  two cases: after a successful **submit**, and on an **explicit clear** — the
+  **Clear** footer button or **⌘⇧⌫** (Cmd-Shift-Delete). The clear hotkey is a
+  capture-phase `keydown` listener on `window`, so it fires ahead of both the
+  title field and the notes editor (which stops React key propagation) and works
+  with either focused.
 - The IPC surface is centralized in `src/api.ts`; add new commands there.
