@@ -21,7 +21,6 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Shared library (../common-ui/src) imported as @taskscape/common-ui/* */
-    "baseUrl": ".",
     "paths": {
       "@taskscape/common-ui/*": ["../common-ui/src/*"]
     }

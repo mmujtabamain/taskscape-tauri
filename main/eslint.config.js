@@ -17,6 +17,9 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
+      // Editors lint main/ and tray/ in one process, so tseslint sees two
+      // candidate roots and refuses to guess. Pin this app's.
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
     },
   },
 ]);
