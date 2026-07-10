@@ -10,7 +10,7 @@ The always-on agent. No dock icon; its only window is a small, frameless, **opaq
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `src-tauri/src/lib.rs`                | **All the interesting logic.** Hotkey, window mechanics, Tauri commands, tray menu, HTTP server wiring.                   |
 | `src-tauri/src/main.rs`               | One-line entry point → `taskscape_tray_lib::run()`.                                                                       |
-| `src-tauri/tauri.conf.json`           | Window config (480×130, frameless, `transparent: true`, always-on-top, hidden at start). `macOSPrivateApi: true` is required for the transparent backing, which now only lets the opaque card's rounded corners render — there is no vibrancy. |
+| `src-tauri/tauri.conf.json`           | Window config (480×180 — sized for the notes panel expanded, frameless, `transparent: true`, always-on-top, hidden at start). `macOSPrivateApi: true` is required for the transparent backing, which now only lets the opaque card's rounded corners render — there is no vibrancy. |
 | `src-tauri/capabilities/default.json` | Permissions for the `main` window.                                                                                        |
 | `src/App.tsx`                         | The mini bar UI (React). Title + notes fields, and a footer with the target (project / list, opens main) on the left and the screenshot **ghost button** (spinner while capturing, shot count, ⌘⇧⏎ hint) on the right. |
 | `src/api.ts`                          | Thin typed wrappers over `invoke(...)` for each Tauri command.                                                            |
@@ -127,10 +127,18 @@ The frontend `listen`s for these (emitted from `lib.rs`):
   bar is a single opaque card (`bg-surface-2`) with hairline dividers between the
   title row, notes row, and footer — reminiscent of the main window. Draggable
   via `data-tauri-drag-region` on the card and its chrome rows.
-- The bar has a title field (autofocused), a notes field below it (the footer
-  buttons are `tabIndex={-1}` so Tab goes title → notes), and a footer with the
-  **target** (project / list — click to open main) on the left and the
-  **screenshot ghost button** on the right.
+- The bar has a title field (autofocused), a **collapsed** notes editor below it,
+  and a footer with the **target** (project / list — click to open main) on the
+  left and the **screenshot ghost button** on the right.
+- **Notes are hidden until Tab.** The card sizes to its content and the window
+  stays a fixed 480×180, so the collapsed card simply leaves the lower part of the
+  (transparent) window empty. Tab from the title sets `notesOpen`, which animates
+  the panel's `grid-template-rows` from `0fr` to `1fr` (expands to the editor's
+  natural height without measuring it) and then focuses the editor. While
+  collapsed the panel is `inert`, so nothing inside it is tabbable. It re-collapses
+  only on `mini-reset` — content typed into it survives until the draft is
+  dismissed or submitted. The footer buttons are `tabIndex={-1}`, so Tab only ever
+  goes title → notes.
 - Screenshots live in a React array; the footer button is state-driven off the
   `screenshot-*` events: **spinner** ("Capturing …") while a shot is in flight,
   the shot **count** once attached, or a brief **"Capture failed"** on error. It

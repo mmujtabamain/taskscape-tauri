@@ -1,22 +1,26 @@
-import { useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { Icon } from "@taskscape/common-ui/Icon";
-import { RichTextEditor, type RichTextHandle } from "@taskscape/common-ui/RichTextEditor";
-import { Spinner } from "@taskscape/common-ui/Spinner";
-import { api, type CaptureTarget } from "./api";
+import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  RichTextEditor,
+  type RichTextHandle,
+} from '@taskscape/common-ui/RichTextEditor';
+import { Spinner } from '@taskscape/common-ui/Spinner';
+import { listen } from '@tauri-apps/api/event';
+import { useEffect, useRef, useState } from 'react';
+import { api, type CaptureTarget } from './api';
 
 const inputClasses =
-  "min-w-0 bg-transparent text-sm outline-none " +
-  "text-content-1l placeholder:text-content-3l " +
-  "dark:text-content-1d dark:placeholder:text-content-3d";
+  'min-w-0 bg-transparent text-sm outline-none ' +
+  'text-content-1l placeholder:text-content-3l ' +
+  'dark:text-content-1d dark:placeholder:text-content-3d';
 
 const ghostButtonBase =
-  "flex shrink-0 items-center gap-1.5 rounded-control px-2 py-1 text-xs transition " +
-  "hover:bg-surface-1l dark:hover:bg-surface-1d " +
-  "disabled:cursor-default disabled:hover:bg-transparent";
+  'flex shrink-0 items-center gap-1.5 rounded-control px-2 py-1 text-xs transition ' +
+  'hover:bg-surface-1l dark:hover:bg-surface-1d ' +
+  'disabled:cursor-default disabled:hover:bg-transparent';
 
 function App() {
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState('');
+  const [notesOpen, setNotesOpen] = useState(false);
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const [pending, setPending] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +29,10 @@ function App() {
   const editorRef = useRef<RichTextHandle>(null);
 
   const refreshTarget = () => {
-    api.captureTarget().then(setTarget).catch(() => {});
+    api
+      .captureTarget()
+      .then(setTarget)
+      .catch(() => {});
   };
   const focusTitle = () =>
     requestAnimationFrame(() => titleRef.current?.focus());
@@ -34,33 +41,34 @@ function App() {
     refreshTarget();
     const subs = [
       // Summoned: refocus the title field and refresh the target name.
-      listen("mini-shown", () => {
+      listen('mini-shown', () => {
         refreshTarget();
         focusTitle();
       }),
       // Dismissed/submitted: the draft is gone, so reset the form.
-      listen("mini-reset", () => {
-        setTitle("");
+      listen('mini-reset', () => {
+        setTitle('');
+        setNotesOpen(false);
         editorRef.current?.clear();
         setScreenshots([]);
         setPending(0);
         setError(null);
       }),
       // A capture is in flight (button or ⌘⇧Return) — show the spinner.
-      listen("screenshot-pending", () => {
+      listen('screenshot-pending', () => {
         setError(null);
         setPending((n) => n + 1);
       }),
       // Capture landed — attach it and drop the spinner.
-      listen<string>("screenshot-captured", (e) => {
+      listen<string>('screenshot-captured', (e) => {
         setPending((n) => Math.max(0, n - 1));
         setScreenshots((prev) => [...prev, e.payload]);
         focusTitle();
       }),
       // Capture failed (e.g. Screen Recording permission) — surface it briefly.
-      listen<string>("screenshot-error", (e) => {
+      listen<string>('screenshot-error', (e) => {
         setPending((n) => Math.max(0, n - 1));
-        setError(e.payload || "Screenshot failed");
+        setError(e.payload || 'Screenshot failed');
         focusTitle();
       }),
     ];
@@ -87,7 +95,7 @@ function App() {
       notes: notesHtml,
       screenshotPaths: screenshots,
     });
-    setTitle("");
+    setTitle('');
     editorRef.current?.clear();
     setScreenshots([]);
   };
@@ -98,13 +106,18 @@ function App() {
     api.captureAndAttach().catch(() => {});
   };
 
+  // The editor stops its own keydowns from bubbling here, so this only ever sees
+  // the title field (and the footer, which isn't tabbable).
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       save();
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       e.preventDefault();
       api.hideMini();
+    } else if (e.key === 'Tab' && !e.shiftKey && !notesOpen) {
+      e.preventDefault();
+      setNotesOpen(true);
     }
   };
 
@@ -112,15 +125,17 @@ function App() {
   const capturing = pending > 0;
 
   const shotTextColor = error
-    ? "text-red-500 dark:text-red-400"
+    ? 'text-red-500 dark:text-red-400'
     : count && !capturing
-      ? "text-accent-500 dark:text-accent-400"
-      : "text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d";
+      ? 'text-accent-500 dark:text-accent-400'
+      : 'text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d';
 
   return (
+    // The window is taller than the collapsed card; the card sizes to its own
+    // content and the rest of the (transparent) window shows through.
     <div
       data-tauri-drag-region
-      className="flex h-screen w-screen flex-col overflow-hidden rounded-panel border border-edge-2l bg-surface-2l text-content-1l dark:border-edge-2d dark:bg-surface-2d dark:text-content-1d"
+      className="rounded-panel border-edge-2l bg-surface-2l text-content-1l dark:border-edge-2d dark:bg-surface-2d dark:text-content-1d flex w-screen flex-col overflow-hidden border"
       onKeyDown={onKeyDown}
     >
       {/* Title row — just the task title now; the screenshot control lives in
@@ -136,21 +151,35 @@ function App() {
         />
       </div>
 
-      <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
+      <div className="bg-edge-2l dark:bg-edge-2d h-px shrink-0" />
 
-      <RichTextEditor
-        ref={editorRef}
-        attachments={[]}
-        placeholder="Notes ..."
-        minHeightClass="min-h-16"
-        floatingToolbar={false}
-        wrapperClassName=""
-        toolbarClassName="border-edge-1l dark:border-edge-1d gap-1 border-t px-2 py-1.5"
-        onSubmit={save}
-        onEscape={() => api.hideMini()}
-      />
-
-      <div className="h-px shrink-0 bg-edge-2l dark:bg-edge-2d" />
+      {notesOpen ? (
+        <div className="min-h-0 overflow-hidden">
+          <RichTextEditor
+            ref={editorRef}
+            autoFocus
+            attachments={[]}
+            placeholder="Notes ..."
+            minHeightClass="min-h-16"
+            floatingToolbar={false}
+            wrapperClassName=""
+            toolbarClassName="border-edge-1l dark:border-edge-1d gap-1 border-t px-2 py-1.5"
+            onSubmit={save}
+            onEscape={() => api.hideMini()}
+          />
+          <div className="bg-edge-2l dark:bg-edge-2d h-px" />
+        </div>
+      ) : (
+        <div className="min-h-0 overflow-hidden">
+          <button
+            onClick={() => setNotesOpen(true)}
+            className="text-content-3l dark:text-content-3d px-3 py-2 text-xs"
+          >
+            Press Tab to add a note
+          </button>
+          <div className="bg-edge-2l dark:bg-edge-2d h-px" />
+        </div>
+      )}
 
       {/* Footer — target (project / list, opens main) + the screenshot button. */}
       <div
@@ -160,7 +189,7 @@ function App() {
         <button
           onClick={() => api.openMain()}
           tabIndex={-1}
-          className="flex min-w-0 items-center gap-2 text-xs text-content-2l transition hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d"
+          className="text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d flex min-w-0 items-center gap-1.5 text-xs transition-colors"
           title="Open the main Taskscape window"
         >
           <Icon name="open_in_new" size={14} />
@@ -168,7 +197,7 @@ function App() {
             {target ? (
               <>
                 {target.project && (
-                  <span className="text-content-3l dark:text-content-3d">
+                  <span className="">
                     {target.project}
                     <span className="px-1 opacity-60">/</span>
                   </span>
@@ -176,7 +205,7 @@ function App() {
                 {target.list}
               </>
             ) : (
-              "Taskscape"
+              'Taskscape'
             )}
           </span>
         </button>
@@ -188,12 +217,12 @@ function App() {
           className={`${ghostButtonBase} ${shotTextColor}`}
           title={
             capturing
-              ? "Capturing screenshot …"
+              ? 'Capturing screenshot …'
               : error
                 ? error
                 : count
-                  ? `${count} screenshot${count > 1 ? "s" : ""} attached — add another (⌘⇧⏎)`
-                  : "Attach a full-screen screenshot (⌘⇧⏎)"
+                  ? `${count} screenshot${count > 1 ? 's' : ''} attached — add another (⌘⇧⏎)`
+                  : 'Attach a full-screen screenshot (⌘⇧⏎)'
           }
         >
           {capturing ? (
@@ -209,8 +238,10 @@ function App() {
           ) : (
             <>
               <Icon name="screenshot_monitor" size={15} filled={count > 0} />
-              <span>{count ? `${count} shot${count > 1 ? "s" : ""}` : "Screenshot"}</span>
-              <kbd className="font-sans text-[11px] not-italic text-content-3l dark:text-content-3d">
+              <span>
+                {count ? `${count} shot${count > 1 ? 's' : ''}` : 'Screenshot'}
+              </span>
+              <kbd className="text-content-3l dark:text-content-3d font-sans text-[11px] not-italic">
                 ⌘⇧⏎
               </kbd>
             </>
