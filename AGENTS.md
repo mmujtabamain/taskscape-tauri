@@ -6,10 +6,10 @@ Orientation for coding agents. This mirrors [`CLAUDE.md`](CLAUDE.md); the two ar
 
 **Taskscape** — a macOS task manager built as **two independent Tauri v2 apps** sharing **one Rust crate** and **one SQLite database**:
 
-- **`apps/main/`** (package `taskscape-main`) — the full task-manager window.
-- **`apps/tray/`** (package `taskscape-tray`) — an always-on menu-bar agent; its only UI is a frameless "mini" capture bar summoned with **⌘Return**. (Its Tauri window label is `"main"` — that's the mini bar, _not_ the main app.)
+- **`main/`** (package `taskscape-main`) — the full task-manager window.
+- **`tray/`** (package `taskscape-tray`) — an always-on menu-bar agent; its only UI is a frameless "mini" capture bar summoned with **⌘Return**. (Its Tauri window label is `"main"` — that's the mini bar, _not_ the main app.)
 - **`common/`** — shared Rust library (`taskscape_common`): SQLite storage, screenshots, attachments, and the localhost HTTP IPC (main :7420, tray :7421).
-- **`packages/common-ui/`** (package `@taskscape/common-ui`) — shared React/TS frontend library, imported by both apps as `@taskscape/common-ui/*`. The repo is an npm workspace (`apps/*` + `packages/*`).
+- **`common-ui/`** (package `@taskscape/common-ui`) — shared React/TS frontend library, imported by both apps as `@taskscape/common-ui/*`. The repo is a flat npm workspace (`main` + `tray` + `common-ui`); dev/packaging scripts live in `scripts/`.
 
 Two separate processes; they coordinate via the shared SQLite DB in`~/.taskscape/` and localhost HTTP.
 
@@ -26,9 +26,11 @@ Two separate processes; they coordinate via the shared SQLite DB in`~/.taskscape
 
 ## Commands
 
+Both run from the repo root:
+
 ```bash
-./run-dev.sh     # run BOTH apps in dev (Ctrl-C stops both)
-./make-app.sh    # build + package → dist/Taskscape.dmg
+npm run dev      # run BOTH apps in dev (Ctrl-C stops both) → scripts/run-dev.sh
+npm run build    # build + package → dist/Taskscape.dmg     → scripts/make-app.sh
 ```
 
 ## Ground rules

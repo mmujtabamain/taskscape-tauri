@@ -34,7 +34,7 @@ Main mounts the shared `data_router` on **:7420** and `.merge()`s these extra ap
 
 ## `launch_embedded_tray()`
 
-On macOS startup the main app `open`s the tray bundle nested at `Contents/Library/LoginItems/taskscape-tray.app` (packaged builds only; a no-op in dev, where `run-dev.sh` starts the tray itself). Uses `open` without `-n`, so a running tray is reused rather than duplicated.
+On macOS startup the main app `open`s the tray bundle nested at `Contents/Library/LoginItems/taskscape-tray.app` (packaged builds only; a no-op in dev, where `scripts/run-dev.sh` starts the tray itself). Uses `open` without `-n`, so a running tray is reused rather than duplicated.
 
 ## Frontend
 

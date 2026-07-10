@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "common-ui",
+    "main",
+    "tray"
   ],
   "scripts": {
-    "dev": "./run-dev.sh",
-    "build": "./make-app.sh",
+    "dev": "scripts/run-dev.sh",
+    "build": "scripts/make-app.sh",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   }

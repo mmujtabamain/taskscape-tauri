@@ -3,24 +3,23 @@
 ## Two apps, one crate, one database
 
 ```
-taskscape-tauri/                # npm workspace (apps/* + packages/*)
-├── common/            # shared Rust library (taskscape_common)
-├── packages/
-│   └── common-ui/     # shared React/TS UI lib (@taskscape/common-ui)
-├── apps/
-│   ├── main/          # full task-manager window  (Tauri app, pkg taskscape-main)
-│   └── tray/          # menu-bar agent + mini bar  (Tauri app, pkg taskscape-tray)
-├── run-dev.sh         # run both apps in dev
-└── make-app.sh        # build + package into one .dmg
+taskscape-tauri/         # npm workspace (main + tray + common-ui)
+├── common/       # shared Rust library (taskscape_common)
+├── common-ui/    # shared React/TS UI lib (@taskscape/common-ui)
+├── main/         # full task-manager window  (Tauri app, pkg taskscape-main)
+├── tray/         # menu-bar agent + mini bar  (Tauri app, pkg taskscape-tray)
+└── scripts/
+    ├── run-dev.sh    # run both apps in dev   (npm run dev)
+    └── make-app.sh   # build + package .dmg   (npm run build)
 ```
 
-Both apps — `apps/main` and `apps/tray` (packages `taskscape-main` / `taskscape-tray`) — are **standalone Tauri v2 apps** with their own `src-tauri/` (Rust) and `src/` (React + TypeScript + Vite). They both depend on the local `common` Rust crate and the shared `@taskscape/common-ui` frontend package.
+Both apps — `main` and `tray` (packages `taskscape-main` / `taskscape-tray`) — are **standalone Tauri v2 apps** with their own `src-tauri/` (Rust) and `src/` (React + TypeScript + Vite). They both depend on the local `common` Rust crate and the shared `@taskscape/common-ui` frontend package.
 
 ## Why two processes?
 
 The menu-bar capture bar must be _always available and instant_ — it runs as a lightweight macOS **Accessory** agent (no dock icon) so it can pop up over any app, including other apps' native full-screen Spaces. The full task browser is a heavier normal window. Splitting them keeps the always-on agent tiny and lets the big window be launched/closed independently.
 
-In the shipped app the user still installs **one** thing: `make-app.sh` nests the tray app _inside_ the main app bundle at `Taskscape.app/Contents/Library/LoginItems/taskscape-tray.app`, and the main app launches it on startup. See [build-and-run.md](build-and-run.md).
+In the shipped app the user still installs **one** thing: `scripts/make-app.sh` nests the tray app _inside_ the main app bundle at `Taskscape.app/Contents/Library/LoginItems/taskscape-tray.app`, and the main app launches it on startup. See [build-and-run.md](build-and-run.md).
 
 ## How the two processes coordinate
 

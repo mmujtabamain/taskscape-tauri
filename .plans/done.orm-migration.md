@@ -62,8 +62,8 @@ SeaORM is async; today's `Store` is sync (`Mutex<Connection>`, `pub fn`). Go asy
 end-to-end — the only correct choice for the axum path:
 
 - axum handlers in [`server.rs`](../common/src/server.rs) are already `async` → just `.await` the store.
-- ~30 Tauri commands across [`taskscape-main/src-tauri/src/lib.rs`](../taskscape-main/src-tauri/src/lib.rs)
-  and [`taskscape-tray/src-tauri/src/lib.rs`](../taskscape-tray/src-tauri/src/lib.rs) become `async fn` + `.await`.
+- ~30 Tauri commands across [`main/src-tauri/src/lib.rs`](../main/src-tauri/src/lib.rs)
+  and [`tray/src-tauri/src/lib.rs`](../tray/src-tauri/src/lib.rs) become `async fn` + `.await`.
 - `Store::open()` → `async`; call via `tauri::async_runtime::block_on(...)` at startup.
 - `.manage(Arc<Store>)` / `State<'_, Arc<Store>>` stay — `DatabaseConnection` is `Send + Sync + Clone`.
 

@@ -3,7 +3,7 @@
 ## Dev
 
 ```bash
-./run-dev.sh
+npm run dev        # from the repo root → scripts/run-dev.sh
 ```
 
 Runs **both** apps together and tears both down on Ctrl-C. The script does one hoisted npm-workspace install at the repo root if `node_modules` is missing, then runs each app's `npm run tauri dev`:
@@ -13,7 +13,7 @@ Runs **both** apps together and tears both down on Ctrl-C. The script does one h
 
 In dev the two apps are launched by the script, so the main app's `launch_embedded_tray()` is a no-op (the nested bundle only exists in packaged builds).
 
-To run just one app: `cd apps/tray && npm run tauri dev` (or `npm run dev -w taskscape-tray`).
+To run just one app: `cd tray && npm run tauri dev` (or `npm run dev -w taskscape-tray`).
 
 ## Ports (fixed)
 
@@ -58,12 +58,12 @@ migrations at startup, tracked in a `schema_migrations` table.
 
 **Data policy:** the `0001` baseline started from an empty DB (dev data was
 disposable). From `0002` onward, migrations run against real user DBs and must be
-forward-only and non-destructive. See [`.plans/orm-migration.md`](../.plans/orm-migration.md).
+forward-only and non-destructive. See [`.plans/done.orm-migration.md`](../.plans/done.orm-migration.md).
 
 ## Package into one `.dmg`
 
 ```bash
-./make-app.sh   # → dist/Taskscape.dmg
+npm run build      # from the repo root → scripts/make-app.sh → dist/Taskscape.dmg
 ```
 
 What it does:
