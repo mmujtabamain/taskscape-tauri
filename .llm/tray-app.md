@@ -36,9 +36,14 @@ While hidden, the window is **moved off-screen to `PARK` (-10000,-10000)** rathe
 
 `cursor_anchor` places the bar just down-and-right of the cursor. If that would push the frame past the **right or bottom edge** of the monitor the cursor is on, it **flips to the opposite side** of the cursor; a final clamp to that monitor's **work area** (menu bar / dock excluded) keeps the whole frame on screen even near a corner or on a small display. The monitor is resolved from the cursor position (`monitor_from_point`), so multi-display setups anchor to the right screen.
 
-### No dismiss-on-blur; visible across every Space
+### Dismiss on click-away, but not on a Space switch
 
-The bar is **not** auto-dismissed when it loses focus. It stays up until it's explicitly closed — Escape, ⌘Return again, submitting a capture, or opening the main window. Combined with `CanJoinAllSpaces` (already set for the full-screen float), that means **switching desktops leaves the bar in place on the new Space** rather than flashing it shut. This deliberately replaced the old dismiss-on-blur: no event (`Focused(false)`, a `blur`, or a Space-change notification) fires until *after* the compositor has already drawn the sticky window on the new Space, so any reactive hide left a one-frame blink — the only way to avoid it is to not hide at all. (Because there's no blur-dismiss, the former `REVEAL_GRACE` / `just_revealed()` transient-blur guard is gone too.)
+A real **click-away** dismisses the bar (`Focused(false)` → `dismiss`). Two blurs must _not_ dismiss it:
+
+- the **transient blur** while it settles onto a Space right after opening — guarded by `just_revealed()` / `REVEAL_GRACE` (500 ms of the reveal);
+- a **desktop (Space) switch**, which blurs the panel too but should carry the bar to the new Space (it joins all Spaces via `CanJoinAllSpaces`). Just hiding on that blur brought back the one-frame flash — no `Focused(false)` / Space-change event fires until _after_ the compositor has drawn the sticky window on the new Space — so instead the bar **stays**.
+
+Telling a switch apart from a click-away needs a signal AppKit only gives natively: `observe_space_changes()` registers a leaked `NSObject` observer (`TaskscapeSpaceObserver`, mirroring `panel_class`) on `NSWorkspaceActiveSpaceDidChangeNotification`. Its `spaceChanged:` stamps `last_space_change` and **re-pins + refocuses** a visible bar onto the new Space (so it stays key/typable there). The blur handler then **defers ~160 ms** (the Space-change notification can land a hair after the blur) and skips the dismiss if `during_space_switch()` is true _or_ the bar has regained focus. The reachable `app_handle()` `OnceLock` lets the C callback find the window.
 
 ### The capture flow
 
@@ -108,7 +113,7 @@ this process.
 ## Window events
 
 - `CloseRequested` → `prevent_close()` + dismiss (never destroy — the agent must stay alive).
-- `Focused(false)` is **not** handled — the bar is never dismissed on blur (see [No dismiss-on-blur; visible across every Space](#no-dismiss-on-blur-visible-across-every-space)).
+- `Focused(false)` → dismiss (deferred ~160 ms), unless `just_revealed()`, `during_space_switch()`, or the bar has regained focus (see [Dismiss on click-away, but not on a Space switch](#dismiss-on-click-away-but-not-on-a-space-switch)).
 
 ## Events (Rust → webview)
 

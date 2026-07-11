@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -258,6 +258,103 @@ fn panel_class() -> *const objc2::runtime::AnyClass {
     }) as *const AnyClass
 }
 
+/// A process-global handle to the app, set once at setup so the AppKit
+/// notification callback below (a plain C function) can reach the mini window.
+fn app_handle() -> &'static OnceLock<AppHandle> {
+    static APP: OnceLock<AppHandle> = OnceLock::new();
+    &APP
+}
+
+/// When the mini window was last revealed. A blur (`Focused(false)`) that arrives
+/// within [`REVEAL_GRACE`] of a reveal is a transient side effect of showing over
+/// a full-screen app's Space, not the user clicking away, so we ignore it.
+fn last_shown() -> &'static Mutex<Option<Instant>> {
+    static LAST_SHOWN: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
+    LAST_SHOWN.get_or_init(|| Mutex::new(None))
+}
+
+const REVEAL_GRACE: Duration = Duration::from_millis(500);
+
+/// Whether the window was revealed within the last [`REVEAL_GRACE`].
+fn just_revealed() -> bool {
+    last_shown()
+        .lock()
+        .ok()
+        .and_then(|guard| *guard)
+        .is_some_and(|t| t.elapsed() < REVEAL_GRACE)
+}
+
+/// macOS: `spaceChanged:` — fired by [`observe_space_changes`] on every active-
+/// Space change. Re-pins a still-visible bar (one summoned within the reveal
+/// grace, just before the switch) onto the new Space so it stays key and typable.
+#[cfg(target_os = "macos")]
+extern "C" fn space_changed(
+    _this: &objc2::runtime::AnyObject,
+    _cmd: objc2::runtime::Sel,
+    _note: *mut objc2::runtime::AnyObject,
+) {
+    if let Some(window) = app_handle()
+        .get()
+        .and_then(|app| app.get_webview_window("main"))
+    {
+        if window.is_visible().unwrap_or(false) {
+            allow_over_fullscreen(&window);
+            order_front_regardless(&window);
+            let _ = window.set_focus();
+        }
+    }
+}
+
+/// macOS: the lazily-registered `NSObject` subclass carrying [`space_changed`] as
+/// its `spaceChanged:` method (mirrors [`panel_class`]).
+#[cfg(target_os = "macos")]
+fn space_observer_class() -> *const objc2::runtime::AnyClass {
+    use objc2::runtime::{AnyClass, ClassBuilder};
+
+    static CLASS: OnceLock<usize> = OnceLock::new();
+    *CLASS.get_or_init(|| {
+        let superclass = objc2::class!(NSObject);
+        let mut builder = ClassBuilder::new(c"TaskscapeSpaceObserver", superclass)
+            .expect("failed to register TaskscapeSpaceObserver");
+        unsafe {
+            builder.add_method(
+                objc2::sel!(spaceChanged:),
+                space_changed as extern "C" fn(_, _, _),
+            );
+        }
+        builder.register() as *const AnyClass as usize
+    }) as *const AnyClass
+}
+
+/// macOS: subscribe to `NSWorkspaceActiveSpaceDidChangeNotification` so a desktop
+/// switch can be told apart from a real click-away. The observer object is
+/// intentionally leaked — the notification center holds it unretained, so it must
+/// outlive every notification, i.e. the whole process.
+#[cfg(target_os = "macos")]
+fn observe_space_changes() {
+    use objc2::runtime::{AnyClass, AnyObject};
+    use objc2::{class, msg_send, sel};
+
+    unsafe {
+        let cls: &AnyClass = &*space_observer_class();
+        let observer: *mut AnyObject = msg_send![cls, new];
+
+        let workspace: *mut AnyObject = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let center: *mut AnyObject = msg_send![workspace, notificationCenter];
+        let name: *mut AnyObject = msg_send![
+            class!(NSString),
+            stringWithUTF8String: c"NSWorkspaceActiveSpaceDidChangeNotification".as_ptr()
+        ];
+        let _: () = msg_send![
+            center,
+            addObserver: observer,
+            selector: sel!(spaceChanged:),
+            name: name,
+            object: std::ptr::null_mut::<AnyObject>(),
+        ];
+    }
+}
+
 /// Hide the window and park it off-screen. The draft it holds is intentionally
 /// left intact so it survives dismissal and is restored on the next reveal —
 /// only submitting a capture or an explicit clear (⌘⇧⌫ / the Clear button)
@@ -326,6 +423,9 @@ fn show_mini(app: &AppHandle, window: &tauri::WebviewWindow) {
     // desktop Space instead of the active full-screen one.
     #[cfg(target_os = "macos")]
     allow_over_fullscreen(window);
+    if let Ok(mut guard) = last_shown().lock() {
+        *guard = Some(Instant::now());
+    }
     let _ = window.show();
     let _ = window.set_focus();
     // ...then pin it onto the current (possibly full-screen) Space.
@@ -534,9 +634,17 @@ pub fn run() {
         )
         .manage(store)
         .setup(move |app| {
+            // Make the app handle reachable from the AppKit notification callback.
+            let _ = app_handle().set(app.handle().clone());
+
             // Run as a menu-bar agent: no dock icon.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            // Learn when the active Space changes so a desktop switch can be told
+            // apart from a real click-away (see the `Focused(false)` handler).
+            #[cfg(target_os = "macos")]
+            observe_space_changes();
 
             // Turn the window into a non-activating NSPanel so it can float over
             // other apps' native-fullscreen Spaces without pulling us out of them.
@@ -599,9 +707,15 @@ pub fn run() {
                 api.prevent_close();
                 dismiss(window);
             }
-            // No dismiss-on-blur: the bar stays visible across every Space until
-            // it's explicitly closed (Escape, ⌘Return, submit, or opening main),
-            // so switching desktops leaves it in place instead of flashing shut.
+            // Click-away dismisses the bar instantly — except the transient blur
+            // while a fresh reveal settles onto a Space (`just_revealed`), which
+            // isn't a click-away.
+            WindowEvent::Focused(false) => {
+                if just_revealed() {
+                    return;
+                }
+                dismiss(window);
+            }
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![

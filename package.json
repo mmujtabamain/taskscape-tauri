@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "scripts/run-dev.sh",
     "build": "scripts/make-app.sh",
+    "clean": "scripts/clean.sh",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   }
