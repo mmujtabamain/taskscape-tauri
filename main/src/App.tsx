@@ -1,7 +1,7 @@
-import { listen } from '@tauri-apps/api/event';
-import { open, save } from '@tauri-apps/plugin-dialog';
 import { formatAccel, matchesEvent } from '@taskscape/common-ui/hotkeys';
 import { Spinner } from '@taskscape/common-ui/Spinner';
+import { listen } from '@tauri-apps/api/event';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type List, type Project, type Task, type TaskPatch } from './api';
 import { ContextMenuProvider } from './components/ContextMenu';
@@ -166,9 +166,6 @@ function App() {
     if (selectedProjectId)
       api.setActiveProject(selectedProjectId).catch(() => {});
   }, [selectedProjectId]);
-  useEffect(() => {
-    if (activeListId) api.setActiveList(activeListId).catch(() => {});
-  }, [activeListId]);
 
   useEffect(() => {
     if (splitListId) localStorage.setItem('ui.split', splitListId);
@@ -281,6 +278,10 @@ function App() {
     (paneFocus === activeListId || paneFocus === splitListId)
       ? paneFocus
       : activeListId;
+
+  useEffect(() => {
+    if (focusedListId) api.setActiveList(focusedListId).catch(() => {});
+  }, [focusedListId]);
 
   // ----- mutations -----
   const createProject = async () => {
@@ -819,7 +820,9 @@ function App() {
                   onRootDrop={dropOnRoot}
                   registerComposer={registerComposer}
                   onFocusPane={setPaneFocus}
-                  captureHint={formatAccel(hotkeyMap['toggle_capture_bar'] ?? '')}
+                  captureHint={formatAccel(
+                    hotkeyMap['toggle_capture_bar'] ?? ''
+                  )}
                 />
               </div>
               {splitList && (
@@ -846,7 +849,9 @@ function App() {
                       onRootDrop={dropOnRoot}
                       registerComposer={registerComposer}
                       onFocusPane={setPaneFocus}
-                      captureHint={formatAccel(hotkeyMap['toggle_capture_bar'] ?? '')}
+                      captureHint={formatAccel(
+                        hotkeyMap['toggle_capture_bar'] ?? ''
+                      )}
                     />
                   </div>
                 </>
