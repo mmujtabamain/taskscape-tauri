@@ -210,6 +210,7 @@ function TaskInspector({
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
   const [addingNote, setAddingNote] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const addNoteRef = useRef<RichTextHandle>(null);
   const addCreated = useRef<Note | null>(null);
   const addTimer = useRef<number | undefined>(undefined);
@@ -368,6 +369,16 @@ function TaskInspector({
     el.style.height = `${el.scrollHeight}px`;
   }, [task.title, titleDraft, editingTitle]);
 
+  const copyTitle = async () => {
+    try {
+      await navigator.clipboard.writeText(task.title);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Clipboard unavailable — nothing to do.
+    }
+  };
+
   const addFile = async () => {
     const picked = await open({
       multiple: false,
@@ -470,12 +481,15 @@ function TaskInspector({
     });
   };
 
+  const headBtn =
+    'rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors';
+
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
       <div className="relative shrink-0 p-4">
         {/* Index tick: the panel "receives" the selection. */}
         <span className="bg-accent-500l dark:bg-accent-500d absolute top-4.75 left-0 h-4 w-0.5" />
-        <div className="group/head flex items-start gap-2.5">
+        <div className="flex items-start gap-2.5">
           <div className="mt-0.5">
             <DoneCheckbox
               done={task.done}
@@ -486,44 +500,33 @@ function TaskInspector({
           <div className="min-w-0 flex-1">
             {/* One field for display and edit: readonly text that wraps, gaining a
                 fill + same-color ring (a padding halo) when editing — never a swap. */}
-            <div className="flex items-start gap-1">
-              <textarea
-                ref={titleRef}
-                rows={1}
-                spellCheck={false}
-                readOnly={!editingTitle}
-                value={editingTitle ? titleDraft : task.title}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onClick={() => {
-                  if (!editingTitle) startTitleEdit();
-                }}
-                onBlur={commitTitle}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    commitTitle();
-                  }
-                  if (e.key === 'Escape') {
-                    setTitleDraft(task.title);
-                    setEditingTitle(false);
-                  }
-                }}
-                className={`font-display text-content-1l dark:text-content-1d rounded-field -ml-1 block min-w-0 flex-1 cursor-text resize-none overflow-hidden border-0 bg-transparent px-1 py-0 text-[18px] leading-6 font-semibold outline-none ${
-                  editingTitle
-                    ? 'bg-surface-0l dark:bg-surface-0d ring-surface-0l dark:ring-surface-0d ring-2'
-                    : ''
-                }`}
-              />
-              {!editingTitle && (
-                <button
-                  onClick={startTitleEdit}
-                  title="Rename"
-                  className="text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded opacity-0 transition-opacity group-hover/head:opacity-100"
-                >
-                  <Icon name="edit" size={15} weight={300} />
-                </button>
-              )}
-            </div>
+            <textarea
+              ref={titleRef}
+              rows={1}
+              spellCheck={false}
+              readOnly={!editingTitle}
+              value={editingTitle ? titleDraft : task.title}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onClick={() => {
+                if (!editingTitle) startTitleEdit();
+              }}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitTitle();
+                }
+                if (e.key === 'Escape') {
+                  setTitleDraft(task.title);
+                  setEditingTitle(false);
+                }
+              }}
+              className={`font-display text-content-1l dark:text-content-1d rounded-field -ml-1 block w-full cursor-text resize-none overflow-hidden border-0 bg-transparent px-1 py-0 text-[18px] leading-6 font-semibold outline-none ${
+                editingTitle
+                  ? 'bg-surface-0l dark:bg-surface-0d ring-surface-0l dark:ring-surface-0d ring-2'
+                  : ''
+              }`}
+            />
             <div className="text-content-3l dark:text-content-3d mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums">
               <span className="flex items-center gap-1.5">
                 <Icon
@@ -567,13 +570,28 @@ function TaskInspector({
               </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            title="Close panel"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d -mt-1 -mr-1 grid h-6 w-6 shrink-0 place-items-center transition-colors"
-          >
-            <Icon name="last_page" size={16} />
-          </button>
+          <div className="-mt-1 -mr-1 flex shrink-0 flex-col items-center gap-0.5">
+            <button onClick={onClose} title="Close panel" className={headBtn}>
+              <Icon name="last_page" size={16} />
+            </button>
+            <button onClick={startTitleEdit} title="Rename" className={headBtn}>
+              <Icon name="edit" size={15} weight={300} />
+            </button>
+            <button
+              onClick={copyTitle}
+              title={copied ? 'Copied' : 'Copy title'}
+              className={headBtn}
+            >
+              <Icon name={copied ? 'check' : 'content_copy'} size={15} />
+            </button>
+            <button
+              onClick={() => onRequestDelete(task)}
+              title="Delete task"
+              className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+            >
+              <Icon name="delete" size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -583,9 +601,19 @@ function TaskInspector({
             label="Notes"
             trailing={
               notes.length > 0 ? (
-                <span className="text-content-3l dark:text-content-3d text-[11px] tabular-nums">
-                  {notes.length}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-content-3l dark:text-content-3d text-[11px] tabular-nums">
+                    {notes.length}
+                  </span>
+                  <button
+                    onClick={() => setAddingNote(true)}
+                    title="Add note"
+                    className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
+                  >
+                    <Icon name="add" size={14} />
+                    Note
+                  </button>
+                </div>
               ) : undefined
             }
           />
@@ -621,7 +649,7 @@ function TaskInspector({
                   if (document.hasFocus()) void finishAddNote();
                 }}
               />
-            ) : (
+            ) : notes.length === 0 ? (
               <button
                 onClick={() => setAddingNote(true)}
                 className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-3l dark:text-content-3d hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d flex h-24 w-full items-center justify-center gap-1.5 border border-dashed font-semibold transition-colors"
@@ -629,7 +657,7 @@ function TaskInspector({
                 <Icon name="add" size={16} />
                 Add note
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -711,7 +739,7 @@ function TaskInspector({
             }
           />
 
-          {task.attachments.length > 0 && (
+          {task.attachments.length > 0 ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2">
               {task.attachments.map((a) => {
                 const thumb = thumbs.get(a.id);
@@ -755,17 +783,27 @@ function TaskInspector({
                 );
               })}
             </div>
+          ) : (
+            <div className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d flex h-20 w-full items-stretch gap-1 border border-dashed p-1">
+              <button
+                onClick={addFile}
+                title="Copy a file into this task"
+                className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold transition-colors"
+              >
+                <Icon name="note_add" size={18} />
+                Copy a file
+              </button>
+              <span className="border-edge-2l dark:border-edge-2d my-2 border-l" />
+              <button
+                onClick={addLink}
+                title="Link a file or URL without copying"
+                className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold transition-colors"
+              >
+                <Icon name="add_link" size={18} />
+                Add a link
+              </button>
+            </div>
           )}
-        </div>
-
-        <div className="border-edge-1l dark:border-edge-1d mt-auto border-t p-4">
-          <button
-            onClick={() => onRequestDelete(task)}
-            className="rounded-field text-danger-500l dark:text-danger-500d hover:bg-danger-100l dark:hover:bg-danger-100d flex h-8 items-center gap-1.5 px-3 text-[13px] font-semibold transition-colors"
-          >
-            <Icon name="delete" size={15} />
-            Delete task
-          </button>
         </div>
       </div>
 
