@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
 
@@ -192,6 +193,7 @@ impl Store {
             sort_order: Set(now as f64),
             created_at: Set(now),
             updated_at: Set(now),
+            deleted_at: Set(None),
         }
         .insert(&txn)
         .await?;
@@ -216,6 +218,7 @@ impl Store {
     pub async fn list_tasks(&self, list_id: &str) -> Result<Vec<Task>> {
         let models = tasks::Entity::find()
             .filter(tasks::Column::ListId.eq(list_id))
+            .filter(tasks::Column::DeletedAt.is_null())
             .order_by_asc(tasks::Column::SortOrder)
             .order_by_asc(tasks::Column::CreatedAt)
             .all(&self.db)
@@ -223,8 +226,11 @@ impl Store {
         self.hydrate(models).await
     }
 
+    /// Every live task across all lists (soft-deleted rows are excluded — only
+    /// [`Store::list_trashed`] surfaces those).
     pub async fn all_tasks(&self) -> Result<Vec<Task>> {
         let models = tasks::Entity::find()
+            .filter(tasks::Column::DeletedAt.is_null())
             .order_by_asc(tasks::Column::SortOrder)
             .order_by_asc(tasks::Column::CreatedAt)
             .all(&self.db)
@@ -270,11 +276,94 @@ impl Store {
         Ok(self.hydrate(vec![model]).await?.pop().unwrap())
     }
 
-    /// Delete a task and, recursively, every subtask beneath it. The subtree is
-    /// removed by the `tasks.parent_id` self-referential `ON DELETE CASCADE`
-    /// foreign key.
+    /// Permanently delete a task and, recursively, every subtask beneath it. The
+    /// subtree is removed by the `tasks.parent_id` self-referential
+    /// `ON DELETE CASCADE` foreign key. This is the hard path (HTTP API, purge);
+    /// the UI deletes softly via [`Store::soft_delete_tasks`].
     pub async fn delete_task(&self, id: &str) -> Result<()> {
         tasks::Entity::delete_by_id(id.to_string())
+            .exec(&self.db)
+            .await?;
+        Ok(())
+    }
+
+    /// Soft-delete tasks: stamp `deleted_at` on each given task *and its whole
+    /// subtree* (the cascade FK only fires on a hard delete, so descendants are
+    /// walked here). Returns every id newly stamped — the exact set an undo /
+    /// restore must clear, so already-trashed rows aren't double-counted.
+    pub async fn soft_delete_tasks(&self, ids: &[String]) -> Result<Vec<String>> {
+        let txn = self.db.begin().await?;
+        let now = now_millis();
+        let mut queue: Vec<String> = ids.to_vec();
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut affected: Vec<String> = Vec::new();
+        while let Some(id) = queue.pop() {
+            if !seen.insert(id.clone()) {
+                continue;
+            }
+            let Some(model) = tasks::Entity::find_by_id(id.clone()).one(&txn).await? else {
+                continue;
+            };
+            for child in tasks::Entity::find()
+                .filter(tasks::Column::ParentId.eq(id.clone()))
+                .all(&txn)
+                .await?
+            {
+                queue.push(child.id);
+            }
+            if model.deleted_at.is_none() {
+                let mut active: tasks::ActiveModel = model.into();
+                active.deleted_at = Set(Some(now));
+                active.updated_at = Set(now);
+                active.update(&txn).await?;
+                affected.push(id);
+            }
+        }
+        txn.commit().await?;
+        Ok(affected)
+    }
+
+    /// Restore soft-deleted tasks (clear `deleted_at`) — the inverse of
+    /// [`Store::soft_delete_tasks`]; pass the exact ids it returned.
+    pub async fn restore_tasks(&self, ids: &[String]) -> Result<()> {
+        let now = now_millis();
+        let txn = self.db.begin().await?;
+        for id in ids {
+            if let Some(model) = tasks::Entity::find_by_id(id.clone()).one(&txn).await? {
+                let mut active: tasks::ActiveModel = model.into();
+                active.deleted_at = Set(None);
+                active.updated_at = Set(now);
+                active.update(&txn).await?;
+            }
+        }
+        txn.commit().await?;
+        Ok(())
+    }
+
+    /// Permanently remove the given tasks (and their subtrees, via cascade).
+    pub async fn purge_tasks(&self, ids: &[String]) -> Result<()> {
+        for id in ids {
+            tasks::Entity::delete_by_id(id.clone())
+                .exec(&self.db)
+                .await?;
+        }
+        Ok(())
+    }
+
+    /// Every soft-deleted task, most-recently-trashed first (the Trash view).
+    pub async fn list_trashed(&self) -> Result<Vec<Task>> {
+        let models = tasks::Entity::find()
+            .filter(tasks::Column::DeletedAt.is_not_null())
+            .order_by_desc(tasks::Column::DeletedAt)
+            .all(&self.db)
+            .await?;
+        self.hydrate(models).await
+    }
+
+    /// Permanently remove everything currently in the Trash.
+    pub async fn empty_trash(&self) -> Result<()> {
+        tasks::Entity::delete_many()
+            .filter(tasks::Column::DeletedAt.is_not_null())
             .exec(&self.db)
             .await?;
         Ok(())
@@ -566,6 +655,7 @@ fn to_task(m: tasks::Model) -> Task {
         sort_order: m.sort_order,
         created_at: m.created_at,
         updated_at: m.updated_at,
+        deleted_at: m.deleted_at,
         attachments: Vec::new(),
         note_items: Vec::new(),
     }
@@ -789,6 +879,43 @@ mod tests {
         // Deleting the root removes the whole subtree via the self-ref FK.
         store.delete_task(&parent.id).await.unwrap();
         assert!(store.all_tasks().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn soft_delete_moves_the_subtree_to_trash_and_restores_it() {
+        let store = temp_store().await;
+        let project = store.create_project("P").await.unwrap();
+        let list = store.create_list(&project.id, "L").await.unwrap();
+        let parent = store.create_task(&list.id, "parent", None, None).await.unwrap();
+        let child = store
+            .create_task(&list.id, "child", None, Some(&parent.id))
+            .await
+            .unwrap();
+        let other = store.create_task(&list.id, "other", None, None).await.unwrap();
+
+        // Soft-deleting the root stamps the whole subtree and returns exactly the
+        // ids it flagged (parent + child), not the untouched sibling.
+        let affected = store.soft_delete_tasks(&[parent.id.clone()]).await.unwrap();
+        assert_eq!(affected.len(), 2);
+        assert!(affected.contains(&parent.id) && affected.contains(&child.id));
+
+        // Live reads hide the trashed subtree; the Trash surfaces it.
+        let live: Vec<_> = store.all_tasks().await.unwrap();
+        assert_eq!(live.len(), 1);
+        assert_eq!(live[0].id, other.id);
+        assert_eq!(store.list_trashed().await.unwrap().len(), 2);
+
+        // Re-deleting the sibling and then restoring only the first set leaves the
+        // sibling trashed — restore clears exactly the ids handed back.
+        store.soft_delete_tasks(&[other.id.clone()]).await.unwrap();
+        store.restore_tasks(&affected).await.unwrap();
+        let restored = store.all_tasks().await.unwrap();
+        assert_eq!(restored.len(), 2);
+        assert_eq!(store.list_trashed().await.unwrap().len(), 1);
+
+        // Purging empties the Trash permanently.
+        store.empty_trash().await.unwrap();
+        assert!(store.list_trashed().await.unwrap().is_empty());
     }
 
     #[tokio::test]

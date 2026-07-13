@@ -35,6 +35,7 @@ find common/src/entities -name '*.rs' -print0 | while IFS= read -r -d '' f; do
   sed -i '' \
     -e 's/pub created_at: i32,/pub created_at: i64,/' \
     -e 's/pub updated_at: i32,/pub updated_at: i64,/' \
+    -e 's/pub deleted_at: Option<i32>,/pub deleted_at: Option<i64>,/' \
     -e 's/pub sort_order: Decimal,/pub sort_order: f64,/' \
     -e 's/#\[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)\]/#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]/' \
     "$f"

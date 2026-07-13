@@ -170,9 +170,11 @@ async fn update_task(
         .map_err(err)
 }
 
+/// Soft-delete a task (move it, with its subtree, to the Trash). Returns every
+/// id that was stamped, so the caller can undo the exact set.
 #[tauri::command]
-async fn delete_task(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
-    store.delete_task(&id).await.map_err(err)
+async fn delete_task(store: State<'_, Arc<Store>>, id: String) -> Result<Vec<String>, String> {
+    store.soft_delete_tasks(&[id]).await.map_err(err)
 }
 
 #[tauri::command]
@@ -198,15 +200,36 @@ async fn reorder_task(
     store.reorder_task(&id, sort_order).await.map_err(err)
 }
 
-/// Delete several tasks in one call (each subtree cascades via the self-
-/// referential FK). Callers pass the forest roots of the selection; a missing
-/// id — e.g. an already-cascaded descendant — is a harmless no-op.
+/// Soft-delete several tasks (and their subtrees) in one transaction. Callers
+/// pass the forest roots of the selection. Returns every stamped id so the
+/// delete is undoable/restorable as an exact set.
 #[tauri::command]
-async fn delete_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<(), String> {
-    for id in &ids {
-        store.delete_task(id).await.map_err(err)?;
-    }
-    Ok(())
+async fn delete_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<Vec<String>, String> {
+    store.soft_delete_tasks(&ids).await.map_err(err)
+}
+
+/// Restore soft-deleted tasks (undo a delete / restore from Trash).
+#[tauri::command]
+async fn restore_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<(), String> {
+    store.restore_tasks(&ids).await.map_err(err)
+}
+
+/// Permanently remove tasks from the Trash.
+#[tauri::command]
+async fn purge_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<(), String> {
+    store.purge_tasks(&ids).await.map_err(err)
+}
+
+/// Everything currently in the Trash, most-recently-deleted first.
+#[tauri::command]
+async fn list_trashed(store: State<'_, Arc<Store>>) -> Result<Vec<Task>, String> {
+    store.list_trashed().await.map_err(err)
+}
+
+/// Permanently empty the Trash.
+#[tauri::command]
+async fn empty_trash(store: State<'_, Arc<Store>>) -> Result<(), String> {
+    store.empty_trash().await.map_err(err)
 }
 
 /// Set the done flag on several tasks at once (bulk mark done / not done).
@@ -955,6 +978,10 @@ pub fn run() {
             move_task,
             reorder_task,
             delete_tasks,
+            restore_tasks,
+            purge_tasks,
+            list_trashed,
+            empty_trash,
             set_tasks_done,
             copy_tasks,
             export_list,

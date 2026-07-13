@@ -18,6 +18,7 @@ interface Props {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onRename: (list: List) => void;
+  onRenameInline: (id: string, name: string) => void;
   onDelete: (list: List) => void;
   onExport: (list: List) => void;
   onToggleSplit: (id: string) => void;
@@ -34,6 +35,7 @@ export function ListTabs({
   onSelect,
   onCreate,
   onRename,
+  onRenameInline,
   onDelete,
   onExport,
   onToggleSplit,
@@ -42,6 +44,7 @@ export function ListTabs({
   onReorder,
 }: Props) {
   const menu = useContextMenu();
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [dropOver, setDropOver] = useState<string | null>(null);
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
   const [tabOver, setTabOver] = useState<{
@@ -122,8 +125,11 @@ export function ListTabs({
               )}
             />
             <div
-              draggable
+              draggable={editingId !== list.id}
               onClick={() => onSelect(list.id)}
+              onDoubleClick={() => {
+                setEditingId(list.id);
+              }}
               onAuxClick={(e) => {
                 if (e.button === 1) onDelete(list);
               }}
@@ -196,15 +202,38 @@ export function ListTabs({
                   className="text-accent-500l dark:text-accent-500d"
                 />
               )}
-              <span
-                className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
-                  focused
-                    ? 'text-content-1l dark:text-content-1d font-medium'
-                    : 'text-content-3l dark:text-content-3d font-medium'
-                }`}
-              >
-                {list.name}
-              </span>
+              {editingId === list.id ? (
+                <input
+                  autoFocus
+                  defaultValue={list.name}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') {
+                      const name = (e.target as HTMLInputElement).value.trim();
+                      if (name && name !== list.name) onRenameInline(list.id, name);
+                      setEditingId(null);
+                    } else if (e.key === 'Escape') setEditingId(null);
+                  }}
+                  onBlur={(e) => {
+                    const name = e.target.value.trim();
+                    if (name && name !== list.name) onRenameInline(list.id, name);
+                    setEditingId(null);
+                  }}
+                  className="rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d ring-focus-1l dark:ring-focus-1d max-w-40 px-1.5 py-0.5 text-[13px] font-medium ring-1 outline-none"
+                />
+              ) : (
+                <span
+                  className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
+                    focused
+                      ? 'text-content-1l dark:text-content-1d font-medium'
+                      : 'text-content-3l dark:text-content-3d font-medium'
+                  }`}
+                >
+                  {list.name}
+                </span>
+              )}
               <span className="relative">
                 <button
                   onClick={(e) => {

@@ -109,6 +109,10 @@ table "tasks" {
     null = false
     type = integer
   }
+  column "deleted_at" {
+    null = true
+    type = integer
+  }
   primary_key {
     columns = [column.id]
   }

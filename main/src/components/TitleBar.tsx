@@ -1,7 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { useEffect, useRef } from 'react';
 import { api, type List, type Project } from '../api';
 import { isMac } from '../lib/platform';
 import { useLowPowerMode } from '../lib/reducedMotion';
@@ -25,16 +24,14 @@ interface Props {
   onSelectList: (id: string) => void;
   onCreateList: () => void;
   onRenameList: (list: List) => void;
+  onRenameListInline: (id: string, name: string) => void;
   onDeleteList: (list: List) => void;
   onExportList: (list: List) => void;
   onToggleSplit: (id: string) => void;
+  onSwapPanes: () => void;
   onDropTaskOnTab: (taskId: string, listId: string) => void;
   onDropTaskSetOnTab: (ids: string[], listId: string) => void;
   onReorderList: (draggedId: string, targetId: string, before: boolean) => void;
-
-  search: string;
-  onSearchChange: (q: string) => void;
-  registerSearch: (focus: (() => void) | null) => void;
 
   previewOpen: boolean;
   onTogglePreview: () => void;
@@ -56,16 +53,6 @@ export function TitleBar(props: Props) {
     const accel = formatAccel(props.hotkeys[id] ?? '');
     return accel ? `  ${accel}` : '';
   };
-
-  const searchRef = useRef<HTMLInputElement>(null);
-  const { registerSearch } = props;
-  useEffect(() => {
-    registerSearch(() => {
-      searchRef.current?.focus();
-      searchRef.current?.select();
-    });
-    return () => registerSearch(null);
-  }, [registerSearch]);
 
   return (
     <header
@@ -104,6 +91,7 @@ export function TitleBar(props: Props) {
         onSelect={props.onSelectList}
         onCreate={props.onCreateList}
         onRename={props.onRenameList}
+        onRenameInline={props.onRenameListInline}
         onDelete={props.onDeleteList}
         onExport={props.onExportList}
         onToggleSplit={props.onToggleSplit}
@@ -113,37 +101,6 @@ export function TitleBar(props: Props) {
       />
 
       <div className="flex items-center gap-2 pr-3 pl-3">
-        <div className="rounded-control bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d flex h-8 w-56 items-center gap-2 px-2.5 transition-shadow focus-within:ring-1">
-          <Icon
-            name="search"
-            size={16}
-            weight={300}
-            className="text-content-3l dark:text-content-3d shrink-0"
-          />
-          <input
-            ref={searchRef}
-            value={props.search}
-            onChange={(e) => props.onSearchChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                props.onSearchChange('');
-                (e.target as HTMLInputElement).blur();
-              }
-            }}
-            placeholder={`Search${hint('search')}`}
-            className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[13px] outline-none"
-          />
-          {props.search && (
-            <button
-              onClick={() => props.onSearchChange('')}
-              className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 shrink-0 place-items-center"
-              title="Clear search"
-            >
-              <Icon name="close" size={13} />
-            </button>
-          )}
-        </div>
-
         {reducedMotion && (
           <div
             title="Reduced motion active on Low Power Mode"
@@ -153,6 +110,13 @@ export function TitleBar(props: Props) {
           </div>
         )}
 
+        {props.splitListId != null && (
+          <BarButton
+            icon="swap_horiz"
+            title="Swap panes"
+            onClick={props.onSwapPanes}
+          />
+        )}
         <BarButton
           icon="vertical_split"
           active={props.splitListId != null}

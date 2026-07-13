@@ -1,10 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { List, Task } from '../api';
 import { absoluteDateTime, relativeTime } from '../time';
 import { useContextMenu, type MenuItem } from './contextMenuContext';
 import { Icon } from '@taskscape/common-ui/Icon';
 
 export type DropZone = 'before' | 'after' | 'nest';
+
+/** Wrap case-insensitive matches of `query` in an accent `<mark>`. Text is plain
+ *  (titles / notes preview), so this is injection-safe. */
+function highlight(text: string, query: string): ReactNode {
+  const q = query.trim();
+  if (!q) return text;
+  const lower = text.toLowerCase();
+  const needle = q.toLowerCase();
+  const out: ReactNode[] = [];
+  let i = 0;
+  let hit = lower.indexOf(needle);
+  let key = 0;
+  while (hit >= 0) {
+    if (hit > i) out.push(text.slice(i, hit));
+    out.push(
+      <mark
+        key={key++}
+        className="rounded-[3px] bg-accent-500l/25 dark:bg-accent-500d/30 text-inherit"
+      >
+        {text.slice(hit, hit + needle.length)}
+      </mark>
+    );
+    i = hit + needle.length;
+    hit = lower.indexOf(needle, i);
+  }
+  if (i < text.length) out.push(text.slice(i));
+  return out;
+}
 
 /** Modifier keys that shape a row click: plain (select single), ⌘ (toggle),
  *  ⇧ (range from the anchor). */
@@ -50,6 +78,8 @@ export interface RowCtx {
   setComposeFor: (id: string | null) => void;
   isVisible: (t: Task) => boolean;
   forceExpand: boolean;
+  /** Active search query for this pane, for highlighting matched text ('' = off). */
+  query: string;
   otherLists: List[];
   onToggleDone: (task: Task) => void;
   onRequestDelete: (task: Task) => void;
@@ -61,7 +91,8 @@ export interface RowCtx {
 }
 
 /** The shared row context App builds once for both panes. Each `TaskPane`
- *  completes it into a full `RowCtx` by adding its own per-pane selection. */
+ *  completes it into a full `RowCtx` by adding its own per-pane selection,
+ *  visibility, and search-driven expansion. */
 export type BaseRowCtx = Omit<
   RowCtx,
   | 'selectedIds'
@@ -71,6 +102,9 @@ export type BaseRowCtx = Omit<
   | 'onBulkSetDone'
   | 'onBulkMove'
   | 'onBulkDelete'
+  | 'isVisible'
+  | 'forceExpand'
+  | 'query'
 >;
 
 const INDENT = 24;
@@ -379,7 +413,7 @@ export function TaskRow({
                 : 'text-content-1l dark:text-content-1d'
             }`}
           >
-            {task.title}
+            {highlight(task.title, ctx.query)}
           </div>
           {task.notes && (
             <div
@@ -389,7 +423,7 @@ export function TaskRow({
                   : 'text-content-2l dark:text-content-2d'
               }`}
             >
-              {task.notes}
+              {highlight(task.notes, ctx.query)}
             </div>
           )}
         </div>
@@ -422,6 +456,17 @@ export function TaskRow({
           >
             {relativeTime(task.created_at)}
           </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              ctx.setComposeFor(task.id);
+            }}
+            onDoubleClick={(e) => e.stopPropagation()}
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 transition-opacity duration-100 group-hover/row:opacity-100"
+            title="Add subtask"
+          >
+            <Icon name="add" size={17} weight={300} />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();

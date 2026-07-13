@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { List, Task } from '../api';
 import { Icon } from '@taskscape/common-ui/Icon';
+import type { List, Task } from '../api';
+import {
+  dropOnRoot as actDropOnRoot,
+  dropSetOnRoot as actDropSetOnRoot,
+} from '../stores/actions';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useProjectStore } from '../stores/projectStore';
+import { directMatches, useSearchStore } from '../stores/searchStore';
+import { useSelectionStore } from '../stores/selectionStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useTaskStore } from '../stores/taskStore';
+import {
+  flattenVisible,
+  isVisibleInPane,
+  paneSearching,
+} from '../stores/visibility';
+import { useViewStore } from '../stores/viewStore';
 import { useContextMenu } from './contextMenuContext';
 import {
   TaskRow,
@@ -25,17 +41,15 @@ export interface PaneSelection {
   bulkDelete: () => void;
 }
 
+const EMPTY_ROOTS: Task[] = [];
+
 interface Props {
   list: List;
-  roots: Task[];
   ctx: BaseRowCtx;
   sel: PaneSelection;
   isSplit: boolean;
-  searching: boolean;
   onCloseSplit?: () => void;
   onCreateTask: (listId: string, title: string) => void;
-  onRootDrop: (draggedId: string, listId: string) => void;
-  onRootDropSet: (ids: string[], listId: string) => void;
   registerComposer: (
     listId: string,
     focus: ((seed?: string) => void) | null
@@ -47,28 +61,37 @@ interface Props {
 
 export function TaskPane({
   list,
-  roots,
   ctx,
   sel,
   isSplit,
-  searching,
   onCloseSplit,
   onCreateTask,
-  onRootDrop,
-  onRootDropSet,
   registerComposer,
   onFocusPane,
   captureHint,
 }: Props) {
   const composerRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [rootDropOver, setRootDropOver] = useState(false);
 
-  const visibleRoots = roots.filter(ctx.isVisible);
+  // Reactive subscriptions: re-render this pane whenever anything that changes
+  // its visible tree changes. The visibility helpers read current store state.
+  const roots = useTaskStore((s) => s.rootsByList[list.id] ?? EMPTY_ROOTS);
+  useLayoutStore((s) => s.collapsed);
+  useSettingsStore((s) => s.showCompleted);
+  useViewStore((s) => s.byPane[list.id]);
+  const paneSearch = useSearchStore((s) => s.byPane[list.id]);
+  const activeProjectId = useProjectStore((s) => s.activeId);
 
-  // Rows augmented with this pane's selection, injected by spreading the shared
-  // ctx — the two panes stay independent while sharing everything else.
+  const searchActive = paneSearch?.active ?? false;
+  const query = searchActive ? (paneSearch?.query ?? '') : '';
+  const searching = paneSearching(list.id);
+
+  const visibleRoots = roots.filter((t) => isVisibleInPane(t, list.id));
+
+  // Rows augmented with this pane's selection + per-pane visibility/highlight.
   const paneCtx = useMemo<RowCtx>(
     () => ({
       ...ctx,
@@ -79,8 +102,11 @@ export function TaskPane({
       onBulkSetDone: sel.bulkSetDone,
       onBulkMove: sel.bulkMove,
       onBulkDelete: sel.bulkDelete,
+      isVisible: (t: Task) => isVisibleInPane(t, list.id),
+      forceExpand: searching,
+      query,
     }),
-    [ctx, sel]
+    [ctx, sel, list.id, searching, query]
   );
 
   // Whole-tree tally (roots + every nested subtask) for the stats bar.
@@ -96,6 +122,9 @@ export function TaskPane({
 
   useEffect(() => {
     registerComposer(list.id, (seed) => {
+      // A ⌘N / type-to-capture request leaves search mode and focuses the add box.
+      const ss = useSearchStore.getState();
+      if (ss.isActive(list.id)) ss.close(list.id);
       const el = composerRef.current;
       if (!el) return;
       el.focus();
@@ -103,6 +132,11 @@ export function TaskPane({
     });
     return () => registerComposer(list.id, null);
   }, [list.id, registerComposer]);
+
+  // Focus the search field the moment the pane enters search mode.
+  useEffect(() => {
+    if (searchActive) searchRef.current?.focus();
+  }, [searchActive]);
 
   const submit = () => {
     const el = composerRef.current;
@@ -112,6 +146,29 @@ export function TaskPane({
     el.value = '';
   };
 
+  // Direct match count for the badge (memo-cheap; recomputed per keystroke).
+  const matchCount = searching
+    ? directMatches(query, paneSearch!.scope, paneSearch!.fields, list.id, activeProjectId).size
+    : 0;
+
+  // Enter / ⇧Enter cycle the matches in visual order, scrolling + previewing each.
+  const cycleMatch = (dir: 1 | -1) => {
+    const ps = useSearchStore.getState().get(list.id);
+    const direct = directMatches(ps.query, ps.scope, ps.fields, list.id, activeProjectId);
+    if (direct.size === 0) return;
+    const ordered = flattenVisible(list.id)
+      .map((t) => t.id)
+      .filter((id) => direct.has(id));
+    if (ordered.length === 0) return;
+    const cur = useSelectionStore.getState().selectedTaskId;
+    const at = ordered.indexOf(cur ?? '');
+    const nextId = ordered[(at + dir + ordered.length) % ordered.length];
+    useSelectionStore.getState().focus(nextId);
+    document
+      .querySelector(`[data-task-id="${CSS.escape(nextId)}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  };
+
   return (
     <section
       className="bg-surface-2l dark:bg-surface-2d flex h-full min-w-0 flex-1 flex-col"
@@ -119,22 +176,53 @@ export function TaskPane({
     >
       <div className="rounded-control bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 px-3 transition-shadow focus-within:ring-1">
         <Icon
-          name="add"
+          name={searchActive ? 'search' : 'add'}
           size={18}
           weight={300}
           className="text-content-3l dark:text-content-3d shrink-0"
         />
-        <input
-          ref={composerRef}
-          placeholder="Add a task — Enter to save"
-          onFocus={() => onFocusPane(list.id)}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === 'Enter') submit();
-            if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
-          }}
-          className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[14px] outline-none"
-        />
+        {searchActive ? (
+          <>
+            <input
+              ref={searchRef}
+              value={query}
+              placeholder={`Search ${list.name}`}
+              onFocus={() => onFocusPane(list.id)}
+              onChange={(e) => useSearchStore.getState().setQuery(list.id, e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Escape') useSearchStore.getState().close(list.id);
+                else if (e.key === 'Enter') cycleMatch(e.shiftKey ? -1 : 1);
+              }}
+              className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[14px] outline-none"
+            />
+            <ScopeFields listId={list.id} />
+            {query.trim() && (
+              <span className="text-content-3l dark:text-content-3d shrink-0 text-[11px] font-semibold tabular-nums">
+                {matchCount}
+              </span>
+            )}
+            <button
+              onClick={() => useSearchStore.getState().close(list.id)}
+              title="Close search"
+              className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
+            >
+              <Icon name="close" size={15} weight={300} />
+            </button>
+          </>
+        ) : (
+          <input
+            ref={composerRef}
+            placeholder="Add a task — Enter to save"
+            onFocus={() => onFocusPane(list.id)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') submit();
+              if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
+            }}
+            className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[14px] outline-none"
+          />
+        )}
         {isSplit && onCloseSplit && (
           <button
             onClick={onCloseSplit}
@@ -167,13 +255,13 @@ export function TaskPane({
           const setJson = e.dataTransfer.getData(TASK_SET_MIME);
           if (setJson) {
             e.preventDefault();
-            onRootDropSet(JSON.parse(setJson) as string[], list.id);
+            void actDropSetOnRoot(JSON.parse(setJson) as string[], list.id);
             return;
           }
           const draggedId = e.dataTransfer.getData('application/x-task');
           if (draggedId) {
             e.preventDefault();
-            onRootDrop(draggedId, list.id);
+            void actDropOnRoot(draggedId, list.id);
           }
         }}
       >
@@ -199,7 +287,7 @@ export function TaskPane({
               </p>
               <p className="text-content-3l dark:text-content-3d px-4 text-center text-[13px] tracking-[0.01em]">
                 {searching
-                  ? 'Try a different search'
+                  ? 'Try a different search or scope'
                   : captureHint
                     ? `Add a task above, or press ${captureHint} anywhere to capture one`
                     : 'Add a task above'}
@@ -212,14 +300,57 @@ export function TaskPane({
       {sel.ids.size > 0 ? (
         <BulkBar sel={sel} count={sel.ids.size} otherLists={ctx.otherLists} />
       ) : (
-        <StatsBar done={done} total={total} pct={pct} />
+        <StatsBar listId={list.id} done={done} total={total} pct={pct} />
       )}
     </section>
   );
 }
 
+/** The scope (list / project / all) + fields (title / notes / both) control that
+ *  sits inside the search field. A check marks the current choice. */
+function ScopeFields({ listId }: { listId: string }) {
+  const menu = useContextMenu();
+  const search = useSearchStore();
+  const state = useSearchStore((s) => s.byPane[listId]);
+  const scope = state?.scope ?? 'list';
+  const fields = state?.fields ?? 'both';
+  const check = (on: boolean) => (on ? 'check' : undefined);
+  const open = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    menu.open({
+      x: r.left,
+      y: r.bottom + 6,
+      items: [
+        { id: 'scope:list', label: 'This list', icon: check(scope === 'list') },
+        { id: 'scope:project', label: 'Whole project', icon: check(scope === 'project') },
+        { id: 'scope:all', label: 'All projects', icon: check(scope === 'all') },
+        { id: 'fields:both', label: 'Title & notes', icon: check(fields === 'both'), dividerAbove: true },
+        { id: 'fields:title', label: 'Title only', icon: check(fields === 'title') },
+        { id: 'fields:notes', label: 'Notes only', icon: check(fields === 'notes') },
+      ],
+      onPick: (id) => {
+        if (id.startsWith('scope:'))
+          search.setScope(listId, id.slice(6) as 'list' | 'project' | 'all');
+        if (id.startsWith('fields:'))
+          search.setFields(listId, id.slice(7) as 'title' | 'notes' | 'both');
+      },
+    });
+  };
+  return (
+    <button
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={open}
+      title="Search options"
+      className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
+    >
+      <Icon name="tune" size={15} weight={300} />
+    </button>
+  );
+}
+
 /** The action bar the footer shows while a selection is live: a count, the bulk
- *  verbs, and Clear. Replaces the old modal Select/Mark toggle entirely. */
+ *  verbs, and Clear. */
 function BulkBar({
   sel,
   count,
@@ -288,17 +419,22 @@ function BulkBar({
   );
 }
 
+/** The footer stats + a per-pane sort/filter control (D.1). */
 function StatsBar({
+  listId,
   done,
   total,
   pct,
 }: {
+  listId: string;
   done: number;
   total: number;
   pct: number;
 }) {
   return (
     <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d text-content-3l dark:text-content-3d flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
+      <ViewControl listId={listId} />
+      <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
       <span>
         {done}/{total} done
       </span>
@@ -314,5 +450,49 @@ function StatsBar({
         </span>
       </div>
     </div>
+  );
+}
+
+/** Per-pane sort + filter, opened from the footer (D.1). */
+function ViewControl({ listId }: { listId: string }) {
+  const menu = useContextMenu();
+  const view = useViewStore((s) => s.byPane[listId]);
+  const sort = view?.sort ?? 'manual';
+  const filter = view?.filter ?? 'all';
+  const check = (on: boolean) => (on ? 'check' : undefined);
+  const open = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    menu.open({
+      x: r.left,
+      y: r.bottom + 6,
+      items: [
+        { id: 'sort:manual', label: 'Sort: Manual', icon: check(sort === 'manual') },
+        { id: 'sort:created', label: 'Sort: Date created', icon: check(sort === 'created') },
+        { id: 'sort:alpha', label: 'Sort: Alphabetical', icon: check(sort === 'alpha') },
+        { id: 'sort:done-last', label: 'Sort: Done last', icon: check(sort === 'done-last') },
+        { id: 'filter:all', label: 'Show: All', icon: check(filter === 'all'), dividerAbove: true },
+        { id: 'filter:active', label: 'Show: Active only', icon: check(filter === 'active') },
+        { id: 'filter:completed', label: 'Show: Completed only', icon: check(filter === 'completed') },
+      ],
+      onPick: (id) => {
+        const s = useViewStore.getState();
+        if (id.startsWith('sort:')) s.setSort(listId, id.slice(5) as never);
+        if (id.startsWith('filter:')) s.setFilter(listId, id.slice(7) as never);
+      },
+    });
+  };
+  const active = sort !== 'manual' || filter !== 'all';
+  return (
+    <button
+      onClick={open}
+      title="Sort & filter"
+      className={`rounded-field flex h-5.5 items-center gap-1 px-1.5 text-[11px] font-semibold tracking-normal normal-case transition-colors ${
+        active
+          ? 'text-accent-500l dark:text-accent-500d'
+          : 'text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d'
+      }`}
+    >
+      <Icon name="tune" size={14} weight={300} />
+    </button>
   );
 }

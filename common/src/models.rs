@@ -35,6 +35,10 @@ pub struct Task {
     pub sort_order: f64,
     pub created_at: i64,
     pub updated_at: i64,
+    /// When soft-deleted (moved to Trash); `None` for a live task. Excluded from
+    /// every normal read — only `list_trashed` surfaces rows where this is set.
+    #[serde(default)]
+    pub deleted_at: Option<i64>,
     /// Parent task id when this is a subtask; `None` for a top-level task.
     /// Subtasks may nest arbitrarily deep.
     #[serde(default)]

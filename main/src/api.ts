@@ -40,6 +40,9 @@ export interface Task {
   sort_order: number;
   created_at: number;
   updated_at: number;
+  /** Set when the task is in the Trash (soft-deleted); null for a live task.
+   *  Live reads never return trashed tasks — only `listTrashed` does. */
+  deleted_at: number | null;
   attachments: Attachment[];
   note_items: Note[];
 }
@@ -86,7 +89,8 @@ export const api = {
     }),
   updateTask: (id: string, patch: TaskPatch) =>
     invoke<Task>('update_task', { id, ...patch }),
-  deleteTask: (id: string) => invoke<void>('delete_task', { id }),
+  /** Soft-delete a task (to Trash); resolves with the ids stamped (for undo). */
+  deleteTask: (id: string) => invoke<string[]>('delete_task', { id }),
   moveTask: (
     id: string,
     parentId: string | null,
@@ -101,9 +105,17 @@ export const api = {
     }),
   reorderTask: (id: string, sortOrder: number) =>
     invoke<Task>('reorder_task', { id, sortOrder }),
-  /** Delete several tasks at once (pass the selection's forest roots; subtrees
-   *  cascade). */
-  deleteTasks: (ids: string[]) => invoke<void>('delete_tasks', { ids }),
+  /** Soft-delete several tasks (pass the selection's forest roots; subtrees
+   *  follow). Resolves with every stamped id, so the delete is undoable. */
+  deleteTasks: (ids: string[]) => invoke<string[]>('delete_tasks', { ids }),
+  /** Restore soft-deleted tasks (undo a delete / restore from Trash). */
+  restoreTasks: (ids: string[]) => invoke<void>('restore_tasks', { ids }),
+  /** Permanently remove tasks from the Trash. */
+  purgeTasks: (ids: string[]) => invoke<void>('purge_tasks', { ids }),
+  /** Everything currently in the Trash, most-recently-deleted first. */
+  listTrashed: () => invoke<Task[]>('list_trashed'),
+  /** Permanently empty the Trash. */
+  emptyTrash: () => invoke<void>('empty_trash'),
   /** Mark several tasks done / not done in one call. */
   setTasksDone: (ids: string[], done: boolean) =>
     invoke<void>('set_tasks_done', { ids, done }),
