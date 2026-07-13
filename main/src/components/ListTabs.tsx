@@ -19,6 +19,7 @@ interface Props {
   onCreate: () => void;
   onRename: (list: List) => void;
   onDelete: (list: List) => void;
+  onExport: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTask: (taskId: string, listId: string) => void;
   onReorder: (draggedId: string, targetId: string, before: boolean) => void;
@@ -34,6 +35,7 @@ export function ListTabs({
   onCreate,
   onRename,
   onDelete,
+  onExport,
   onToggleSplit,
   onDropTask,
   onReorder,
@@ -63,6 +65,12 @@ export function ListTabs({
           disabled: list.id === activeListId && list.id !== splitListId,
         },
         {
+          id: 'export',
+          label: 'Export list…',
+          icon: 'ios_share',
+          dividerAbove: true,
+        },
+        {
           id: 'delete',
           label: 'Delete list…',
           icon: 'delete',
@@ -73,6 +81,7 @@ export function ListTabs({
       onPick: (id) => {
         if (id === 'rename') onRename(list);
         if (id === 'split') onToggleSplit(list.id);
+        if (id === 'export') onExport(list);
         if (id === 'delete') onDelete(list);
       },
     });

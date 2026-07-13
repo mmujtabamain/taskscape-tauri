@@ -24,6 +24,7 @@ interface Props {
   onCreateList: () => void;
   onRenameList: (list: List) => void;
   onDeleteList: (list: List) => void;
+  onExportList: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTaskOnTab: (taskId: string, listId: string) => void;
   onReorderList: (draggedId: string, targetId: string, before: boolean) => void;
@@ -91,6 +92,7 @@ export function TitleBar(props: Props) {
         onCreate={props.onCreateList}
         onRename={props.onRenameList}
         onDelete={props.onDeleteList}
+        onExport={props.onExportList}
         onToggleSplit={props.onToggleSplit}
         onDropTask={props.onDropTaskOnTab}
         onReorder={props.onReorderList}

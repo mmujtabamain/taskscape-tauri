@@ -1,13 +1,16 @@
 mod panels;
 
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use axum::{extract::State as AxumState, http::StatusCode, routing::post, Router};
+use serde::{Deserialize, Serialize};
 use tauri::{
+    menu::{Menu, MenuItem, Submenu},
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl,
     WebviewWindowBuilder, WindowEvent,
 };
-use taskscape_common::{server, Attachment, List, Note, Project, Store, Task, MAIN_PORT};
+use taskscape_common::{server, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT};
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
@@ -190,6 +193,197 @@ async fn reorder_task(
     sort_order: f64,
 ) -> Result<Task, String> {
     store.reorder_task(&id, sort_order).await.map_err(err)
+}
+
+/// Group tasks under their parents, preserving the incoming order (callers pass
+/// tasks already sorted by `sort_order`, so each group stays in visual order).
+/// Returns (roots, children-by-parent-id).
+fn group_by_parent(tasks: &[Task]) -> (Vec<&Task>, HashMap<&str, Vec<&Task>>) {
+    let mut roots = Vec::new();
+    let mut children: HashMap<&str, Vec<&Task>> = HashMap::new();
+    for t in tasks {
+        match &t.parent_id {
+            Some(p) => children.entry(p.as_str()).or_default().push(t),
+            None => roots.push(t),
+        }
+    }
+    (roots, children)
+}
+
+/// Render selected tasks as a Markdown checklist. The output holds *exactly* the
+/// selected tasks in tree order; a task's indent is how many of its ancestors are
+/// also selected, so selecting a parent + child nests the child while a lone
+/// selected child renders flush left.
+fn render_markdown<'a>(
+    node: &'a Task,
+    depth: usize,
+    children: &HashMap<&'a str, Vec<&'a Task>>,
+    selected: &HashSet<&str>,
+    out: &mut String,
+) {
+    let picked = selected.contains(node.id.as_str());
+    if picked {
+        for _ in 0..depth {
+            out.push_str("  ");
+        }
+        out.push_str(if node.done { "- [x] " } else { "- [ ] " });
+        out.push_str(&node.title);
+        out.push('\n');
+    }
+    let child_depth = depth + usize::from(picked);
+    if let Some(kids) = children.get(node.id.as_str()) {
+        for k in kids {
+            render_markdown(k, child_depth, children, selected, out);
+        }
+    }
+}
+
+/// Build a Markdown checklist for the given task ids (Select mode's copy action).
+#[tauri::command]
+async fn copy_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<String, String> {
+    let tasks = store.all_tasks().await.map_err(err)?;
+    let selected: HashSet<&str> = ids.iter().map(String::as_str).collect();
+    let (roots, children) = group_by_parent(&tasks);
+    let mut out = String::new();
+    for r in &roots {
+        render_markdown(r, 0, &children, &selected, &mut out);
+    }
+    Ok(out.trim_end().to_string())
+}
+
+/// A list exported to JSON: full fidelity minus copied-file attachments, which
+/// live under `~/.taskscape/` and can't travel in the document.
+#[derive(Serialize, Deserialize)]
+struct ListExport {
+    /// Schema version, so a future import can migrate older documents.
+    taskscape_export: u32,
+    list: ListMeta,
+    tasks: Vec<ExportTask>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ListMeta {
+    name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ExportTask {
+    title: String,
+    done: bool,
+    /// Rich-text note blocks (sanitized HTML), in order.
+    #[serde(default)]
+    notes: Vec<String>,
+    /// `reference`-type attachments only.
+    #[serde(default)]
+    attachments: Vec<ExportAttachment>,
+    #[serde(default)]
+    children: Vec<ExportTask>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ExportAttachment {
+    name: String,
+    location: String,
+}
+
+fn to_export_task<'a>(node: &'a Task, children: &HashMap<&'a str, Vec<&'a Task>>) -> ExportTask {
+    ExportTask {
+        title: node.title.clone(),
+        done: node.done,
+        notes: node.note_items.iter().map(|n| n.content.clone()).collect(),
+        attachments: node
+            .attachments
+            .iter()
+            .filter(|a| a.link_type == LinkType::Reference)
+            .map(|a| ExportAttachment {
+                name: a.name.clone(),
+                location: a.location.clone(),
+            })
+            .collect(),
+        children: children
+            .get(node.id.as_str())
+            .map(|kids| kids.iter().map(|k| to_export_task(k, children)).collect())
+            .unwrap_or_default(),
+    }
+}
+
+/// Write a whole list (its tasks, subtasks, notes, and reference attachments) to
+/// `path` as JSON.
+#[tauri::command]
+async fn export_list(
+    store: State<'_, Arc<Store>>,
+    list_id: String,
+    path: String,
+) -> Result<(), String> {
+    let list = store
+        .list_lists()
+        .await
+        .map_err(err)?
+        .into_iter()
+        .find(|l| l.id == list_id)
+        .ok_or_else(|| format!("list not found: {list_id}"))?;
+    let tasks = store.list_tasks(&list_id).await.map_err(err)?;
+    let (roots, children) = group_by_parent(&tasks);
+    let export = ListExport {
+        taskscape_export: 1,
+        list: ListMeta { name: list.name },
+        tasks: roots.iter().map(|r| to_export_task(r, &children)).collect(),
+    };
+    let json = serde_json::to_string_pretty(&export).map_err(err)?;
+    std::fs::write(&path, json).map_err(err)
+}
+
+/// Recreate one exported task (and its subtree) under `parent_id` in `list_id`.
+/// Async recursion needs a boxed future, hence the `Box::pin` on the child call.
+async fn import_task(
+    store: &Store,
+    list_id: &str,
+    parent_id: Option<&str>,
+    t: &ExportTask,
+) -> Result<(), String> {
+    let task = store
+        .create_task(list_id, &t.title, None, parent_id)
+        .await
+        .map_err(err)?;
+    if t.done {
+        store
+            .update_task(&task.id, None, None, Some(true))
+            .await
+            .map_err(err)?;
+    }
+    for note in &t.notes {
+        store.create_note(&task.id, note).await.map_err(err)?;
+    }
+    for a in &t.attachments {
+        taskscape_common::attachments::attach_reference(store, &task.id, &a.name, &a.location)
+            .await
+            .map_err(err)?;
+    }
+    for child in &t.children {
+        Box::pin(import_task(store, list_id, Some(&task.id), child)).await?;
+    }
+    Ok(())
+}
+
+/// Create a new list in `project_id` from an exported JSON file. `name` overrides
+/// the document's embedded list name when provided (non-blank).
+#[tauri::command]
+async fn import_list(
+    store: State<'_, Arc<Store>>,
+    project_id: String,
+    path: String,
+    name: Option<String>,
+) -> Result<List, String> {
+    let raw = std::fs::read_to_string(&path).map_err(err)?;
+    let export: ListExport = serde_json::from_str(&raw).map_err(err)?;
+    let list_name = name
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(export.list.name);
+    let list = store.create_list(&project_id, &list_name).await.map_err(err)?;
+    for t in &export.tasks {
+        import_task(&store, &list.id, None, t).await?;
+    }
+    Ok(list)
 }
 
 #[tauri::command]
@@ -536,6 +730,39 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Start from the standard menu (keeps the App/Edit menus, so ⌘C/⌘V/⌘X/⌘A
+        // still work in text fields) and append a "List" category for import/export.
+        .menu(|handle| {
+            let menu = Menu::default(handle)?;
+            let import = MenuItem::with_id(
+                handle,
+                "import_list",
+                "Import List from JSON…",
+                true,
+                None::<&str>,
+            )?;
+            let export = MenuItem::with_id(
+                handle,
+                "export_list",
+                "Export List to JSON…",
+                true,
+                None::<&str>,
+            )?;
+            let list_menu = Submenu::with_items(handle, "List", true, &[&import, &export])?;
+            menu.append(&list_menu)?;
+            Ok(menu)
+        })
+        // Menu clicks drive frontend flows (they need the dialog + clipboard), so
+        // forward them as events — the same pattern as `refresh`/`modal-result`.
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "import_list" => {
+                let _ = app.emit_to("main", "menu:import-list", ());
+            }
+            "export_list" => {
+                let _ = app.emit_to("main", "menu:export-list", ());
+            }
+            _ => {}
+        })
         .manage(store)
         .manage(ModalState(Mutex::new(None)))
         .manage(NoteQueue(note_tx))
@@ -648,6 +875,9 @@ pub fn run() {
             delete_task,
             move_task,
             reorder_task,
+            copy_tasks,
+            export_list,
+            import_list,
             list_notes,
             create_note,
             update_note,

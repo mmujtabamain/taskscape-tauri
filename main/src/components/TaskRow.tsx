@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { List, Task } from '../api';
 import { absoluteDateTime, relativeTime } from '../time';
-import { useContextMenu } from './contextMenuContext';
+import { useContextMenu, type MenuItem } from './contextMenuContext';
 import { Icon } from '@taskscape/common-ui/Icon';
 
 export type DropZone = 'before' | 'after' | 'nest';
+
+/** The task pane is always in one of two modes. `select` (default) — the row's
+ *  checkbox toggles its membership in `selectedIds` (for the Copy action).
+ *  `mark` — the checkbox toggles the task's done state, as it always has. */
+export type PaneMode = 'select' | 'mark';
 
 export interface RowCtx {
   childrenByParent: Record<string, Task[]>;
@@ -12,6 +17,11 @@ export interface RowCtx {
   toggleCollapsed: (id: string) => void;
   selectedTaskId: string | null;
   select: (id: string) => void;
+  mode: PaneMode;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  /** Copy the given tasks to the clipboard as a Markdown checklist. */
+  onCopy: (ids: string[]) => void;
   requestRename: (id: string) => void;
   dropTarget: { taskId: string; zone: DropZone } | null;
   setDropTarget: (t: { taskId: string; zone: DropZone } | null) => void;
@@ -29,6 +39,13 @@ export interface RowCtx {
   onCreateSubtask: (parentId: string, title: string) => void;
   onDropOnRow: (draggedId: string, target: Task, zone: DropZone) => void;
 }
+
+/** The shared row context App builds once for both panes. Each `TaskPane`
+ *  completes it into a full `RowCtx` by adding its own `mode`/selection. */
+export type BaseRowCtx = Omit<
+  RowCtx,
+  'mode' | 'selectedIds' | 'onToggleSelect'
+>;
 
 const INDENT = 24;
 
@@ -48,7 +65,10 @@ export function TaskRow({
   const children = (ctx.childrenByParent[task.id] ?? []).filter(ctx.isVisible);
   const doneChildren = children.filter((c) => c.done).length;
   const expanded = ctx.forceExpand || !ctx.collapsed.has(task.id);
-  const selected = ctx.selectedTaskId === task.id;
+  const selecting = ctx.mode === 'select';
+  const picked = selecting && ctx.selectedIds.has(task.id);
+  // Highlight the preview-selected row and, in select mode, every picked row.
+  const selected = ctx.selectedTaskId === task.id || picked;
   const dragging = ctx.draggingId === task.id;
   const drop = ctx.dropTarget?.taskId === task.id ? ctx.dropTarget : null;
   const nestHighlight = drop?.zone === 'nest';
@@ -74,44 +94,57 @@ export function TaskRow({
 
   const openMenu = (x: number, y: number) => {
     ctx.select(task.id);
+    // When several tasks are picked in Select mode, the menu collapses to a
+    // single "Copy N tasks" acting on the whole selection; otherwise it's the
+    // normal per-task menu, led by a "Copy" for this one task.
+    const selCount = ctx.selectedIds.size;
+    const copyMany =
+      ctx.mode === 'select' && selCount >= 2 && ctx.selectedIds.has(task.id);
+    const items: MenuItem[] = copyMany
+      ? [{ id: 'copy', label: `Copy ${selCount} tasks`, icon: 'content_copy' }]
+      : [
+          { id: 'copy', label: 'Copy', icon: 'content_copy' },
+          {
+            id: 'subtask',
+            label: 'Add subtask',
+            icon: 'subdirectory_arrow_right',
+            dividerAbove: true,
+          },
+          { id: 'rename', label: 'Rename', icon: 'edit' },
+          {
+            id: 'move',
+            label: 'Move to list',
+            icon: 'arrow_forward',
+            disabled: ctx.otherLists.length === 0,
+            submenu: ctx.otherLists.map((l) => ({
+              id: `move:${l.id}`,
+              label: l.name,
+            })),
+          },
+          ...(task.parent_id
+            ? [
+                {
+                  id: 'promote',
+                  label: 'Promote to top level',
+                  icon: 'north_west',
+                },
+              ]
+            : []),
+          {
+            id: 'delete',
+            label: 'Delete task…',
+            icon: 'delete',
+            danger: true,
+            dividerAbove: true,
+          },
+        ];
     menu.open({
       x,
       y,
-      items: [
-        {
-          id: 'subtask',
-          label: 'Add subtask',
-          icon: 'subdirectory_arrow_right',
-        },
-        { id: 'rename', label: 'Rename', icon: 'edit' },
-        {
-          id: 'move',
-          label: 'Move to list',
-          icon: 'arrow_forward',
-          disabled: ctx.otherLists.length === 0,
-          submenu: ctx.otherLists.map((l) => ({
-            id: `move:${l.id}`,
-            label: l.name,
-          })),
-        },
-        ...(task.parent_id
-          ? [
-              {
-                id: 'promote',
-                label: 'Promote to top level',
-                icon: 'north_west',
-              },
-            ]
-          : []),
-        {
-          id: 'delete',
-          label: 'Delete task…',
-          icon: 'delete',
-          danger: true,
-          dividerAbove: true,
-        },
-      ],
+      items,
       onPick: (id) => {
+        if (id === 'copy')
+          ctx.onCopy(copyMany ? [...ctx.selectedIds] : [task.id]);
         if (id === 'subtask') ctx.setComposeFor(task.id);
         if (id === 'rename') ctx.requestRename(task.id);
         if (id === 'promote') ctx.onPromote(task);
@@ -238,7 +271,14 @@ export function TaskRow({
         </span>
 
         <span className="grid w-6 shrink-0 place-items-center">
-          <Check done={task.done} flashing={flash} onToggle={toggleDone} />
+          <Check
+            done={selecting ? picked : task.done}
+            flashing={selecting ? false : flash}
+            selecting={selecting}
+            onToggle={
+              selecting ? () => ctx.onToggleSelect(task.id) : toggleDone
+            }
+          />
         </span>
 
         <div className="ml-2.5 min-w-0 flex-1 py-2">
@@ -333,11 +373,20 @@ function Check({
   done,
   flashing,
   onToggle,
+  selecting = false,
 }: {
   done: boolean;
   flashing: boolean;
   onToggle: () => void;
+  selecting?: boolean;
 }) {
+  const title = selecting
+    ? done
+      ? 'Deselect'
+      : 'Select'
+    : done
+      ? 'Mark not done'
+      : 'Mark done';
   return (
     <button
       onClick={(e) => {
@@ -346,7 +395,7 @@ function Check({
       }}
       onDoubleClick={(e) => e.stopPropagation()}
       className="group/check rounded-field relative h-4.5 w-4.5 shrink-0 overflow-hidden"
-      title={done ? 'Mark not done' : 'Mark done'}
+      title={title}
     >
       <span
         className={`rounded-field absolute inset-0 border-[1.5px] transition-colors duration-100 ${

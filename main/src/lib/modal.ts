@@ -81,6 +81,27 @@ export async function confirmModal(opts: {
   return res.buttonId === 'confirm';
 }
 
+/** The "New list" dialog: name a fresh empty list, or branch off to import one
+ *  from a JSON file. Import ignores the name field (the field carries a random
+ *  suggested name); the imported list takes its name from the document. */
+export async function promptNewList(): Promise<
+  { action: 'create'; name: string } | { action: 'import' } | null
+> {
+  const res = await openModal({
+    icon: 'list_alt_add',
+    title: 'New list',
+    input: { suggest: 'list' },
+    buttons: [
+      { id: 'cancel', label: 'Cancel', variant: 'ghost' },
+      { id: 'import', label: 'Import from JSON…', variant: 'ghost' },
+      { id: 'create', label: 'Create', variant: 'primary' },
+    ],
+  });
+  if (res.buttonId === 'import') return { action: 'import' };
+  const name = res.value?.trim();
+  return res.buttonId === 'create' && name ? { action: 'create', name } : null;
+}
+
 /** Name prompt with a suggested default; resolves the trimmed name or null. */
 export async function promptName(opts: {
   title: string;

@@ -100,6 +100,14 @@ export const api = {
     }),
   reorderTask: (id: string, sortOrder: number) =>
     invoke<Task>('reorder_task', { id, sortOrder }),
+  /** Render the given tasks as a Markdown checklist (Select mode's copy). */
+  copyTasks: (ids: string[]) => invoke<string>('copy_tasks', { ids }),
+
+  // import / export (whole list, as JSON)
+  exportList: (listId: string, path: string) =>
+    invoke<void>('export_list', { listId, path }),
+  importList: (projectId: string, path: string, name?: string) =>
+    invoke<List>('import_list', { projectId, path, name: name ?? null }),
 
   // notes (rich-text blocks per task)
   listNotes: (taskId: string) => invoke<Note[]>('list_notes', { taskId }),

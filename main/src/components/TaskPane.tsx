@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { List, Task } from '../api';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { TaskRow, type RowCtx } from './TaskRow';
+import { TaskRow, type BaseRowCtx, type PaneMode, type RowCtx } from './TaskRow';
 
 interface Props {
   list: List;
   roots: Task[];
-  ctx: RowCtx;
+  ctx: BaseRowCtx;
   isSplit: boolean;
   searching: boolean;
   onCloseSplit?: () => void;
@@ -36,8 +36,35 @@ export function TaskPane({
   const contentRef = useRef<HTMLDivElement>(null);
   const [rootDropOver, setRootDropOver] = useState(false);
 
+  // Select (default) / Mark modes are local to each pane so split panes act
+  // independently. The mode only reinterprets each row's checkbox — in Select it
+  // toggles the row's membership in `selected`, in Mark it toggles done.
+  const [mode, setMode] = useState<PaneMode>('select');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
   const visibleRoots = roots.filter(ctx.isVisible);
-  const open = roots.filter((t) => !t.done).length;
+
+  const onToggleSelect = useCallback((id: string) => {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Switching mode starts the selection fresh (checkboxes reset).
+  const setPaneMode = useCallback((m: PaneMode) => {
+    setSelected(new Set());
+    setMode(m);
+  }, []);
+
+  // Rows augmented with this pane's mode + selection, injected by spreading the
+  // shared ctx — the two panes stay independent while sharing everything else.
+  const paneCtx = useMemo<RowCtx>(
+    () => ({ ...ctx, mode, selectedIds: selected, onToggleSelect }),
+    [ctx, mode, selected, onToggleSelect]
+  );
 
   // Whole-tree tally (roots + every nested subtask) for the stats bar.
   let total = 0;
@@ -129,7 +156,7 @@ export function TaskPane({
       >
         <div ref={contentRef} className="relative pb-6">
           {visibleRoots.map((task) => (
-            <TaskRow key={task.id} task={task} depth={0} ctx={ctx} />
+            <TaskRow key={task.id} task={task} depth={0} ctx={paneCtx} />
           ))}
           {rootDropOver && ctx.draggingId && (
             <div className="rounded-field bg-accent-500l dark:bg-accent-500d relative mx-3 mt-1 h-0.5">
@@ -157,27 +184,66 @@ export function TaskPane({
         </div>
       </div>
 
-      <StatsBar open={open} done={done} total={total} pct={pct} />
+      <StatsBar
+        mode={mode}
+        onSetMode={setPaneMode}
+        done={done}
+        total={total}
+        pct={pct}
+      />
     </section>
   );
 }
 
+/** The Select / Mark toggle that lives in the status bar. Each mode shows its
+ *  own icon; the active one is highlighted. */
+function ModeToggle({
+  mode,
+  onSetMode,
+}: {
+  mode: PaneMode;
+  onSetMode: (m: PaneMode) => void;
+}) {
+  const opt = (m: PaneMode, icon: string, title: string) => {
+    const active = mode === m;
+    return (
+      <button
+        onClick={() => onSetMode(m)}
+        title={title}
+        className={`grid h-5.5 w-6.5 place-items-center rounded-[5px] transition-colors ${
+          active
+            ? 'bg-surface-2l dark:bg-surface-2d text-accent-500l dark:text-accent-500d shadow-sm'
+            : 'text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d'
+        }`}
+      >
+        <Icon name={icon} size={15} weight={300} filled={active} />
+      </button>
+    );
+  };
+  return (
+    <div className="bg-surface-0l dark:bg-surface-0d rounded-field flex items-center gap-0.5 p-0.5">
+      {opt('select', 'select_check_box', 'Select tasks to copy')}
+      {opt('mark', 'task_alt', 'Mark tasks done')}
+    </div>
+  );
+}
+
 function StatsBar({
-  open,
+  mode,
+  onSetMode,
   done,
   total,
   pct,
 }: {
-  open: number;
+  mode: PaneMode;
+  onSetMode: (m: PaneMode) => void;
   done: number;
   total: number;
   pct: number;
 }) {
   return (
     <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d text-content-3l dark:text-content-3d flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
-      <span className="text-accent-500l dark:text-accent-500d">
-        {open} open
-      </span>
+      <ModeToggle mode={mode} onSetMode={onSetMode} />
       <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
       <span>
         {done}/{total} done

@@ -1,13 +1,14 @@
 import { listen } from '@tauri-apps/api/event';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { Spinner } from '@taskscape/common-ui/Spinner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type List, type Project, type Task, type TaskPatch } from './api';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { PreviewPanel } from './components/PreviewPanel';
 import { TaskPane } from './components/TaskPane';
-import type { DropZone, RowCtx } from './components/TaskRow';
+import type { BaseRowCtx, DropZone } from './components/TaskRow';
 import { TitleBar } from './components/TitleBar';
-import { confirmModal, promptName } from './lib/modal';
+import { confirmModal, promptName, promptNewList } from './lib/modal';
 import { overlayOpen } from './lib/overlays';
 import { cmdKey } from './lib/platform';
 
@@ -311,15 +312,51 @@ function App() {
     await load();
   };
 
+  // Import a JSON list file into a new list in the current project (`name`
+  // overrides the document's embedded list name when given).
+  const importList = useCallback(
+    async (name?: string) => {
+      const projectId = projectIdRef.current;
+      if (!projectId) return;
+      const path = await open({
+        multiple: false,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (typeof path !== 'string') return;
+      const list = await api.importList(projectId, path, name);
+      listIdRef.current = list.id;
+      await load();
+    },
+    [load]
+  );
+
+  // Select mode's copy: the backend renders the tasks as a Markdown checklist;
+  // we just place it on the clipboard.
+  const copyTasksToClipboard = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const md = await api.copyTasks(ids);
+    if (md) await navigator.clipboard.writeText(md);
+  }, []);
+
+  // Export a whole list (tasks, subtasks, notes, reference attachments) to JSON.
+  const exportList = useCallback(async (list: List) => {
+    const path = await save({
+      defaultPath: `${list.name}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (!path) return;
+    await api.exportList(list.id, path);
+  }, []);
+
   const createList = async () => {
     if (!selectedProjectId) return;
-    const name = await promptName({
-      title: 'New list',
-      icon: 'list_alt_add',
-      suggestKind: 'list',
-    });
-    if (!name) return;
-    const list = await api.createList(selectedProjectId, name);
+    const res = await promptNewList();
+    if (!res) return;
+    if (res.action === 'import') {
+      await importList();
+      return;
+    }
+    const list = await api.createList(selectedProjectId, res.name);
     listIdRef.current = list.id;
     await load();
   };
@@ -536,7 +573,9 @@ function App() {
   const clearTitleEditReq = useCallback(() => setTitleEditReq(null), []);
 
   // ----- row context shared by both panes -----
-  const ctx: RowCtx = {
+  // The per-pane `mode`/selection is added by each TaskPane; this base holds
+  // everything the two panes share.
+  const ctx: BaseRowCtx = {
     childrenByParent,
     collapsed,
     toggleCollapsed: (id) =>
@@ -564,6 +603,7 @@ function App() {
     onPromote: (task) => moveTask(task.id, null, task.list_id),
     onCreateSubtask: createSubtask,
     onDropOnRow: dropOnRow,
+    onCopy: copyTasksToClipboard,
   };
 
   // Rows visible in a pane, in visual order — for arrow-key navigation.
@@ -589,6 +629,20 @@ function App() {
     },
     []
   );
+
+  // The macOS "List" menu forwards its clicks here as events (it can't reach the
+  // frontend dialog/clipboard itself). Re-subscribes when the active list changes
+  // so Export always targets the list on screen.
+  useEffect(() => {
+    const un1 = listen('menu:import-list', () => void importList());
+    const un2 = listen('menu:export-list', () => {
+      if (activeList) void exportList(activeList);
+    });
+    return () => {
+      un1.then((fn) => fn());
+      un2.then((fn) => fn());
+    };
+  }, [importList, exportList, activeList]);
 
   // ----- keyboard -----
   useEffect(() => {
@@ -712,6 +766,7 @@ function App() {
           onCreateList={createList}
           onRenameList={renameList}
           onDeleteList={deleteList}
+          onExportList={exportList}
           onToggleSplit={toggleSplit}
           onDropTaskOnTab={(taskId, listId) => moveTask(taskId, null, listId)}
           onReorderList={reorderList}
