@@ -844,7 +844,7 @@ pub fn run() {
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .show_menu_on_left_click(false)
+                .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => quit_all(app),
                     "open_main" => focus_or_launch_main(),
