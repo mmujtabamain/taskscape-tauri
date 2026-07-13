@@ -4,6 +4,7 @@ import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useRef } from 'react';
 import { api, type List, type Project } from '../api';
 import { isMac } from '../lib/platform';
+import { useLowPowerMode } from '../lib/reducedMotion';
 import { ListTabs } from './ListTabs';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { WindowControls } from './WindowControls';
@@ -42,6 +43,8 @@ interface Props {
 }
 
 export function TitleBar(props: Props) {
+  const reducedMotion = useLowPowerMode();
+
   const splitTarget =
     props.splitListId ??
     props.lists.find((l) => l.id !== props.activeListId)?.id ??
@@ -139,6 +142,15 @@ export function TitleBar(props: Props) {
             </button>
           )}
         </div>
+
+        {reducedMotion && (
+          <div
+            title="Reduced motion active on Low Power Mode"
+            className="text-content-3l dark:text-content-3d grid h-8 w-8 shrink-0 place-items-center"
+          >
+            <Icon name="motion_photos_off" size={19} weight={300} />
+          </div>
+        )}
 
         <BarButton
           icon="vertical_split"

@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { initReducedMotion } from './lib/reducedMotion';
 import { initTheme } from './lib/theme';
 import { ModalWindow } from './windows/ModalWindow';
 import { SettingsWindow } from './windows/SettingsWindow';
@@ -16,6 +17,7 @@ function route(): React.ReactElement {
 }
 
 initTheme();
+initReducedMotion();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>{route()}</React.StrictMode>

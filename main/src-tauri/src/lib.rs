@@ -1,4 +1,5 @@
 mod panels;
+mod power;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -742,6 +743,13 @@ fn set_window_theme(window: tauri::WebviewWindow, dark: bool) -> Result<(), Stri
     Ok(())
 }
 
+/// Whether macOS is currently in Low Power Mode, read once at frontend startup.
+/// Live changes arrive as `power-state-changed` events (see `power::start_watching`).
+#[tauri::command]
+fn is_low_power_mode() -> bool {
+    power::is_low_power_mode()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let store = Arc::new(
@@ -797,6 +805,9 @@ pub fn run() {
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             launch_embedded_tray();
+
+            // Follow macOS Low Power Mode so the frontend can force reduced motion.
+            power::start_watching(app.handle());
 
             // The frontend draws its own window controls; hiding the native
             // traffic lights (while keeping the Overlay titlebar style) keeps
@@ -944,6 +955,7 @@ pub fn run() {
             close_modal,
             open_settings,
             set_window_theme,
+            is_low_power_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

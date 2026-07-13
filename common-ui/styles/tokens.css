@@ -283,3 +283,13 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Class-driven twin of the block above. macOS Low Power Mode can't be read as a
+   media query, so the frontend toggles `.reduced-motion` on <html> to force the
+   same neutralization (see main/src/lib/reducedMotion.ts). */
+:root.reduced-motion *,
+:root.reduced-motion *::before,
+:root.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
