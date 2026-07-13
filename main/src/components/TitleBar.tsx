@@ -100,7 +100,6 @@ export function TitleBar(props: Props) {
         activeListId={props.activeListId}
         splitListId={props.splitListId}
         focusedListId={props.focusedListId}
-        counts={props.counts}
         onSelect={props.onSelectList}
         onCreate={props.onCreateList}
         onRename={props.onRenameList}

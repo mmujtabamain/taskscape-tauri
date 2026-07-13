@@ -1,8 +1,8 @@
+import { Icon } from '@taskscape/common-ui/Icon';
 import { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import type { List } from '../api';
 import { useContextMenu } from './contextMenuContext';
-import { Icon } from '@taskscape/common-ui/Icon';
 
 const TAB_MIME = 'application/x-list-tab';
 
@@ -14,7 +14,6 @@ interface Props {
   activeListId: string | null;
   splitListId: string | null;
   focusedListId: string | null;
-  counts: Record<string, number>;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onRename: (list: List) => void;
@@ -30,7 +29,6 @@ export function ListTabs({
   activeListId,
   splitListId,
   focusedListId,
-  counts,
   onSelect,
   onCreate,
   onRename,
@@ -96,7 +94,6 @@ export function ListTabs({
         const isLeft = list.id === activeListId;
         const isRight = list.id === splitListId;
         const focused = list.id === focusedListId;
-        const open = counts[list.id] ?? 0;
         const sepAdjacentActive = i === focusedIdx || i - 1 === focusedIdx;
         // The split indicator marks the two panes on screen — shown on BOTH
         // panes, and only while split view is on. The icon points to the side
@@ -123,12 +120,6 @@ export function ListTabs({
             />
             <div
               draggable
-              className={twMerge(
-                'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-2 border-b border-transparent px-4 transition-colors',
-                focused && 'bg-surface-2l dark:bg-surface-2d',
-                dropOver === list.id && 'bg-selection-1l dark:bg-selection-1d',
-                draggingTab === list.id ? 'opacity-40' : ''
-              )}
               onClick={() => onSelect(list.id)}
               onAuxClick={(e) => {
                 if (e.button === 1) onDelete(list);
@@ -185,6 +176,12 @@ export function ListTabs({
                   onReorder(tabId, list.id, over?.before ?? true);
                 }
               }}
+              className={twMerge(
+                'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-2 border-b border-transparent pr-2 pl-4 transition-colors',
+                focused && 'bg-surface-2l dark:bg-surface-2d',
+                dropOver === list.id && 'bg-selection-1l dark:bg-selection-1d',
+                draggingTab === list.id ? 'opacity-40' : ''
+              )}
             >
               {paneDot && (
                 <Icon
@@ -196,24 +193,21 @@ export function ListTabs({
                 className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
                   focused
                     ? 'text-content-1l dark:text-content-1d font-medium'
-                    : 'text-content-2l dark:text-content-2d font-medium'
+                    : 'text-content-3l dark:text-content-3d font-medium'
                 }`}
               >
                 {list.name}
               </span>
-              <span className="relative grid w-4 place-items-center">
-                <span className="text-content-3l dark:text-content-3d text-[11.5px] font-semibold tracking-[0.02em] tabular-nums group-hover:opacity-0">
-                  {open}
-                </span>
+              <span className="relative">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onDelete(list);
                   }}
-                  className="text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d absolute inset-0 grid place-items-center rounded opacity-0 transition-opacity duration-100 group-hover:opacity-100"
+                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center transition-colors"
                   title="Delete list"
                 >
-                  <Icon name="close" size={15} weight={300} />
+                  <Icon name="close" size={15} weight={500} />
                 </button>
               </span>
             </div>
