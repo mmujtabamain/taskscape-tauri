@@ -17,6 +17,8 @@ interface Props {
     focus: ((seed?: string) => void) | null
   ) => void;
   onFocusPane: (listId: string) => void;
+  /** Display combo of the global capture-bar hotkey; empty when unbound. */
+  captureHint: string;
 }
 
 export function TaskPane({
@@ -30,6 +32,7 @@ export function TaskPane({
   onRootDrop,
   registerComposer,
   onFocusPane,
+  captureHint,
 }: Props) {
   const composerRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -177,7 +180,9 @@ export function TaskPane({
               <p className="text-content-3l dark:text-content-3d px-4 text-center text-[13px] tracking-[0.01em]">
                 {searching
                   ? 'Try a different search'
-                  : 'Add a task above, or press ⌘⏎ anywhere to capture one'}
+                  : captureHint
+                    ? `Add a task above, or press ${captureHint} anywhere to capture one`
+                    : 'Add a task above'}
               </p>
             </div>
           )}

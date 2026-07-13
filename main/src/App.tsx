@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
+import { formatAccel, matchesEvent } from '@taskscape/common-ui/hotkeys';
 import { Spinner } from '@taskscape/common-ui/Spinner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type List, type Project, type Task, type TaskPatch } from './api';
@@ -10,7 +11,6 @@ import type { BaseRowCtx, DropZone } from './components/TaskRow';
 import { TitleBar } from './components/TitleBar';
 import { confirmModal, promptName, promptNewList } from './lib/modal';
 import { overlayOpen } from './lib/overlays';
-import { cmdKey } from './lib/platform';
 
 const effSort = (t: Task) => t.sort_order || t.created_at;
 
@@ -141,6 +141,24 @@ function App() {
       un2.then((fn) => fn());
     };
   }, [load]);
+
+  // Effective hotkey combos by command id. Rust owns the catalog; the map is
+  // rebuilt when the settings window closes (`hotkeys-changed`).
+  const [hotkeyMap, setHotkeyMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const loadHotkeys = () =>
+      api
+        .listHotkeys()
+        .then((bindings) =>
+          setHotkeyMap(Object.fromEntries(bindings.map((b) => [b.id, b.accel])))
+        )
+        .catch(() => {});
+    void loadHotkeys();
+    const un = listen('hotkeys-changed', loadHotkeys);
+    return () => {
+      un.then((fn) => fn());
+    };
+  }, []);
 
   // Remember the active project/list so we can restore them next launch, and so
   // tray captures land in the last-used list.
@@ -653,37 +671,41 @@ function App() {
         el.tagName === 'TEXTAREA' ||
         el.isContentEditable;
 
-      if (cmdKey(e)) {
-        if (e.key === 'f') {
-          e.preventDefault();
-          searchFocusRef.current?.();
-          return;
-        }
-        if (e.key === 'n') {
-          e.preventDefault();
-          const target = focusedListId;
-          if (target) composers.current.get(target)?.();
-          return;
-        }
-        if (e.key === ',') {
-          e.preventDefault();
-          api.openSettings();
-          return;
-        }
-        if (e.key === '\\') {
-          e.preventDefault();
-          setPreviewOpen((v) => !v);
-          return;
-        }
-        if (!typing && e.key >= '1' && e.key <= '9') {
-          const list = listsInProject[Number(e.key) - 1];
-          if (list) {
-            e.preventDefault();
-            selectList(list.id);
+      const pressed = (id: string) => matchesEvent(hotkeyMap[id] ?? '', e);
+
+      if (pressed('search')) {
+        e.preventDefault();
+        searchFocusRef.current?.();
+        return;
+      }
+      if (pressed('new_task')) {
+        e.preventDefault();
+        const target = focusedListId;
+        if (target) composers.current.get(target)?.();
+        return;
+      }
+      if (pressed('open_settings')) {
+        e.preventDefault();
+        api.openSettings();
+        return;
+      }
+      if (pressed('toggle_preview')) {
+        e.preventDefault();
+        setPreviewOpen((v) => !v);
+        return;
+      }
+      if (!typing) {
+        for (let i = 1; i <= 9; i++) {
+          if (pressed(`switch_list_${i}`)) {
+            const list = listsInProject[i - 1];
+            if (list) {
+              e.preventDefault();
+              selectList(list.id);
+            }
+            return;
           }
-          return;
         }
-        if (!typing && e.key === 'Backspace' && selectedTask) {
+        if (pressed('delete_task') && selectedTask) {
           e.preventDefault();
           requestDeleteTask(selectedTask);
           return;
@@ -775,6 +797,7 @@ function App() {
           registerSearch={registerSearch}
           previewOpen={previewOpen}
           onTogglePreview={() => setPreviewOpen((v) => !v)}
+          hotkeys={hotkeyMap}
         />
 
         <div className="flex min-h-0 flex-1">
@@ -796,6 +819,7 @@ function App() {
                   onRootDrop={dropOnRoot}
                   registerComposer={registerComposer}
                   onFocusPane={setPaneFocus}
+                  captureHint={formatAccel(hotkeyMap['toggle_capture_bar'] ?? '')}
                 />
               </div>
               {splitList && (
@@ -822,6 +846,7 @@ function App() {
                       onRootDrop={dropOnRoot}
                       registerComposer={registerComposer}
                       onFocusPane={setPaneFocus}
+                      captureHint={formatAccel(hotkeyMap['toggle_capture_bar'] ?? '')}
                     />
                   </div>
                 </>

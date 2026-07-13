@@ -1,12 +1,13 @@
 import { emit } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../api';
 import { Icon } from '@taskscape/common-ui/Icon';
+import { api } from '../api';
 import { setTheme, type ThemePref } from '../lib/theme';
+import { ShortcutsPane } from './ShortcutsPane';
 
-const WIDTH = 520;
-const MAX_HEIGHT = 640;
+const WIDTH = 640;
+const HEIGHT = 520;
 
 const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
   { value: 'system', label: 'System' },
@@ -14,20 +15,16 @@ const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
-const SHORTCUTS: { label: string; keys: string; global?: boolean }[] = [
-  { label: 'Capture bar', keys: '⌘↩', global: true },
-  { label: 'Screenshot capture', keys: '⌘⇧↩', global: true },
-  { label: 'New task', keys: '⌘N' },
-  { label: 'Search', keys: '⌘F' },
-  { label: 'Switch list', keys: '⌘1–9' },
-  { label: 'Toggle preview', keys: '⌘\\' },
-  { label: 'Settings', keys: '⌘,' },
-];
+const PANES = [
+  { id: 'general', label: 'General', icon: 'tune' },
+  { id: 'shortcuts', label: 'Shortcuts', icon: 'keyboard' },
+] as const;
+type PaneId = (typeof PANES)[number]['id'];
 
 function SectionLabel({ children }: { children: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-content-3l dark:text-content-3d text-[11px] font-semibold tracking-[0.1em] uppercase">
+      <span className="text-content-3l dark:text-content-3d text-[11px] font-semibold tracking-widest uppercase">
         {children}
       </span>
       <span className="border-edge-1l dark:border-edge-1d -mr-5 flex-1 border-t" />
@@ -35,15 +32,76 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
+function GeneralPane({
+  theme,
+  onTheme,
+  showCompleted,
+  onToggleCompleted,
+}: {
+  theme: ThemePref;
+  onTheme: (next: ThemePref) => void;
+  showCompleted: boolean;
+  onToggleCompleted: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <section className="space-y-3">
+        <SectionLabel>Appearance</SectionLabel>
+        <div className="rounded-control bg-surface-0l dark:bg-surface-0d flex p-0.5">
+          {THEME_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onTheme(o.value)}
+              className={`rounded-field h-7 flex-1 text-[12px] font-medium transition duration-150 ${
+                theme === o.value
+                  ? 'border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d border'
+                  : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <SectionLabel>Tasks</SectionLabel>
+        <div className="flex items-center justify-between">
+          <span className="text-content-1l dark:text-content-1d text-[13px]">
+            Show completed tasks
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showCompleted}
+            aria-label="Show completed tasks"
+            onClick={onToggleCompleted}
+            className={`relative h-5 w-8.5 shrink-0 rounded-full border transition-colors duration-160 ${
+              showCompleted
+                ? 'bg-accent-500l dark:bg-accent-500d border-transparent'
+                : 'border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d'
+            }`}
+          >
+            <span
+              className={`bg-surface-3l dark:bg-surface-3d absolute top-1/2 left-px h-4 w-4 -translate-y-1/2 rounded-full shadow-sm transition-transform duration-160 ${
+                showCompleted ? 'translate-x-3.5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function SettingsWindow() {
+  const [pane, setPane] = useState<PaneId>('general');
   const [theme, setThemeChoice] = useState<ThemePref>('system');
   const [showCompleted, setShowCompleted] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [presented, setPresented] = useState(false);
 
-  const headerRef = useRef<HTMLElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const footerRef = useRef<HTMLElement>(null);
   const presentedRef = useRef(false);
 
   useEffect(() => {
@@ -63,17 +121,13 @@ export function SettingsWindow() {
     };
   }, []);
 
-  // Measure after fonts settle, then size, center and reveal the hidden
-  // window exactly once (StrictMode-safe).
+  // Size, center and reveal the hidden window exactly once, after fonts settle
+  // (StrictMode-safe). The window is a fixed size; panes scroll internally.
   useEffect(() => {
     if (!loaded || presentedRef.current) return;
     presentedRef.current = true;
     void document.fonts.ready.then(() => {
-      const height =
-        (headerRef.current?.offsetHeight ?? 44) +
-        (bodyRef.current?.scrollHeight ?? 0) +
-        (footerRef.current?.offsetHeight ?? 0);
-      void api.presentWindow(WIDTH, Math.min(height, MAX_HEIGHT));
+      void api.presentWindow(WIDTH, HEIGHT);
       setPresented(true);
     });
   }, [loaded]);
@@ -116,7 +170,6 @@ export function SettingsWindow() {
         }
       >
         <header
-          ref={headerRef}
           data-tauri-drag-region
           className="border-edge-2l dark:border-edge-2d flex h-11 shrink-0 items-center border-b px-4"
         >
@@ -136,86 +189,40 @@ export function SettingsWindow() {
           </button>
         </header>
 
-        <div
-          ref={bodyRef}
-          className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4"
-        >
-          <section className="space-y-3">
-            <SectionLabel>Appearance</SectionLabel>
-            <div className="rounded-control bg-surface-0l dark:bg-surface-0d flex p-0.5">
-              {THEME_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => chooseTheme(o.value)}
-                  className={`rounded-field h-7 flex-1 text-[12px] font-medium transition duration-150 ${
-                    theme === o.value
-                      ? 'border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d border'
-                      : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <SectionLabel>Tasks</SectionLabel>
-            <div className="flex items-center justify-between">
-              <span className="text-content-1l dark:text-content-1d text-[13px]">
-                Show completed tasks
-              </span>
+        <div className="flex min-h-0 flex-1">
+          <nav className="border-edge-1l dark:border-edge-1d w-40 shrink-0 space-y-0.5 border-r px-2 py-3">
+            {PANES.map((p) => (
               <button
+                key={p.id}
                 type="button"
-                role="switch"
-                aria-checked={showCompleted}
-                aria-label="Show completed tasks"
-                onClick={toggleCompleted}
-                className={`relative h-5 w-[34px] shrink-0 rounded-full border transition-colors duration-[160ms] ${
-                  showCompleted
-                    ? 'bg-accent-500l dark:bg-accent-500d border-transparent'
-                    : 'border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d'
+                onClick={() => setPane(p.id)}
+                className={`rounded-field flex h-8 w-full items-center gap-2 px-2.5 text-[13px] font-medium transition duration-150 ${
+                  pane === p.id
+                    ? 'bg-wash-2l dark:bg-wash-2d text-content-1l dark:text-content-1d'
+                    : 'text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d'
                 }`}
               >
-                <span
-                  className={`bg-surface-3l dark:bg-surface-3d absolute top-1/2 left-px h-4 w-4 -translate-y-1/2 rounded-full shadow-sm transition-transform duration-[160ms] ${
-                    showCompleted ? 'translate-x-[14px]' : 'translate-x-0'
-                  }`}
-                />
+                <Icon name={p.icon} size={16} />
+                {p.label}
               </button>
-            </div>
-          </section>
+            ))}
+          </nav>
 
-          <section className="space-y-3">
-            <SectionLabel>Shortcuts</SectionLabel>
-            <div className="space-y-2">
-              {SHORTCUTS.map((s) => (
-                <div
-                  key={s.label}
-                  className="text-content-2l dark:text-content-2d flex items-center justify-between text-[12.5px]"
-                >
-                  <span>{s.label}</span>
-                  <span className="flex items-center gap-1.5">
-                    {s.global && (
-                      <span className="text-content-3l dark:text-content-3d text-[10px] tracking-[0.08em] uppercase">
-                        global
-                      </span>
-                    )}
-                    <kbd className="rounded-field border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d text-content-2l dark:text-content-2d inline-flex h-5 items-center border px-1.5 font-sans text-[11px] tabular-nums">
-                      {s.keys}
-                    </kbd>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {pane === 'general' ? (
+              <GeneralPane
+                theme={theme}
+                onTheme={chooseTheme}
+                showCompleted={showCompleted}
+                onToggleCompleted={toggleCompleted}
+              />
+            ) : (
+              <ShortcutsPane />
+            )}
+          </div>
         </div>
 
-        <footer
-          ref={footerRef}
-          className="text-content-3l dark:text-content-3d shrink-0 pb-4 text-center text-[11px]"
-        >
+        <footer className="text-content-3l dark:text-content-3d shrink-0 pb-4 text-center text-[11px]">
           Taskscape 0.1.0
         </footer>
       </div>

@@ -1,8 +1,9 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useRef } from 'react';
 import { api, type List, type Project } from '../api';
-import { cmd, isMac } from '../lib/platform';
+import { isMac } from '../lib/platform';
 import { ListTabs } from './ListTabs';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { WindowControls } from './WindowControls';
@@ -35,6 +36,9 @@ interface Props {
 
   previewOpen: boolean;
   onTogglePreview: () => void;
+
+  /** Effective hotkey combos by command id, for the hint labels. */
+  hotkeys: Record<string, string>;
 }
 
 export function TitleBar(props: Props) {
@@ -42,6 +46,12 @@ export function TitleBar(props: Props) {
     props.splitListId ??
     props.lists.find((l) => l.id !== props.activeListId)?.id ??
     null;
+
+  // "  ⌘F"-style suffix for a tooltip/placeholder; empty when unbound.
+  const hint = (id: string) => {
+    const accel = formatAccel(props.hotkeys[id] ?? '');
+    return accel ? `  ${accel}` : '';
+  };
 
   const searchRef = useRef<HTMLInputElement>(null);
   const { registerSearch } = props;
@@ -116,7 +126,7 @@ export function TitleBar(props: Props) {
                 (e.target as HTMLInputElement).blur();
               }
             }}
-            placeholder={`Search  ${cmd}F`}
+            placeholder={`Search${hint('search')}`}
             className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[13px] outline-none"
           />
           {props.search && (
@@ -140,12 +150,12 @@ export function TitleBar(props: Props) {
         <BarButton
           icon={props.previewOpen ? 'right_panel_close' : 'right_panel_open'}
           active={props.previewOpen}
-          title={`${props.previewOpen ? 'Hide' : 'Show'} preview panel  ${cmd}\\`}
+          title={`${props.previewOpen ? 'Hide' : 'Show'} preview panel${hint('toggle_preview')}`}
           onClick={props.onTogglePreview}
         />
         <BarButton
           icon="settings"
-          title={`Settings  ${cmd},`}
+          title={`Settings${hint('open_settings')}`}
           onClick={() => api.openSettings()}
         />
       </div>

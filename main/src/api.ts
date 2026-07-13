@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { HotkeyBinding } from '@taskscape/common-ui/hotkeys';
 import type { Attachment, LinkType } from '@taskscape/common-ui/types';
 
-export type { Attachment, LinkType };
+export type { Attachment, HotkeyBinding, LinkType };
 
 export interface Project {
   id: string;
@@ -125,6 +126,12 @@ export const api = {
   getSetting: (key: string) => invoke<string | null>('get_setting', { key }),
   setSetting: (key: string, value: string) =>
     invoke<void>('set_setting', { key, value }),
+
+  // hotkeys (catalog + user bindings; conflicts are rejected by the backend)
+  listHotkeys: () => invoke<HotkeyBinding[]>('list_hotkeys'),
+  setHotkey: (id: string, accel: string) =>
+    invoke<void>('set_hotkey', { id, accel }),
+  resetHotkey: (id: string) => invoke<void>('reset_hotkey', { id }),
 
   // windows (modals, settings)
   openModal: (id: string, props: unknown) =>

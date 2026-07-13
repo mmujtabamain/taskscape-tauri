@@ -78,15 +78,24 @@ panic) makes overlapping captures a no-op, so two triggers can't collide.
 
 ## Hotkeys
 
-Registered via `tauri-plugin-global-shortcut`; the single handler dispatches on
-which shortcut fired (only on `Pressed`):
+**User-customizable** via the centralized hotkey system (`common/src/hotkeys.rs`
+owns the catalog + settings-backed bindings; edited in main's Settings ▸
+Shortcuts pane). At startup — and on every `POST /reload-hotkeys` from main —
+`refresh_global_shortcuts` resolves the two `Global`-scope commands from
+settings asynchronously and (re)registers them on the main thread via
+`tauri-plugin-global-shortcut`, updating the tray tooltip to match. The single
+handler dispatches by comparing the fired shortcut against that registered
+state (only on `Pressed`):
 
-- **⌘Return** (`hotkey()` = `SUPER + Enter`) toggles the mini bar (`toggle_mini`).
-- **⌘⇧Return** (`screenshot_hotkey()` = `SUPER | SHIFT + Enter`) captures a
+- **`toggle_capture_bar`** (default **⌘Return**) toggles the mini bar (`toggle_mini`).
+- **`screenshot_capture`** (default **⌘⇧Return**) captures a
   screenshot and attaches it (`capture_and_show`): summons the bar **instantly**
   (showing a spinner) if it was hidden, or reuses it if it's already open, then
   captures in the background and attaches the shot when it lands. See
   [The capture flow](#the-capture-flow).
+
+A combo the OS refuses (taken by another app) is logged and the previous
+registration is kept.
 
 ## Tauri commands (Rust ⇄ frontend)
 

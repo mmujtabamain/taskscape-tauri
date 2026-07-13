@@ -8,6 +8,7 @@ Everything both apps share: persistence, screenshots, attachments, and the HTTP 
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `lib.rs`         | Re-exports (`Store`, `Project`, `List`, `Task`, `Note`, `Attachment`, `LinkType`) and the port constants `MAIN_PORT`/`TRAY_PORT`.      |
 | `models.rs`      | Serde **domain** structs: `Project`, `List`, `Task`, `Note`, `Attachment`, and `LinkType` (`Reference` \| `Copy`). The JSON contract.  |
+| `hotkeys.rs`     | The hotkey system's source of truth: command catalog, canonical accel format, `resolve`/`set_binding` (conflict-checked) over the `settings` table (key `hotkeys`). The frontend twin is `common-ui/src/hotkeys.ts`. |
 | `storage.rs`     | `Store` — the async SeaORM handle. All DB reads/writes; maps entities → domain models.                                                 |
 | `entities/`      | **Generated** SeaORM entities (`sea-orm-cli`, via `gen-entities.sh`). Never serialized to the frontend — mapped in `storage.rs`.       |
 | `migrations.rs`  | Runtime applier: embeds `common/migrations/*.sql` and applies unrecorded versions at startup. Atlas authors the SQL; it's not shipped. |

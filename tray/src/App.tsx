@@ -1,3 +1,4 @@
+import { formatAccel, matchesEvent } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import {
   RichTextEditor,
@@ -51,14 +52,31 @@ function App() {
     requestAnimationFrame(() => titleRef.current?.focus());
   }, []);
 
+  // Effective hotkey combos by command id (the bar uses `clear_draft` and the
+  // `screenshot_capture` hints). Rust owns the catalog; the map is refreshed on
+  // every reveal and when the settings window closes (`hotkeys-changed`).
+  const [hotkeyMap, setHotkeyMap] = useState<Record<string, string>>({});
+  const loadHotkeys = useCallback(() => {
+    api
+      .listHotkeys()
+      .then((bindings) =>
+        setHotkeyMap(Object.fromEntries(bindings.map((b) => [b.id, b.accel])))
+      )
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     refreshTarget();
+    loadHotkeys();
     const subs = [
-      // Summoned: refocus the title field and refresh the target name.
+      // Summoned: refocus the title field, refresh the target name and pick up
+      // any hotkey changes made while the bar was hidden.
       listen('mini-shown', () => {
         refreshTarget();
+        loadHotkeys();
         focusTitle();
       }),
+      listen('hotkeys-changed', loadHotkeys),
       // A capture is in flight (button or ⌘⇧Return) — show the spinner.
       listen('screenshot-pending', () => {
         setError(null);
@@ -80,7 +98,7 @@ function App() {
     return () => {
       subs.forEach((s) => s.then((fn) => fn()));
     };
-  }, []);
+  }, [loadHotkeys]);
 
   // Clear a surfaced capture error after a few seconds.
   useEffect(() => {
@@ -89,16 +107,16 @@ function App() {
     return () => clearTimeout(t);
   }, [error]);
 
-  // ⌘⇧⌫ clears the draft from anywhere in the bar. A capture-phase listener on
-  // window fires before the title field's and the notes editor's own key
-  // handling (the editor stops React propagation), so it works in either field.
+  const clearAccel = hotkeyMap['clear_draft'] ?? '';
+  const screenshotHint = formatAccel(hotkeyMap['screenshot_capture'] ?? '');
+
+  // The clear-draft combo (⌘⇧⌫ by default, user-customizable) works from
+  // anywhere in the bar. A capture-phase listener on window fires before the
+  // title field's and the notes editor's own key handling (the editor stops
+  // React propagation), so it works in either field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (
-        e.metaKey &&
-        e.shiftKey &&
-        (e.key === 'Backspace' || e.key === 'Delete')
-      ) {
+      if (matchesEvent(clearAccel, e)) {
         e.preventDefault();
         e.stopPropagation();
         clearDraft();
@@ -107,7 +125,7 @@ function App() {
     window.addEventListener('keydown', onKey, { capture: true });
     return () =>
       window.removeEventListener('keydown', onKey, { capture: true });
-  }, [clearDraft]);
+  }, [clearAccel, clearDraft]);
 
   // Hide the mouse pointer when the bar opens (it lands right on the title field)
   // and while typing, and bring it straight back on any real mouse movement — so
@@ -229,13 +247,19 @@ function App() {
               'gap-0 text-[11px]',
               'text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d'
             )}
-            title="Clear the draft (⌘⇧⌫)"
+            title={
+              clearAccel
+                ? `Clear the draft (${formatAccel(clearAccel)})`
+                : 'Clear the draft'
+            }
           >
             <Icon name="delete_sweep" size={16} />
             <p className="px-1">Clear</p>
-            <kbd className="text-content-3l dark:text-content-3d font-sans text-[11px] not-italic">
-              ⌘⇧⌫
-            </kbd>
+            {clearAccel && (
+              <kbd className="text-content-3l dark:text-content-3d font-sans text-[11px] not-italic">
+                {formatAccel(clearAccel)}
+              </kbd>
+            )}
           </button>
         )}
       </div>
@@ -316,8 +340,8 @@ function App() {
                 : error
                   ? error
                   : count
-                    ? `${count} screenshot${count > 1 ? 's' : ''} attached — add another (⌘⇧⏎)`
-                    : 'Attach a full-screen screenshot (⌘⇧⏎)'
+                    ? `${count} screenshot${count > 1 ? 's' : ''} attached — add another${screenshotHint ? ` (${screenshotHint})` : ''}`
+                    : `Attach a full-screen screenshot${screenshotHint ? ` (${screenshotHint})` : ''}`
             }
           >
             {capturing ? (
@@ -338,9 +362,11 @@ function App() {
                     ? `${count} shot${count > 1 ? 's' : ''}`
                     : 'Screenshot'}
                 </span>
-                <kbd className="text-content-3l dark:text-content-3d font-sans text-[11px] not-italic">
-                  ⌘⇧⏎
-                </kbd>
+                {screenshotHint && (
+                  <kbd className="text-content-3l dark:text-content-3d font-sans text-[11px] not-italic">
+                    {screenshotHint}
+                  </kbd>
+                )}
               </>
             )}
           </button>

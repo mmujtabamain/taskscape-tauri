@@ -9,6 +9,7 @@ pub mod attachments;
 // re-exports go unused because storage.rs references entities directly.
 #[allow(unused_imports)]
 mod entities;
+pub mod hotkeys;
 mod migrations;
 pub mod models;
 pub mod names;

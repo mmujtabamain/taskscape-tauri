@@ -10,7 +10,9 @@ use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl,
     WebviewWindowBuilder, WindowEvent,
 };
-use taskscape_common::{server, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT};
+use taskscape_common::{
+    hotkeys, server, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT, TRAY_PORT,
+};
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
@@ -519,6 +521,31 @@ async fn set_setting(
     store.set_setting(&key, &value).await.map_err(err)
 }
 
+/// The hotkey catalog with effective (user-customized) combos.
+#[tauri::command]
+async fn list_hotkeys(
+    store: State<'_, Arc<Store>>,
+) -> Result<Vec<hotkeys::ResolvedBinding>, String> {
+    hotkeys::resolve(&store).await.map_err(err)
+}
+
+/// Persist one binding (`""` unbinds). The error carries the conflict message
+/// the shortcuts editor shows inline.
+#[tauri::command]
+async fn set_hotkey(
+    store: State<'_, Arc<Store>>,
+    id: String,
+    accel: String,
+) -> Result<(), String> {
+    hotkeys::set_binding(&store, &id, &accel).await.map_err(err)
+}
+
+/// Restore one binding to its default combo.
+#[tauri::command]
+async fn reset_hotkey(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+    hotkeys::reset_binding(&store, &id).await.map_err(err)
+}
+
 /// Open an attachment with the OS default handler. Copies resolve to their file
 /// under `~/.taskscape/`; references (URLs / file / network paths) open as-is.
 #[tauri::command]
@@ -681,8 +708,9 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
         WebviewUrl::App("index.html#settings".into()),
     )
     .title("Settings")
-    .inner_size(520., 560.)
-    .resizable(false)
+    .inner_size(640., 520.)
+    .min_inner_size(640., 520.)
+    .resizable(true)
     .minimizable(false)
     .maximizable(false)
     .decorations(false)
@@ -854,6 +882,19 @@ pub fn run() {
                     }
                 }
                 let _ = window.hide();
+                // Settings may have rebound hotkeys: tell this window's frontend
+                // to rebuild its key map, and the tray to re-register its globals.
+                if window.label() == "settings" {
+                    let _ = window.app_handle().emit_to("main", "hotkeys-changed", ());
+                    tauri::async_runtime::spawn(async {
+                        let _ = server::client::post_json(
+                            TRAY_PORT,
+                            "/reload-hotkeys",
+                            &serde_json::json!({}),
+                        )
+                        .await;
+                    });
+                }
             }
             _ => {}
         })
@@ -894,6 +935,9 @@ pub fn run() {
             set_active_project,
             get_setting,
             set_setting,
+            list_hotkeys,
+            set_hotkey,
+            reset_hotkey,
             open_modal,
             modal_current,
             present_window,

@@ -23,6 +23,7 @@ All are thin wrappers over the shared `Store` (see [common-crate.md](common-crat
 - Tasks: `list_tasks`, `all_tasks`, `create_task`, `update_task`, `delete_task`, `set_task_due`.
 - Attachments: `list_attachments`, `add_reference`, `add_copy`, `delete_attachment`, `open_attachment`.
 - Settings: `set_active_list` (writes `last_active_list`, which the tray reads to decide where captures go).
+- Hotkeys: `list_hotkeys`, `set_hotkey`, `reset_hotkey` (thin wrappers over `common::hotkeys`; edited in Settings ▸ Shortcuts). When the settings window closes, main emits `hotkeys-changed` to its webview and POSTs `/reload-hotkeys` to the tray (:7421) so both sides re-apply bindings.
 
 ## HTTP: what main serves that the tray calls
 

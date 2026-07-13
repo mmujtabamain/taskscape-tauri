@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { HotkeyBinding } from "@taskscape/common-ui/hotkeys";
 
 export interface CaptureTarget {
   project: string;
@@ -7,6 +8,7 @@ export interface CaptureTarget {
 
 export const api = {
   hideMini: () => invoke<void>("hide_mini"),
+  listHotkeys: () => invoke<HotkeyBinding[]>("list_hotkeys"),
   captureTarget: () => invoke<CaptureTarget>("capture_target"),
   openMain: () => invoke<void>("open_main"),
   // Fire-and-forget: the capture runs in the background and reports progress via
