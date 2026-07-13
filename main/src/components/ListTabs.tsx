@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import type { List } from '../api';
 import { useContextMenu } from './contextMenuContext';
@@ -17,7 +17,7 @@ interface Props {
   counts: Record<string, number>;
   onSelect: (id: string) => void;
   onCreate: () => void;
-  onRename: (id: string, name: string) => void;
+  onRename: (list: List) => void;
   onDelete: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTask: (taskId: string, listId: string) => void;
@@ -39,7 +39,6 @@ export function ListTabs({
   onReorder,
 }: Props) {
   const menu = useContextMenu();
-  const [renaming, setRenaming] = useState<string | null>(null);
   const [dropOver, setDropOver] = useState<string | null>(null);
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
   const [tabOver, setTabOver] = useState<{
@@ -72,7 +71,7 @@ export function ListTabs({
         },
       ],
       onPick: (id) => {
-        if (id === 'rename') setRenaming(list.id);
+        if (id === 'rename') onRename(list);
         if (id === 'split') onToggleSplit(list.id);
         if (id === 'delete') onDelete(list);
       },
@@ -114,7 +113,7 @@ export function ListTabs({
               )}
             />
             <div
-              draggable={renaming !== list.id}
+              draggable
               className={twMerge(
                 'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-2 border-b border-transparent px-4 transition-colors',
                 focused && 'bg-surface-2l dark:bg-surface-2d',
@@ -122,7 +121,6 @@ export function ListTabs({
                 draggingTab === list.id ? 'opacity-40' : ''
               )}
               onClick={() => onSelect(list.id)}
-              onDoubleClick={() => setRenaming(list.id)}
               onAuxClick={(e) => {
                 if (e.button === 1) onDelete(list);
               }}
@@ -185,25 +183,15 @@ export function ListTabs({
                   className="text-accent-500l dark:text-accent-500d"
                 />
               )}
-              {renaming === list.id ? (
-                <TabRenameInput
-                  initial={list.name}
-                  onDone={(name) => {
-                    setRenaming(null);
-                    if (name && name !== list.name) onRename(list.id, name);
-                  }}
-                />
-              ) : (
-                <span
-                  className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
-                    focused
-                      ? 'text-content-1l dark:text-content-1d font-medium'
-                      : 'text-content-2l dark:text-content-2d font-medium'
-                  }`}
-                >
-                  {list.name}
-                </span>
-              )}
+              <span
+                className={`max-w-40 truncate text-[13px] tracking-[0.01em] ${
+                  focused
+                    ? 'text-content-1l dark:text-content-1d font-medium'
+                    : 'text-content-2l dark:text-content-2d font-medium'
+                }`}
+              >
+                {list.name}
+              </span>
               <span className="relative grid w-4 place-items-center">
                 <span className="text-content-3l dark:text-content-3d text-[11.5px] font-semibold tracking-[0.02em] tabular-nums group-hover:opacity-0">
                   {open}
@@ -274,31 +262,5 @@ export function ListTabs({
       {/* Trailing empty strip drags the window (the tabs themselves are interactive). */}
       <span data-tauri-drag-region className="min-w-6 flex-1 self-stretch" />
     </div>
-  );
-}
-
-function TabRenameInput({
-  initial,
-  onDone,
-}: {
-  initial: string;
-  onDone: (name: string | null) => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    ref.current?.select();
-  }, []);
-  return (
-    <input
-      ref={ref}
-      defaultValue={initial}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onDone(ref.current?.value.trim() || null);
-        if (e.key === 'Escape') onDone(null);
-      }}
-      onBlur={() => onDone(ref.current?.value.trim() || null)}
-      className="bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d w-32 rounded px-1.5 py-0.5 text-[13px] font-medium outline-none"
-    />
   );
 }

@@ -22,7 +22,7 @@ interface Props {
   counts: Record<string, number>;
   onSelectList: (id: string) => void;
   onCreateList: () => void;
-  onRenameList: (id: string, name: string) => void;
+  onRenameList: (list: List) => void;
   onDeleteList: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTaskOnTab: (taskId: string, listId: string) => void;

@@ -12,8 +12,7 @@ export interface RowCtx {
   toggleCollapsed: (id: string) => void;
   selectedTaskId: string | null;
   select: (id: string) => void;
-  renamingId: string | null;
-  requestRename: (id: string | null) => void;
+  requestRename: (id: string) => void;
   dropTarget: { taskId: string; zone: DropZone } | null;
   setDropTarget: (t: { taskId: string; zone: DropZone } | null) => void;
   draggingId: string | null;
@@ -24,7 +23,6 @@ export interface RowCtx {
   forceExpand: boolean;
   otherLists: List[];
   onToggleDone: (task: Task) => void;
-  onRename: (id: string, title: string) => void;
   onRequestDelete: (task: Task) => void;
   onMoveToList: (id: string, listId: string) => void;
   onPromote: (task: Task) => void;
@@ -44,7 +42,6 @@ export function TaskRow({
   ctx: RowCtx;
 }) {
   const menu = useContextMenu();
-  const renaming = ctx.renamingId === task.id;
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
 
@@ -136,7 +133,7 @@ export function TaskRow({
     <div>
       <div
         data-task-id={task.id}
-        draggable={!renaming}
+        draggable
         onDragStart={(e) => {
           e.dataTransfer.setData('application/x-task', task.id);
           e.dataTransfer.effectAllowed = 'move';
@@ -180,7 +177,6 @@ export function TaskRow({
         }}
         onClick={() => ctx.select(task.id)}
         onDoubleClick={(e) => {
-          if (renaming) return;
           e.stopPropagation();
           toggleDone();
         }}
@@ -246,25 +242,15 @@ export function TaskRow({
         </span>
 
         <div className="ml-2.5 min-w-0 flex-1 py-2">
-          {renaming ? (
-            <RenameInput
-              initial={task.title}
-              onDone={(title) => {
-                ctx.requestRename(null);
-                if (title && title !== task.title) ctx.onRename(task.id, title);
-              }}
-            />
-          ) : (
-            <div
-              className={`truncate text-[14px] leading-4.75 font-medium ${
-                task.done
-                  ? 'strike strike-on text-content-3l dark:text-content-3d'
-                  : 'text-content-1l dark:text-content-1d'
-              }`}
-            >
-              {task.title}
-            </div>
-          )}
+          <div
+            className={`truncate text-[14px] leading-4.75 font-medium ${
+              task.done
+                ? 'strike strike-on text-content-3l dark:text-content-3d'
+                : 'text-content-1l dark:text-content-1d'
+            }`}
+          >
+            {task.title}
+          </div>
           {task.notes && (
             <div
               className={`truncate text-[12.5px] leading-4.25 ${
@@ -411,33 +397,6 @@ function Check({
         </svg>
       )}
     </button>
-  );
-}
-
-function RenameInput({
-  initial,
-  onDone,
-}: {
-  initial: string;
-  onDone: (title: string | null) => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    ref.current?.select();
-  }, []);
-  return (
-    <input
-      ref={ref}
-      defaultValue={initial}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        e.stopPropagation();
-        if (e.key === 'Enter') onDone(ref.current?.value.trim() || null);
-        if (e.key === 'Escape') onDone(null);
-      }}
-      onBlur={() => onDone(ref.current?.value.trim() || null)}
-      className="rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d w-full px-1.5 py-0.5 text-[14px] font-medium outline-none"
-    />
   );
 }
 

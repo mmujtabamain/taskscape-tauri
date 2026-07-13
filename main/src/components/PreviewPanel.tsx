@@ -37,6 +37,10 @@ interface PreviewPanelProps {
   onRequestDelete: (task: Task) => void;
   onRefresh: () => void;
   onClose: () => void;
+  /** When this points at the shown task, the inspector begins editing its title;
+   *  `onTitleEditStarted` clears it so a later request can re-trigger. */
+  titleEditReq: { id: string; n: number } | null;
+  onTitleEditStarted: () => void;
 }
 
 /** Prompt for a URL via the native modal; resolves the trimmed URL or null.
@@ -196,9 +200,12 @@ function TaskInspector({
   onRequestDelete,
   onRefresh,
   onClose,
+  titleEditReq,
+  onTitleEditStarted,
 }: InspectorProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task.title);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
   const [addingNote, setAddingNote] = useState(false);
@@ -318,12 +325,48 @@ function TaskInspector({
     };
   }, [task.attachments]);
 
+  const startTitleEdit = () => {
+    setTitleDraft(task.title);
+    setEditingTitle(true);
+  };
+
   const commitTitle = () => {
+    if (!editingTitle) return;
     const t = titleDraft.trim();
     if (t && t !== task.title) onUpdateTask(task.id, { title: t });
     else setTitleDraft(task.title);
     setEditingTitle(false);
   };
+
+  // A rename requested from a task row (or F2/Enter) reaches this inspector as a
+  // prop. Begin editing during render (React's "you might not need an effect"
+  // state adjustment); the effect then clears the request in the parent so it
+  // can't re-fire when the task is reselected later.
+  const renameRequested = titleEditReq?.id === task.id;
+  if (renameRequested && !editingTitle) {
+    setTitleDraft(task.title);
+    setEditingTitle(true);
+  }
+  useEffect(() => {
+    if (renameRequested) onTitleEditStarted();
+  }, [renameRequested, onTitleEditStarted]);
+
+  // Focus and select when editing opens, from any trigger.
+  useEffect(() => {
+    if (!editingTitle) return;
+    const el = titleRef.current;
+    el?.focus();
+    el?.select();
+  }, [editingTitle]);
+
+  // Grow the field to fit the wrapped title so display and edit share a height
+  // (no swap, no layout shift) — the whole point of editing in place.
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [task.title, titleDraft, editingTitle]);
 
   const addFile = async () => {
     const picked = await open({
@@ -432,7 +475,7 @@ function TaskInspector({
       <div className="relative shrink-0 p-4">
         {/* Index tick: the panel "receives" the selection. */}
         <span className="bg-accent-500l dark:bg-accent-500d absolute top-4.75 left-0 h-4 w-0.5" />
-        <div className="flex items-start gap-2.5">
+        <div className="group/head flex items-start gap-2.5">
           <div className="mt-0.5">
             <DoneCheckbox
               done={task.done}
@@ -441,33 +484,46 @@ function TaskInspector({
             />
           </div>
           <div className="min-w-0 flex-1">
-            {editingTitle ? (
-              <input
-                autoFocus
-                value={titleDraft}
+            {/* One field for display and edit: readonly text that wraps, gaining a
+                fill + same-color ring (a padding halo) when editing — never a swap. */}
+            <div className="flex items-start gap-1">
+              <textarea
+                ref={titleRef}
+                rows={1}
+                spellCheck={false}
+                readOnly={!editingTitle}
+                value={editingTitle ? titleDraft : task.title}
                 onChange={(e) => setTitleDraft(e.target.value)}
+                onClick={() => {
+                  if (!editingTitle) startTitleEdit();
+                }}
                 onBlur={commitTitle}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitTitle();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitTitle();
+                  }
                   if (e.key === 'Escape') {
                     setTitleDraft(task.title);
                     setEditingTitle(false);
                   }
                 }}
-                className="rounded-field bg-surface-0l dark:bg-surface-0d font-display text-content-1l dark:text-content-1d -mx-1 w-[calc(100%+8px)] px-1 text-[18px] leading-6 font-semibold outline-none"
+                className={`font-display text-content-1l dark:text-content-1d rounded-field -ml-1 block min-w-0 flex-1 cursor-text resize-none overflow-hidden border-0 bg-transparent px-1 py-0 text-[18px] leading-6 font-semibold outline-none ${
+                  editingTitle
+                    ? 'bg-surface-0l dark:bg-surface-0d ring-surface-0l dark:ring-surface-0d ring-2'
+                    : ''
+                }`}
               />
-            ) : (
-              <button
-                onClick={() => {
-                  setTitleDraft(task.title);
-                  setEditingTitle(true);
-                }}
-                title="Click to edit"
-                className="font-display text-content-1l dark:text-content-1d block w-full text-left text-[18px] leading-6 font-semibold"
-              >
-                {task.title}
-              </button>
-            )}
+              {!editingTitle && (
+                <button
+                  onClick={startTitleEdit}
+                  title="Rename"
+                  className="text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded opacity-0 transition-opacity group-hover/head:opacity-100"
+                >
+                  <Icon name="edit" size={15} weight={300} />
+                </button>
+              )}
+            </div>
             <div className="text-content-3l dark:text-content-3d mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums">
               <span className="flex items-center gap-1.5">
                 <Icon

@@ -89,8 +89,9 @@ export async function promptName(opts: {
   initialValue?: string;
   placeholder?: string;
   confirmLabel?: string;
-  /** Which default-name pool the dice suggests from. Only shown for a fresh
-   *  name (no `initialValue`); defaults to the list pool. */
+  /** Which default-name pool the dice suggests from. Passing this shows the
+   *  suggestor even when renaming (with an `initialValue`); omit it and the
+   *  dice appears only for a fresh name, from the list pool. */
   suggestKind?: 'project' | 'list';
   /** Locked, greyed suffix appended to the returned name (e.g. `.png`). */
   suffix?: string;
@@ -103,7 +104,7 @@ export async function promptName(opts: {
       placeholder: opts.placeholder,
       initialValue: opts.initialValue,
       suffix: opts.suffix,
-      suggest: opts.initialValue ? undefined : (opts.suggestKind ?? 'list'),
+      suggest: opts.suggestKind ?? (opts.initialValue ? undefined : 'list'),
     },
     buttons: [
       { id: 'cancel', label: 'Cancel', variant: 'ghost' },

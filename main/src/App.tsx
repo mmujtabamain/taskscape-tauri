@@ -45,7 +45,13 @@ function App() {
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [composeFor, setComposeFor] = useState<string | null>(null);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  // A task is renamed in the preview inspector, never inline. This flags the
+  // inspector to start editing its title; the nonce lets a repeat request on the
+  // already-open task re-trigger the edit.
+  const [titleEditReq, setTitleEditReq] = useState<{
+    id: string;
+    n: number;
+  } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     taskId: string;
@@ -318,8 +324,16 @@ function App() {
     await load();
   };
 
-  const renameList = async (id: string, name: string) => {
-    await api.renameList(id, name);
+  const renameList = async (list: List) => {
+    const name = await promptName({
+      title: 'Rename list',
+      icon: 'edit',
+      initialValue: list.name,
+      confirmLabel: 'Rename',
+      suggestKind: 'list',
+    });
+    if (!name || name === list.name) return;
+    await api.renameList(list.id, name);
     await load();
   };
 
@@ -513,6 +527,14 @@ function App() {
     setSplitListId((s) => (s === id ? null : id === activeListId ? s : id));
   };
 
+  // Open the task in the preview and ask its inspector to edit the title.
+  const beginTitleEdit = (id: string) => {
+    setSelectedTaskId(id);
+    setPreviewOpen(true);
+    setTitleEditReq((r) => ({ id, n: (r?.n ?? 0) + 1 }));
+  };
+  const clearTitleEditReq = useCallback(() => setTitleEditReq(null), []);
+
   // ----- row context shared by both panes -----
   const ctx: RowCtx = {
     childrenByParent,
@@ -526,8 +548,7 @@ function App() {
       }),
     selectedTaskId,
     select: setSelectedTaskId,
-    renamingId,
-    requestRename: setRenamingId,
+    requestRename: beginTitleEdit,
     dropTarget,
     setDropTarget,
     draggingId,
@@ -538,7 +559,6 @@ function App() {
     forceExpand: query.length > 0,
     otherLists: listsInProject,
     onToggleDone: toggleDone,
-    onRename: (id, title) => updateTask(id, { title }),
     onRequestDelete: requestDeleteTask,
     onMoveToList: (id, listId) => moveTask(id, null, listId),
     onPromote: (task) => moveTask(task.id, null, task.list_id),
@@ -638,7 +658,7 @@ function App() {
         toggleDone(selectedTask);
       } else if ((e.key === 'F2' || e.key === 'Enter') && selectedTask) {
         e.preventDefault();
-        setRenamingId(selectedTask.id);
+        beginTitleEdit(selectedTask.id);
       } else if (e.key === 'Escape') {
         // A menu/dropdown is dismissing itself on this same Escape — don't also
         // clear the selection out from under the user.
@@ -802,6 +822,8 @@ function App() {
                   onRequestDelete={requestDeleteTask}
                   onRefresh={load}
                   onClose={() => setPreviewOpen(false)}
+                  titleEditReq={titleEditReq}
+                  onTitleEditStarted={clearTitleEditReq}
                 />
               </aside>
             </>
