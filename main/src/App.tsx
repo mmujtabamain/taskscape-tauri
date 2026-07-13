@@ -6,11 +6,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type List, type Project, type Task, type TaskPatch } from './api';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { PreviewPanel } from './components/PreviewPanel';
-import { TaskPane } from './components/TaskPane';
-import type { BaseRowCtx, DropZone } from './components/TaskRow';
+import { TaskPane, type PaneSelection } from './components/TaskPane';
+import type { BaseRowCtx, ClickMods, DropZone } from './components/TaskRow';
 import { TitleBar } from './components/TitleBar';
 import { confirmModal, promptName, promptNewList } from './lib/modal';
 import { overlayOpen } from './lib/overlays';
+import {
+  collapseToRoots,
+  EMPTY_SELECTION,
+  rangeBetween,
+} from './lib/selection';
 
 const effSort = (t: Task) => t.sort_order || t.created_at;
 
@@ -45,6 +50,11 @@ function App() {
   );
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Ambient multi-selection, per pane (keyed by the list the pane shows, so the
+  // two panes select independently). `anchor` is where a ⇧-range extends from.
+  const [selByPane, setSelByPane] = useState<
+    Record<string, { ids: Set<string>; anchor: string | null }>
+  >({});
   const [composeFor, setComposeFor] = useState<string | null>(null);
   // A task is renamed in the preview inspector, never inline. This flags the
   // inspector to start editing its title; the nonce lets a repeat request on the
@@ -123,6 +133,22 @@ function App() {
       s && s !== listId && inProject.some((l) => l.id === s) ? s : null
     );
     setSelectedTaskId((t) => (t && tasks.some((x) => x.id === t) ? t : null));
+
+    // Drop any selected ids that no longer exist (deleted here or by the tray),
+    // so bulk actions never target a missing task.
+    const alive = new Set(tasks.map((t) => t.id));
+    setSelByPane((prev) => {
+      const next: typeof prev = {};
+      let changed = false;
+      for (const [key, v] of Object.entries(prev)) {
+        const ids = new Set([...v.ids].filter((id) => alive.has(id)));
+        const anchor = v.anchor && alive.has(v.anchor) ? v.anchor : null;
+        if (ids.size !== v.ids.size || anchor !== v.anchor) changed = true;
+        if (ids.size > 0 || anchor) next[key] = { ids, anchor };
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
     setReady(true);
   }, []);
 
@@ -591,6 +617,125 @@ function App() {
   };
   const clearTitleEditReq = useCallback(() => setTitleEditReq(null), []);
 
+  const selectProject = (id: string) => {
+    projectIdRef.current = id;
+    setSelectedProjectId(id);
+    const first = allLists.find((l) => l.project_id === id) ?? null;
+    listIdRef.current = first?.id ?? null;
+    setActiveListId(first?.id ?? null);
+    setSplitListId(null);
+    setSelectedTaskId(null);
+  };
+
+  // ----- selection (per pane, keyed by the pane's list) -----
+  const parentOf = useCallback(
+    (id: string) => taskById[id]?.parent_id ?? null,
+    [taskById]
+  );
+  const paneSelOf = (listId: string) => selByPane[listId] ?? EMPTY_SELECTION;
+  const setPaneSelection = (
+    listId: string,
+    ids: Set<string>,
+    anchor: string | null
+  ) => setSelByPane((prev) => ({ ...prev, [listId]: { ids, anchor } }));
+  const clearPaneSelection = (listId: string) =>
+    setSelByPane((prev) => {
+      if (!prev[listId]) return prev;
+      const next = { ...prev };
+      delete next[listId];
+      return next;
+    });
+
+  // Bulk mutations act on a pane's current selection. Done/copy keep the
+  // selection (non-destructive); move/delete clear it (the rows leave or vanish).
+  const bulkSetDone = async (listId: string, done: boolean) => {
+    const ids = [...paneSelOf(listId).ids];
+    if (ids.length === 0) return;
+    await api.setTasksDone(ids, done);
+    await load();
+  };
+
+  const bulkCopy = (listId: string) => {
+    const ids = [...paneSelOf(listId).ids];
+    void copyTasksToClipboard(ids);
+  };
+
+  const bulkDelete = async (listId: string) => {
+    const roots = collapseToRoots(paneSelOf(listId).ids, parentOf);
+    if (roots.length === 0) return;
+    const total = roots.reduce((n, id) => n + 1 + subtreeSize(id), 0);
+    const ok = await confirmModal({
+      danger: true,
+      title: `Delete ${roots.length} task${roots.length === 1 ? '' : 's'}?`,
+      message: `${total} task${total === 1 ? '' : 's'} (including subtasks) will be permanently deleted. This cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    await api.deleteTasks(roots);
+    clearPaneSelection(listId);
+    await load();
+  };
+
+  // Move a set of already-collapsed roots (from a multi-drag payload) to the
+  // root of `listId`, appended in the order given. Clears selections afterward.
+  const dropSetOnRoot = async (ids: string[], listId: string) => {
+    const idset = new Set(ids);
+    const targetRoots = (rootsByList[listId] ?? []).filter(
+      (t) => !idset.has(t.id)
+    );
+    const last = targetRoots[targetRoots.length - 1];
+    const base = last ? effSort(last) + 1000 : 1000;
+    await Promise.all(
+      ids.map((id, i) => api.moveTask(id, null, listId, base + i * 1000))
+    );
+    setSelByPane({});
+    await load();
+  };
+
+  // Drop a set of collapsed roots onto a row: nest under it, or land them as a
+  // contiguous band in the target sibling group (full-group rebuild, mirroring
+  // the single-drop rebalance so N items never collide on a midpoint).
+  const dropSetOnRow = async (ids: string[], target: Task, zone: DropZone) => {
+    if (ids.some((id) => isInSubtree(target.id, id))) return;
+    const idset = new Set(ids);
+    if (zone === 'nest') {
+      const kids = (childrenByParent[target.id] ?? []).filter(
+        (t) => !idset.has(t.id)
+      );
+      const last = kids[kids.length - 1];
+      const base = last ? effSort(last) + 1000 : 1000;
+      await Promise.all(
+        ids.map((id, i) => api.moveTask(id, target.id, null, base + i * 1000))
+      );
+      setSelByPane({});
+      await load();
+      return;
+    }
+    const parentId = target.parent_id;
+    const listArg = parentId ? null : target.list_id;
+    const siblings = (
+      parentId
+        ? (childrenByParent[parentId] ?? [])
+        : (rootsByList[target.list_id] ?? [])
+    ).filter((t) => !idset.has(t.id));
+    const targetIdx = siblings.findIndex((t) => t.id === target.id);
+    const insertIdx = zone === 'before' ? targetIdx : targetIdx + 1;
+    const ordered = [
+      ...siblings.slice(0, insertIdx).map((t) => ({ id: t.id, dragged: false })),
+      ...ids.map((id) => ({ id, dragged: true })),
+      ...siblings.slice(insertIdx).map((t) => ({ id: t.id, dragged: false })),
+    ];
+    await Promise.all(
+      ordered.map((x, i) =>
+        x.dragged
+          ? api.moveTask(x.id, parentId, listArg, (i + 1) * 1000)
+          : api.reorderTask(x.id, (i + 1) * 1000)
+      )
+    );
+    setSelByPane({});
+    await load();
+  };
+
   // ----- row context shared by both panes -----
   // The per-pane `mode`/selection is added by each TaskPane; this base holds
   // everything the two panes share.
@@ -622,6 +767,7 @@ function App() {
     onPromote: (task) => moveTask(task.id, null, task.list_id),
     onCreateSubtask: createSubtask,
     onDropOnRow: dropOnRow,
+    onDropSetOnRow: dropSetOnRow,
     onCopy: copyTasksToClipboard,
   };
 
@@ -640,6 +786,120 @@ function App() {
     },
     [rootsByList, childrenByParent, isVisible, collapsed, query]
   );
+
+  // The selection's forest roots in the pane's visual order — the multi-drag
+  // payload and the operative set for bulk move (subtrees follow their roots).
+  const selectionRootsOf = (listId: string): string[] => {
+    const roots = new Set(collapseToRoots(paneSelOf(listId).ids, parentOf));
+    if (roots.size === 0) return [];
+    const ordered = flattenVisible(listId)
+      .map((t) => t.id)
+      .filter((id) => roots.has(id));
+    // A root hidden under a collapsed (unselected) ancestor won't be in the flat
+    // list; append it so the payload never silently drops a task.
+    for (const id of roots) if (!ordered.includes(id)) ordered.push(id);
+    return ordered;
+  };
+
+  // A row was clicked: plain = preview + reset selection (anchor here); ⌘ =
+  // toggle membership; ⇧ = range from the anchor along the visual order.
+  const onRowClick = (listId: string, id: string, mods: ClickMods) => {
+    setPaneFocus(listId);
+    setSelectedTaskId(id);
+    const cur = paneSelOf(listId);
+    if (mods.metaKey || mods.ctrlKey) {
+      const ids = new Set(cur.ids);
+      if (ids.has(id)) ids.delete(id);
+      else ids.add(id);
+      setPaneSelection(listId, ids, id);
+    } else if (mods.shiftKey && (cur.anchor || selectedTaskId)) {
+      const anchor = cur.anchor ?? selectedTaskId!;
+      const order = flattenVisible(listId).map((t) => t.id);
+      setPaneSelection(listId, new Set(rangeBetween(order, anchor, id)), anchor);
+    } else {
+      // Plain click previews one row and drops the bulk selection (anchor kept
+      // for a subsequent ⇧-range).
+      setPaneSelection(listId, new Set(), id);
+    }
+  };
+
+  const toggleSelectMember = (listId: string, id: string) => {
+    setPaneFocus(listId);
+    setSelectedTaskId(id);
+    const ids = new Set(paneSelOf(listId).ids);
+    if (ids.has(id)) ids.delete(id);
+    else ids.add(id);
+    setPaneSelection(listId, ids, id);
+  };
+
+  const selectAllVisible = (listId: string) => {
+    const ids = flattenVisible(listId).map((t) => t.id);
+    if (ids.length === 0) return;
+    setPaneFocus(listId);
+    setPaneSelection(listId, new Set(ids), selectedTaskId ?? ids[0]);
+  };
+
+  const bulkMove = async (listId: string, targetListId: string) => {
+    const roots = selectionRootsOf(listId);
+    if (roots.length === 0) return;
+    const idset = new Set(roots);
+    const targetRoots = (rootsByList[targetListId] ?? []).filter(
+      (t) => !idset.has(t.id)
+    );
+    const last = targetRoots[targetRoots.length - 1];
+    const base = last ? effSort(last) + 1000 : 1000;
+    await Promise.all(
+      roots.map((id, i) => api.moveTask(id, null, targetListId, base + i * 1000))
+    );
+    clearPaneSelection(listId);
+    await load();
+  };
+
+  // Reorder the previewed task within its sibling group (⌘⌥↑/↓), reusing the
+  // drag drop-math so the gap/rebalance logic stays in one place.
+  const reorderSelected = (dir: -1 | 1) => {
+    const t = selectedTask;
+    if (!t) return;
+    const sibs =
+      (t.parent_id
+        ? childrenByParent[t.parent_id]
+        : rootsByList[t.list_id]) ?? [];
+    const idx = sibs.findIndex((s) => s.id === t.id);
+    const target = dir < 0 ? sibs[idx - 1] : sibs[idx + 1];
+    if (!target) return;
+    dropOnRow(t.id, target, dir < 0 ? 'before' : 'after');
+  };
+
+  const cycleTab = (dir: -1 | 1) => {
+    const n = listsInProject.length;
+    if (n === 0) return;
+    const idx = listsInProject.findIndex((l) => l.id === focusedListId);
+    const next = listsInProject[((idx < 0 ? 0 : idx) + dir + n) % n];
+    if (next) selectList(next.id);
+  };
+
+  const cycleProject = (dir: -1 | 1) => {
+    const n = projects.length;
+    if (n === 0) return;
+    const idx = projects.findIndex((p) => p.id === selectedProjectId);
+    const next = projects[((idx < 0 ? 0 : idx) + dir + n) % n];
+    if (next && next.id !== selectedProjectId) selectProject(next.id);
+  };
+
+  // A pane's selection API, bound to the list it shows. Rebuilt each render (as
+  // `ctx` is), which is fine — rows already re-render on any App update.
+  const makeSel = (listId: string): PaneSelection => ({
+    ids: paneSelOf(listId).ids,
+    onRowClick: (id, mods) => onRowClick(listId, id, mods),
+    onToggleSelect: (id) => toggleSelectMember(listId, id),
+    selectionRoots: () => selectionRootsOf(listId),
+    selectAll: () => selectAllVisible(listId),
+    clear: () => clearPaneSelection(listId),
+    bulkSetDone: (done) => void bulkSetDone(listId, done),
+    bulkMove: (target) => void bulkMove(listId, target),
+    bulkCopy: () => bulkCopy(listId),
+    bulkDelete: () => void bulkDelete(listId),
+  });
 
   const registerComposer = useCallback(
     (listId: string, focus: ((seed?: string) => void) | null) => {
@@ -695,6 +955,18 @@ function App() {
         setPreviewOpen((v) => !v);
         return;
       }
+      // Chorded navigation — safe to fire even while typing (⌘⌥/⌘⇧ combos don't
+      // collide with text entry).
+      if (pressed('prev_tab') || pressed('next_tab')) {
+        e.preventDefault();
+        cycleTab(pressed('prev_tab') ? -1 : 1);
+        return;
+      }
+      if (pressed('prev_project') || pressed('next_project')) {
+        e.preventDefault();
+        cycleProject(pressed('prev_project') ? -1 : 1);
+        return;
+      }
       if (!typing) {
         for (let i = 1; i <= 9; i++) {
           if (pressed(`switch_list_${i}`)) {
@@ -706,14 +978,39 @@ function App() {
             return;
           }
         }
-        if (pressed('delete_task') && selectedTask) {
+        if (pressed('select_all')) {
+          if (focusedListId) {
+            e.preventDefault();
+            selectAllVisible(focusedListId);
+          }
+          return;
+        }
+        if (pressed('move_up') || pressed('move_down')) {
           e.preventDefault();
-          requestDeleteTask(selectedTask);
+          reorderSelected(pressed('move_up') ? -1 : 1);
+          return;
+        }
+        if (pressed('delete_task')) {
+          const listId = focusedListId;
+          if (listId && paneSelOf(listId).ids.size > 0) {
+            e.preventDefault();
+            void bulkDelete(listId);
+            return;
+          }
+          if (selectedTask) {
+            e.preventDefault();
+            requestDeleteTask(selectedTask);
+          }
           return;
         }
       }
 
       if (typing) return;
+
+      const scrollTo = (id: string) =>
+        document
+          .querySelector(`[data-task-id="${CSS.escape(id)}"]`)
+          ?.scrollIntoView({ block: 'nearest' });
 
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         const listId = focusedListId;
@@ -721,15 +1018,65 @@ function App() {
         const flat = flattenVisible(listId);
         if (flat.length === 0) return;
         e.preventDefault();
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
         const idx = flat.findIndex((t) => t.id === selectedTaskId);
-        const next =
-          e.key === 'ArrowDown'
-            ? flat[Math.min(idx + 1, flat.length - 1)]
-            : flat[Math.max(idx - 1, 0)];
-        setSelectedTaskId(next.id);
-        document
-          .querySelector(`[data-task-id="${CSS.escape(next.id)}"]`)
-          ?.scrollIntoView({ block: 'nearest' });
+        if (e.shiftKey) {
+          // Extend the selection to the neighbour (clamped at the ends).
+          const nidx =
+            idx < 0
+              ? dir > 0
+                ? 0
+                : flat.length - 1
+              : Math.min(Math.max(idx + dir, 0), flat.length - 1);
+          const active = flat[nidx].id;
+          const cur = paneSelOf(listId);
+          const anchor = cur.anchor ?? selectedTaskId ?? active;
+          const order = flat.map((t) => t.id);
+          setPaneSelection(listId, new Set(rangeBetween(order, anchor, active)), anchor);
+          setSelectedTaskId(active);
+          scrollTo(active);
+        } else {
+          // Move the cursor (wrap at the ends), dropping any bulk selection.
+          const nidx =
+            idx < 0
+              ? dir > 0
+                ? 0
+                : flat.length - 1
+              : (idx + dir + flat.length) % flat.length;
+          const active = flat[nidx].id;
+          setPaneSelection(listId, new Set(), active);
+          setSelectedTaskId(active);
+          scrollTo(active);
+        }
+      } else if (e.key === 'ArrowLeft' && selectedTask) {
+        const t = selectedTask;
+        const kids = (childrenByParent[t.id] ?? []).filter(isVisible);
+        if (kids.length > 0 && !collapsed.has(t.id) && !query) {
+          e.preventDefault();
+          setCollapsed((s) => new Set(s).add(t.id));
+        } else if (t.parent_id && focusedListId) {
+          e.preventDefault();
+          setPaneSelection(focusedListId, new Set(), t.parent_id);
+          setSelectedTaskId(t.parent_id);
+          scrollTo(t.parent_id);
+        }
+      } else if (e.key === 'ArrowRight' && selectedTask) {
+        const t = selectedTask;
+        const kids = (childrenByParent[t.id] ?? []).filter(isVisible);
+        if (kids.length === 0) return;
+        e.preventDefault();
+        if (collapsed.has(t.id) && !query) {
+          setCollapsed((s) => {
+            const n = new Set(s);
+            n.delete(t.id);
+            return n;
+          });
+        } else if (focusedListId) {
+          const first = kids[0].id;
+          setPaneSelection(focusedListId, new Set(), first);
+          setSelectedTaskId(first);
+          scrollTo(first);
+        }
       } else if (e.key === ' ' && selectedTask) {
         e.preventDefault();
         toggleDone(selectedTask);
@@ -738,8 +1085,12 @@ function App() {
         beginTitleEdit(selectedTask.id);
       } else if (e.key === 'Escape') {
         // A menu/dropdown is dismissing itself on this same Escape — don't also
-        // clear the selection out from under the user.
-        if (!overlayOpen()) setSelectedTaskId(null);
+        // clear the user's selection/preview. Otherwise clear the bulk selection
+        // first, then (on a second press) the preview.
+        if (overlayOpen()) return;
+        const listId = focusedListId;
+        if (listId && paneSelOf(listId).ids.size > 0) clearPaneSelection(listId);
+        else setSelectedTaskId(null);
       } else if (
         e.key.length === 1 &&
         !e.altKey &&
@@ -761,6 +1112,23 @@ function App() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // The focused pane drives the preview: a >1 selection there shows the
+  // multi-select inspector, otherwise the single-task inspector.
+  const selectionTasks = focusedListId
+    ? (() => {
+        const ids = paneSelOf(focusedListId).ids;
+        const inOrder = flattenVisible(focusedListId).filter((t) =>
+          ids.has(t.id)
+        );
+        const seen = new Set(inOrder.map((t) => t.id));
+        for (const id of ids)
+          if (!seen.has(id) && taskById[id]) inOrder.push(taskById[id]);
+        return inOrder;
+      })()
+    : [];
+  const listNameById = (listId: string) =>
+    allLists.find((l) => l.id === listId)?.name ?? null;
+
   // ----- layout -----
   return (
     <ContextMenuProvider>
@@ -768,15 +1136,7 @@ function App() {
         <TitleBar
           projects={projects}
           selectedProjectId={selectedProjectId}
-          onSelectProject={(id) => {
-            projectIdRef.current = id;
-            setSelectedProjectId(id);
-            const first = allLists.find((l) => l.project_id === id) ?? null;
-            listIdRef.current = first?.id ?? null;
-            setActiveListId(first?.id ?? null);
-            setSplitListId(null);
-            setSelectedTaskId(null);
-          }}
+          onSelectProject={selectProject}
           onCreateProject={createProject}
           onRenameProject={renameProject}
           onDeleteProject={deleteProject}
@@ -792,6 +1152,7 @@ function App() {
           onExportList={exportList}
           onToggleSplit={toggleSplit}
           onDropTaskOnTab={(taskId, listId) => moveTask(taskId, null, listId)}
+          onDropTaskSetOnTab={dropSetOnRoot}
           onReorderList={reorderList}
           search={search}
           onSearchChange={setSearch}
@@ -814,10 +1175,12 @@ function App() {
                   list={activeList}
                   roots={rootsByList[activeList.id] ?? []}
                   ctx={ctx}
+                  sel={makeSel(activeList.id)}
                   isSplit={false}
                   searching={query.length > 0}
                   onCreateTask={createTask}
                   onRootDrop={dropOnRoot}
+                  onRootDropSet={dropSetOnRoot}
                   registerComposer={registerComposer}
                   onFocusPane={setPaneFocus}
                   captureHint={formatAccel(
@@ -842,11 +1205,13 @@ function App() {
                       list={splitList}
                       roots={rootsByList[splitList.id] ?? []}
                       ctx={ctx}
+                      sel={makeSel(splitList.id)}
                       isSplit
                       searching={query.length > 0}
                       onCloseSplit={() => setSplitListId(null)}
                       onCreateTask={createTask}
                       onRootDrop={dropOnRoot}
+                      onRootDropSet={dropSetOnRoot}
                       registerComposer={registerComposer}
                       onFocusPane={setPaneFocus}
                       captureHint={formatAccel(
@@ -909,6 +1274,37 @@ function App() {
                   onClose={() => setPreviewOpen(false)}
                   titleEditReq={titleEditReq}
                   onTitleEditStarted={clearTitleEditReq}
+                  selectionTasks={selectionTasks}
+                  listNameById={listNameById}
+                  moveTargets={listsInProject}
+                  onBulkSetDone={
+                    focusedListId
+                      ? (done) => void bulkSetDone(focusedListId, done)
+                      : undefined
+                  }
+                  onBulkMove={
+                    focusedListId
+                      ? (target) => void bulkMove(focusedListId, target)
+                      : undefined
+                  }
+                  onBulkDelete={
+                    focusedListId
+                      ? () => void bulkDelete(focusedListId)
+                      : undefined
+                  }
+                  onBulkCopy={
+                    focusedListId ? () => bulkCopy(focusedListId) : undefined
+                  }
+                  onClearSelection={
+                    focusedListId
+                      ? () => clearPaneSelection(focusedListId)
+                      : undefined
+                  }
+                  onOpenOne={(id) => {
+                    if (focusedListId)
+                      setPaneSelection(focusedListId, new Set(), id);
+                    setSelectedTaskId(id);
+                  }}
                 />
               </aside>
             </>

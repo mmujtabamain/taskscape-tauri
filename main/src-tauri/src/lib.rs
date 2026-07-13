@@ -198,6 +198,33 @@ async fn reorder_task(
     store.reorder_task(&id, sort_order).await.map_err(err)
 }
 
+/// Delete several tasks in one call (each subtree cascades via the self-
+/// referential FK). Callers pass the forest roots of the selection; a missing
+/// id — e.g. an already-cascaded descendant — is a harmless no-op.
+#[tauri::command]
+async fn delete_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<(), String> {
+    for id in &ids {
+        store.delete_task(id).await.map_err(err)?;
+    }
+    Ok(())
+}
+
+/// Set the done flag on several tasks at once (bulk mark done / not done).
+#[tauri::command]
+async fn set_tasks_done(
+    store: State<'_, Arc<Store>>,
+    ids: Vec<String>,
+    done: bool,
+) -> Result<(), String> {
+    for id in &ids {
+        store
+            .update_task(id, None, None, Some(done))
+            .await
+            .map_err(err)?;
+    }
+    Ok(())
+}
+
 /// Group tasks under their parents, preserving the incoming order (callers pass
 /// tasks already sorted by `sort_order`, so each group stays in visual order).
 /// Returns (roots, children-by-parent-id).
@@ -927,6 +954,8 @@ pub fn run() {
             delete_task,
             move_task,
             reorder_task,
+            delete_tasks,
+            set_tasks_done,
             copy_tasks,
             export_list,
             import_list,

@@ -1,17 +1,41 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { List, Task } from '../api';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { TaskRow, type BaseRowCtx, type PaneMode, type RowCtx } from './TaskRow';
+import { useContextMenu } from './contextMenuContext';
+import {
+  TaskRow,
+  type BaseRowCtx,
+  type ClickMods,
+  type RowCtx,
+  TASK_SET_MIME,
+} from './TaskRow';
+
+/** Per-pane selection state + actions, built by App and injected here. Split
+ *  panes each get their own so they select independently. */
+export interface PaneSelection {
+  ids: Set<string>;
+  onRowClick: (id: string, mods: ClickMods) => void;
+  onToggleSelect: (id: string) => void;
+  selectionRoots: () => string[];
+  selectAll: () => void;
+  clear: () => void;
+  bulkSetDone: (done: boolean) => void;
+  bulkMove: (listId: string) => void;
+  bulkCopy: () => void;
+  bulkDelete: () => void;
+}
 
 interface Props {
   list: List;
   roots: Task[];
   ctx: BaseRowCtx;
+  sel: PaneSelection;
   isSplit: boolean;
   searching: boolean;
   onCloseSplit?: () => void;
   onCreateTask: (listId: string, title: string) => void;
   onRootDrop: (draggedId: string, listId: string) => void;
+  onRootDropSet: (ids: string[], listId: string) => void;
   registerComposer: (
     listId: string,
     focus: ((seed?: string) => void) | null
@@ -25,11 +49,13 @@ export function TaskPane({
   list,
   roots,
   ctx,
+  sel,
   isSplit,
   searching,
   onCloseSplit,
   onCreateTask,
   onRootDrop,
+  onRootDropSet,
   registerComposer,
   onFocusPane,
   captureHint,
@@ -39,34 +65,22 @@ export function TaskPane({
   const contentRef = useRef<HTMLDivElement>(null);
   const [rootDropOver, setRootDropOver] = useState(false);
 
-  // Select (default) / Mark modes are local to each pane so split panes act
-  // independently. The mode only reinterprets each row's checkbox — in Select it
-  // toggles the row's membership in `selected`, in Mark it toggles done.
-  const [mode, setMode] = useState<PaneMode>('select');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-
   const visibleRoots = roots.filter(ctx.isVisible);
 
-  const onToggleSelect = useCallback((id: string) => {
-    setSelected((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  // Switching mode starts the selection fresh (checkboxes reset).
-  const setPaneMode = useCallback((m: PaneMode) => {
-    setSelected(new Set());
-    setMode(m);
-  }, []);
-
-  // Rows augmented with this pane's mode + selection, injected by spreading the
-  // shared ctx — the two panes stay independent while sharing everything else.
+  // Rows augmented with this pane's selection, injected by spreading the shared
+  // ctx — the two panes stay independent while sharing everything else.
   const paneCtx = useMemo<RowCtx>(
-    () => ({ ...ctx, mode, selectedIds: selected, onToggleSelect }),
-    [ctx, mode, selected, onToggleSelect]
+    () => ({
+      ...ctx,
+      selectedIds: sel.ids,
+      onRowClick: sel.onRowClick,
+      onToggleSelect: sel.onToggleSelect,
+      selectionRoots: sel.selectionRoots,
+      onBulkSetDone: sel.bulkSetDone,
+      onBulkMove: sel.bulkMove,
+      onBulkDelete: sel.bulkDelete,
+    }),
+    [ctx, sel]
   );
 
   // Whole-tree tally (roots + every nested subtask) for the stats bar.
@@ -150,6 +164,12 @@ export function TaskPane({
         }}
         onDrop={(e) => {
           setRootDropOver(false);
+          const setJson = e.dataTransfer.getData(TASK_SET_MIME);
+          if (setJson) {
+            e.preventDefault();
+            onRootDropSet(JSON.parse(setJson) as string[], list.id);
+            return;
+          }
           const draggedId = e.dataTransfer.getData('application/x-task');
           if (draggedId) {
             e.preventDefault();
@@ -189,67 +209,96 @@ export function TaskPane({
         </div>
       </div>
 
-      <StatsBar
-        mode={mode}
-        onSetMode={setPaneMode}
-        done={done}
-        total={total}
-        pct={pct}
-      />
+      {sel.ids.size > 0 ? (
+        <BulkBar sel={sel} count={sel.ids.size} otherLists={ctx.otherLists} />
+      ) : (
+        <StatsBar done={done} total={total} pct={pct} />
+      )}
     </section>
   );
 }
 
-/** The Select / Mark toggle that lives in the status bar. Each mode shows its
- *  own icon; the active one is highlighted. */
-function ModeToggle({
-  mode,
-  onSetMode,
+/** The action bar the footer shows while a selection is live: a count, the bulk
+ *  verbs, and Clear. Replaces the old modal Select/Mark toggle entirely. */
+function BulkBar({
+  sel,
+  count,
+  otherLists,
 }: {
-  mode: PaneMode;
-  onSetMode: (m: PaneMode) => void;
+  sel: PaneSelection;
+  count: number;
+  otherLists: List[];
 }) {
-  const opt = (m: PaneMode, icon: string, title: string) => {
-    const active = mode === m;
-    return (
-      <button
-        onClick={() => onSetMode(m)}
-        title={title}
-        className={`grid h-5.5 w-6.5 place-items-center rounded-[5px] transition-colors ${
-          active
-            ? 'bg-surface-2l dark:bg-surface-2d text-accent-500l dark:text-accent-500d shadow-sm'
-            : 'text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d'
-        }`}
-      >
-        <Icon name={icon} size={15} weight={300} filled={active} />
-      </button>
-    );
+  const menu = useContextMenu();
+  const openMoveMenu = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    menu.open({
+      x: r.left,
+      y: r.bottom + 4,
+      items: otherLists.map((l) => ({ id: l.id, label: l.name })),
+      onPick: (id) => sel.bulkMove(id),
+    });
   };
+  const btn =
+    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d flex h-6 items-center gap-1 px-1.5 text-[12px] font-semibold normal-case tracking-normal transition-colors disabled:pointer-events-none disabled:opacity-40';
   return (
-    <div className="bg-surface-0l dark:bg-surface-0d rounded-field flex items-center gap-0.5 p-0.5">
-      {opt('select', 'select_check_box', 'Select tasks to copy')}
-      {opt('mark', 'task_alt', 'Mark tasks done')}
+    <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d flex h-9 shrink-0 items-center gap-1 border-t px-3">
+      <span className="text-content-1l dark:text-content-1d mr-1 pl-1 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
+        {count} selected
+      </span>
+      <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
+      <button className={btn} onClick={() => sel.bulkSetDone(true)} title="Mark done">
+        <Icon name="task_alt" size={15} weight={300} />
+        Done
+      </button>
+      <button
+        className={btn}
+        onClick={() => sel.bulkSetDone(false)}
+        title="Mark not done"
+      >
+        <Icon name="radio_button_unchecked" size={15} weight={300} />
+        Undone
+      </button>
+      <button
+        className={btn}
+        onClick={openMoveMenu}
+        disabled={otherLists.length === 0}
+        title="Move to another list"
+      >
+        <Icon name="arrow_forward" size={15} weight={300} />
+        Move to…
+      </button>
+      <button className={btn} onClick={sel.bulkCopy} title="Copy as checklist">
+        <Icon name="content_copy" size={15} weight={300} />
+        Copy
+      </button>
+      <button
+        className={`${btn} hover:text-danger-500l dark:hover:text-danger-500d`}
+        onClick={sel.bulkDelete}
+        title="Delete selection"
+      >
+        <Icon name="delete" size={15} weight={300} />
+        Delete
+      </button>
+      <button className={`${btn} ml-auto`} onClick={sel.clear} title="Clear selection">
+        <Icon name="close" size={15} weight={300} />
+        Clear
+      </button>
     </div>
   );
 }
 
 function StatsBar({
-  mode,
-  onSetMode,
   done,
   total,
   pct,
 }: {
-  mode: PaneMode;
-  onSetMode: (m: PaneMode) => void;
   done: number;
   total: number;
   pct: number;
 }) {
   return (
     <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d text-content-3l dark:text-content-3d flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
-      <ModeToggle mode={mode} onSetMode={onSetMode} />
-      <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
       <span>
         {done}/{total} done
       </span>

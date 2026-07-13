@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   api,
   type Attachment,
+  type List,
   type Note,
   type Task,
   type TaskPatch,
@@ -41,6 +42,18 @@ interface PreviewPanelProps {
    *  `onTitleEditStarted` clears it so a later request can re-trigger. */
   titleEditReq: { id: string; n: number } | null;
   onTitleEditStarted: () => void;
+
+  // ----- multi-select (focused pane's selection; >1 shows the multi inspector) -----
+  selectionTasks?: Task[];
+  listNameById?: (listId: string) => string | null;
+  moveTargets?: List[];
+  onBulkSetDone?: (done: boolean) => void;
+  onBulkMove?: (listId: string) => void;
+  onBulkDelete?: () => void;
+  onBulkCopy?: () => void;
+  onClearSelection?: () => void;
+  /** Collapse the selection to a single task (the "Open" affordance). */
+  onOpenOne?: (id: string) => void;
 }
 
 /** Prompt for a URL via the native modal; resolves the trimmed URL or null.
@@ -824,8 +837,176 @@ function TaskInspector({
   );
 }
 
+/** Shown when the focused pane has more than one task selected: a combined
+ *  tally, the bulk verbs, and a peek-able list. Clicking a row peeks (highlights
+ *  without collapsing the selection); "Open" narrows to that single task. */
+function MultiInspector({
+  tasks,
+  activeId,
+  listNameById,
+  moveTargets,
+  onSelectTask,
+  onToggleDone,
+  onOpenOne,
+  onBulkSetDone,
+  onBulkMove,
+  onBulkDelete,
+  onBulkCopy,
+  onClearSelection,
+}: {
+  tasks: Task[];
+  activeId: string | null;
+  listNameById?: (listId: string) => string | null;
+  moveTargets?: List[];
+  onSelectTask: (id: string) => void;
+  onToggleDone: (task: Task) => void;
+  onOpenOne?: (id: string) => void;
+  onBulkSetDone?: (done: boolean) => void;
+  onBulkMove?: (listId: string) => void;
+  onBulkDelete?: () => void;
+  onBulkCopy?: () => void;
+  onClearSelection?: () => void;
+}) {
+  const menu = useContextMenu();
+  const done = tasks.filter((t) => t.done).length;
+  const openMoveMenu = (e: React.MouseEvent) => {
+    const targets = moveTargets ?? [];
+    if (targets.length === 0) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    menu.open({
+      x: r.left,
+      y: r.bottom + 4,
+      items: targets.map((l) => ({ id: l.id, label: l.name })),
+      onPick: (id) => onBulkMove?.(id),
+    });
+  };
+  const act =
+    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-8 items-center justify-center gap-1.5 text-[12.5px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40';
+  return (
+    <div className="animate-rise flex min-h-0 flex-1 flex-col">
+      <div className="shrink-0 p-4">
+        <div className="flex items-center gap-2.5">
+          <span className="bg-accent-500l dark:bg-accent-500d text-on-accent grid h-8 min-w-8 place-items-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+            {tasks.length}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-content-1l dark:text-content-1d text-[16px] font-semibold">
+              {tasks.length} tasks selected
+            </p>
+            <p className="text-content-3l dark:text-content-3d text-[11.5px] tabular-nums">
+              {done} done / {tasks.length}
+            </p>
+          </div>
+          <button
+            onClick={onClearSelection}
+            title="Clear selection"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-1">
+          <button className={act} onClick={() => onBulkSetDone?.(true)}>
+            <Icon name="task_alt" size={15} weight={300} />
+            Done
+          </button>
+          <button className={act} onClick={() => onBulkSetDone?.(false)}>
+            <Icon name="radio_button_unchecked" size={15} weight={300} />
+            Undone
+          </button>
+          <button
+            className={act}
+            onClick={openMoveMenu}
+            disabled={(moveTargets?.length ?? 0) === 0}
+          >
+            <Icon name="arrow_forward" size={15} weight={300} />
+            Move
+          </button>
+          <button className={act} onClick={onBulkCopy}>
+            <Icon name="content_copy" size={15} weight={300} />
+            Copy
+          </button>
+          <button
+            className={`${act} col-span-2 hover:text-danger-500l dark:hover:text-danger-500d`}
+            onClick={onBulkDelete}
+          >
+            <Icon name="delete" size={15} weight={300} />
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 pt-0">
+        <SectionHeader label="Selected" />
+        <div className="-mx-1.5 flex flex-col">
+          {tasks.map((t) => (
+            <div
+              key={t.id}
+              className={`group/sel rounded-field flex h-9 items-center gap-2.5 px-1.5 ${
+                t.id === activeId
+                  ? 'bg-selection-1l dark:bg-selection-1d'
+                  : 'hover:bg-wash-1l dark:hover:bg-wash-1d'
+              }`}
+            >
+              <DoneCheckbox
+                done={t.done}
+                size={14}
+                onToggle={() => onToggleDone(t)}
+              />
+              <button
+                onClick={() => onSelectTask(t.id)}
+                title={t.title}
+                className={`min-w-0 flex-1 truncate text-left text-[13.5px] ${
+                  t.done
+                    ? 'text-content-3l dark:text-content-3d line-through'
+                    : 'text-content-1l dark:text-content-1d'
+                }`}
+              >
+                {t.title}
+              </button>
+              {listNameById?.(t.list_id) && (
+                <span className="rounded-field border-edge-2l dark:border-edge-2d text-content-3l dark:text-content-3d shrink-0 border px-1.5 text-[10.5px] font-semibold">
+                  {listNameById(t.list_id)}
+                </span>
+              )}
+              <button
+                onClick={() => onOpenOne?.(t.id)}
+                title="Open"
+                className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center opacity-0 transition-opacity group-hover/sel:opacity-100"
+              >
+                <Icon name="open_in_full" size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PreviewPanel(props: PreviewPanelProps) {
-  const { task } = props;
+  const { task, selectionTasks } = props;
+  if ((selectionTasks?.length ?? 0) > 1) {
+    return (
+      <div className="bg-surface-1l dark:bg-surface-1d flex h-full flex-col overflow-hidden">
+        <MultiInspector
+          tasks={selectionTasks!}
+          activeId={task?.id ?? null}
+          listNameById={props.listNameById}
+          moveTargets={props.moveTargets}
+          onSelectTask={props.onSelectTask}
+          onToggleDone={props.onToggleDone}
+          onOpenOne={props.onOpenOne}
+          onBulkSetDone={props.onBulkSetDone}
+          onBulkMove={props.onBulkMove}
+          onBulkDelete={props.onBulkDelete}
+          onBulkCopy={props.onBulkCopy}
+          onClearSelection={props.onClearSelection}
+        />
+      </div>
+    );
+  }
   return (
     <div className="bg-surface-1l dark:bg-surface-1d flex h-full flex-col overflow-hidden">
       {task ? (

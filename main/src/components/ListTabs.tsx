@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import type { List } from '../api';
 import { useContextMenu } from './contextMenuContext';
+import { TASK_SET_MIME } from './TaskRow';
 
 const TAB_MIME = 'application/x-list-tab';
 
@@ -21,6 +22,7 @@ interface Props {
   onExport: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTask: (taskId: string, listId: string) => void;
+  onDropTaskSet: (ids: string[], listId: string) => void;
   onReorder: (draggedId: string, targetId: string, before: boolean) => void;
 }
 
@@ -36,6 +38,7 @@ export function ListTabs({
   onExport,
   onToggleSplit,
   onDropTask,
+  onDropTaskSet,
   onReorder,
 }: Props) {
   const menu = useContextMenu();
@@ -163,12 +166,16 @@ export function ListTabs({
                 setTabOver((v) => (v?.id === list.id ? null : v));
               }}
               onDrop={(e) => {
+                const setJson = e.dataTransfer.getData(TASK_SET_MIME);
                 const taskId = e.dataTransfer.getData('application/x-task');
                 const tabId = e.dataTransfer.getData(TAB_MIME);
                 setDropOver(null);
                 const over = tabOver;
                 setTabOver(null);
-                if (taskId) {
+                if (setJson) {
+                  e.preventDefault();
+                  onDropTaskSet(JSON.parse(setJson) as string[], list.id);
+                } else if (taskId) {
                   e.preventDefault();
                   onDropTask(taskId, list.id);
                 } else if (tabId && tabId !== list.id) {

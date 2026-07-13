@@ -101,7 +101,13 @@ export const api = {
     }),
   reorderTask: (id: string, sortOrder: number) =>
     invoke<Task>('reorder_task', { id, sortOrder }),
-  /** Render the given tasks as a Markdown checklist (Select mode's copy). */
+  /** Delete several tasks at once (pass the selection's forest roots; subtrees
+   *  cascade). */
+  deleteTasks: (ids: string[]) => invoke<void>('delete_tasks', { ids }),
+  /** Mark several tasks done / not done in one call. */
+  setTasksDone: (ids: string[], done: boolean) =>
+    invoke<void>('set_tasks_done', { ids, done }),
+  /** Render the given tasks as a Markdown checklist (the copy action). */
   copyTasks: (ids: string[]) => invoke<string>('copy_tasks', { ids }),
 
   // import / export (whole list, as JSON)

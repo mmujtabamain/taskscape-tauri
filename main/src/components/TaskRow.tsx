@@ -6,22 +6,41 @@ import { Icon } from '@taskscape/common-ui/Icon';
 
 export type DropZone = 'before' | 'after' | 'nest';
 
-/** The task pane is always in one of two modes. `select` (default) — the row's
- *  checkbox toggles its membership in `selectedIds` (for the Copy action).
- *  `mark` — the checkbox toggles the task's done state, as it always has. */
-export type PaneMode = 'select' | 'mark';
+/** Modifier keys that shape a row click: plain (select single), ⌘ (toggle),
+ *  ⇧ (range from the anchor). */
+export interface ClickMods {
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+}
+
+/** MIME payload for a multi-task drag: a JSON id array of the selection's
+ *  forest roots, in visual order. Single drags still carry `application/x-task`. */
+export const TASK_SET_MIME = 'application/x-task-set';
 
 export interface RowCtx {
   childrenByParent: Record<string, Task[]>;
   collapsed: Set<string>;
   toggleCollapsed: (id: string) => void;
   selectedTaskId: string | null;
+  /** Preview a task without touching the multi-selection. */
   select: (id: string) => void;
-  mode: PaneMode;
+  /** This pane's ambient multi-selection (ids picked for bulk actions). */
   selectedIds: Set<string>;
+  /** A row was clicked — apply plain / ⌘ / ⇧ semantics against the selection. */
+  onRowClick: (id: string, mods: ClickMods) => void;
+  /** The selection handle toggled a row's membership. */
   onToggleSelect: (id: string) => void;
+  /** The selection's forest roots in visual order — the multi-drag payload. */
+  selectionRoots: () => string[];
   /** Copy the given tasks to the clipboard as a Markdown checklist. */
   onCopy: (ids: string[]) => void;
+  /** Bulk-set done on this pane's whole selection. */
+  onBulkSetDone: (done: boolean) => void;
+  /** Bulk-move this pane's selection to another list. */
+  onBulkMove: (listId: string) => void;
+  /** Delete this pane's whole selection (with confirmation). */
+  onBulkDelete: () => void;
   requestRename: (id: string) => void;
   dropTarget: { taskId: string; zone: DropZone } | null;
   setDropTarget: (t: { taskId: string; zone: DropZone } | null) => void;
@@ -38,13 +57,20 @@ export interface RowCtx {
   onPromote: (task: Task) => void;
   onCreateSubtask: (parentId: string, title: string) => void;
   onDropOnRow: (draggedId: string, target: Task, zone: DropZone) => void;
+  onDropSetOnRow: (ids: string[], target: Task, zone: DropZone) => void;
 }
 
 /** The shared row context App builds once for both panes. Each `TaskPane`
- *  completes it into a full `RowCtx` by adding its own `mode`/selection. */
+ *  completes it into a full `RowCtx` by adding its own per-pane selection. */
 export type BaseRowCtx = Omit<
   RowCtx,
-  'mode' | 'selectedIds' | 'onToggleSelect'
+  | 'selectedIds'
+  | 'onRowClick'
+  | 'onToggleSelect'
+  | 'selectionRoots'
+  | 'onBulkSetDone'
+  | 'onBulkMove'
+  | 'onBulkDelete'
 >;
 
 const INDENT = 24;
@@ -65,9 +91,8 @@ export function TaskRow({
   const children = (ctx.childrenByParent[task.id] ?? []).filter(ctx.isVisible);
   const doneChildren = children.filter((c) => c.done).length;
   const expanded = ctx.forceExpand || !ctx.collapsed.has(task.id);
-  const selecting = ctx.mode === 'select';
-  const picked = selecting && ctx.selectedIds.has(task.id);
-  // Highlight the preview-selected row and, in select mode, every picked row.
+  const picked = ctx.selectedIds.has(task.id);
+  // Highlight the preview-selected row and every picked row.
   const selected = ctx.selectedTaskId === task.id || picked;
   const dragging = ctx.draggingId === task.id;
   const drop = ctx.dropTarget?.taskId === task.id ? ctx.dropTarget : null;
@@ -93,15 +118,46 @@ export function TaskRow({
   };
 
   const openMenu = (x: number, y: number) => {
-    ctx.select(task.id);
-    // When several tasks are picked in Select mode, the menu collapses to a
-    // single "Copy N tasks" acting on the whole selection; otherwise it's the
-    // normal per-task menu, led by a "Copy" for this one task.
-    const selCount = ctx.selectedIds.size;
-    const copyMany =
-      ctx.mode === 'select' && selCount >= 2 && ctx.selectedIds.has(task.id);
-    const items: MenuItem[] = copyMany
-      ? [{ id: 'copy', label: `Copy ${selCount} tasks`, icon: 'content_copy' }]
+    // Right-clicking a row inside a multi-selection acts on the whole set;
+    // right-clicking any other row selects just it first (standard behaviour).
+    const n = ctx.selectedIds.size;
+    const bulk = n >= 2 && ctx.selectedIds.has(task.id);
+    if (bulk) ctx.select(task.id);
+    else ctx.onRowClick(task.id, { metaKey: false, ctrlKey: false, shiftKey: false });
+
+    const moveSubmenu = ctx.otherLists.map((l) => ({
+      id: `move:${l.id}`,
+      label: l.name,
+    }));
+    const items: MenuItem[] = bulk
+      ? [
+          { id: 'copy', label: `Copy ${n} tasks`, icon: 'content_copy' },
+          {
+            id: 'done',
+            label: `Mark ${n} done`,
+            icon: 'task_alt',
+            dividerAbove: true,
+          },
+          {
+            id: 'undone',
+            label: `Mark ${n} not done`,
+            icon: 'radio_button_unchecked',
+          },
+          {
+            id: 'move',
+            label: 'Move to list',
+            icon: 'arrow_forward',
+            disabled: ctx.otherLists.length === 0,
+            submenu: moveSubmenu,
+          },
+          {
+            id: 'delete',
+            label: `Delete ${n} tasks…`,
+            icon: 'delete',
+            danger: true,
+            dividerAbove: true,
+          },
+        ]
       : [
           { id: 'copy', label: 'Copy', icon: 'content_copy' },
           {
@@ -116,10 +172,7 @@ export function TaskRow({
             label: 'Move to list',
             icon: 'arrow_forward',
             disabled: ctx.otherLists.length === 0,
-            submenu: ctx.otherLists.map((l) => ({
-              id: `move:${l.id}`,
-              label: l.name,
-            })),
+            submenu: moveSubmenu,
           },
           ...(task.parent_id
             ? [
@@ -143,13 +196,21 @@ export function TaskRow({
       y,
       items,
       onPick: (id) => {
-        if (id === 'copy')
-          ctx.onCopy(copyMany ? [...ctx.selectedIds] : [task.id]);
+        if (id === 'copy') ctx.onCopy(bulk ? [...ctx.selectedIds] : [task.id]);
+        if (id === 'done') ctx.onBulkSetDone(true);
+        if (id === 'undone') ctx.onBulkSetDone(false);
         if (id === 'subtask') ctx.setComposeFor(task.id);
         if (id === 'rename') ctx.requestRename(task.id);
         if (id === 'promote') ctx.onPromote(task);
-        if (id === 'delete') ctx.onRequestDelete(task);
-        if (id.startsWith('move:')) ctx.onMoveToList(task.id, id.slice(5));
+        if (id === 'delete') {
+          if (bulk) ctx.onBulkDelete();
+          else ctx.onRequestDelete(task);
+        }
+        if (id.startsWith('move:')) {
+          const listId = id.slice(5);
+          if (bulk) ctx.onBulkMove(listId);
+          else ctx.onMoveToList(task.id, listId);
+        }
       },
     });
   };
@@ -169,6 +230,14 @@ export function TaskRow({
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData('application/x-task', task.id);
+          // Dragging a row that's part of a multi-selection carries the whole
+          // set (its forest roots); a row outside the selection drags alone.
+          if (ctx.selectedIds.has(task.id) && ctx.selectedIds.size > 1) {
+            e.dataTransfer.setData(
+              TASK_SET_MIME,
+              JSON.stringify(ctx.selectionRoots())
+            );
+          }
           e.dataTransfer.effectAllowed = 'move';
           ctx.setDraggingId(task.id);
         }}
@@ -198,17 +267,36 @@ export function TaskRow({
             ctx.setDropTarget(null);
         }}
         onDrop={(e) => {
+          const setJson = e.dataTransfer.getData(TASK_SET_MIME);
           const draggedId = e.dataTransfer.getData('application/x-task');
           ctx.setDropTarget(null);
-          if (!draggedId) return;
+          if (!setJson && !draggedId) return;
           // Consume the drop here (even a self-drop) so it can't fall through
           // to the pane's root-drop.
           e.preventDefault();
           e.stopPropagation();
+          const zone = zoneFromEvent(e);
+          if (setJson) {
+            const ids = JSON.parse(setJson) as string[];
+            if (ids.includes(task.id)) return;
+            ctx.onDropSetOnRow(ids, task, zone);
+            return;
+          }
           if (draggedId === task.id) return;
-          ctx.onDropOnRow(draggedId, task, zoneFromEvent(e));
+          ctx.onDropOnRow(draggedId, task, zone);
         }}
-        onClick={() => ctx.select(task.id)}
+        onMouseDown={(e) => {
+          // Stop ⇧-click range-select from smearing a native text selection
+          // across the rows it spans.
+          if (e.shiftKey) e.preventDefault();
+        }}
+        onClick={(e) =>
+          ctx.onRowClick(task.id, {
+            metaKey: e.metaKey,
+            ctrlKey: e.ctrlKey,
+            shiftKey: e.shiftKey,
+          })
+        }
         onDoubleClick={(e) => {
           e.stopPropagation();
           toggleDone();
@@ -229,7 +317,7 @@ export function TaskRow({
         {/* Inset row separator (starts at the text column, keeps the gutter clean). */}
         <span
           className="bg-edge-1l dark:bg-edge-1d pointer-events-none absolute right-0 bottom-0 h-px"
-          style={{ left: depth * INDENT + 44 }}
+          style={{ left: depth * INDENT + 64 }}
         />
 
         {/* Drop indicator: accent line at target depth, with its index-dot terminal. */}
@@ -238,11 +326,20 @@ export function TaskRow({
             className={`z-raised bg-accent-500l dark:bg-accent-500d pointer-events-none absolute right-3 h-0.5 ${
               drop.zone === 'before' ? '-top-px' : '-bottom-px'
             }`}
-            style={{ left: depth * INDENT + 44 }}
+            style={{ left: depth * INDENT + 64 }}
           >
             <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-0.75 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
           </span>
         )}
+
+        {/* Selection handle: leftmost gutter, distinct from the done checkbox.
+            Revealed on row hover; stays lit while the row is picked. */}
+        <span className="grid w-5 shrink-0 place-items-center">
+          <SelectHandle
+            picked={picked}
+            onToggle={() => ctx.onToggleSelect(task.id)}
+          />
+        </span>
 
         {/* Disclosure chevron, left of the checkbox in the gutter. */}
         <span className="grid w-5 shrink-0 place-items-center">
@@ -271,14 +368,7 @@ export function TaskRow({
         </span>
 
         <span className="grid w-6 shrink-0 place-items-center">
-          <Check
-            done={selecting ? picked : task.done}
-            flashing={selecting ? false : flash}
-            selecting={selecting}
-            onToggle={
-              selecting ? () => ctx.onToggleSelect(task.id) : toggleDone
-            }
-          />
+          <Check done={task.done} flashing={flash} onToggle={toggleDone} />
         </span>
 
         <div className="ml-2.5 min-w-0 flex-1 py-2">
@@ -367,26 +457,48 @@ export function TaskRow({
   );
 }
 
+/** The ambient-selection handle: a hollow circle revealed on row hover, filled
+ *  accent while the row is picked. Distinct from the square done lamp beside it
+ *  — this one never marks done, it only adds to the selection. */
+function SelectHandle({
+  picked,
+  onToggle,
+}: {
+  picked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      title={picked ? 'Deselect' : 'Select'}
+      aria-pressed={picked}
+      className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] transition-all ${
+        picked
+          ? 'bg-accent-500l dark:bg-accent-500d text-on-accent border-transparent opacity-100'
+          : 'border-edge-3l dark:border-edge-3d hover:border-content-3l dark:hover:border-content-3d text-transparent opacity-0 group-hover/row:opacity-100'
+      }`}
+    >
+      <Icon name="check" size={11} weight={700} />
+    </button>
+  );
+}
+
 /** The lamp well: ghost check on hover, accent wipe + drawn stroke on check,
  *  instant cheap uncheck (unchecking is error correction, never ceremony). */
 function Check({
   done,
   flashing,
   onToggle,
-  selecting = false,
 }: {
   done: boolean;
   flashing: boolean;
   onToggle: () => void;
-  selecting?: boolean;
 }) {
-  const title = selecting
-    ? done
-      ? 'Deselect'
-      : 'Select'
-    : done
-      ? 'Mark not done'
-      : 'Mark done';
+  const title = done ? 'Mark not done' : 'Mark done';
   return (
     <button
       onClick={(e) => {

@@ -29,6 +29,7 @@ interface Props {
   onExportList: (list: List) => void;
   onToggleSplit: (id: string) => void;
   onDropTaskOnTab: (taskId: string, listId: string) => void;
+  onDropTaskSetOnTab: (ids: string[], listId: string) => void;
   onReorderList: (draggedId: string, targetId: string, before: boolean) => void;
 
   search: string;
@@ -107,6 +108,7 @@ export function TitleBar(props: Props) {
         onExport={props.onExportList}
         onToggleSplit={props.onToggleSplit}
         onDropTask={props.onDropTaskOnTab}
+        onDropTaskSet={props.onDropTaskSetOnTab}
         onReorder={props.onReorderList}
       />
 

@@ -142,6 +142,48 @@ pub const COMMANDS: &[Command] = &[
         default_accel: "Cmd+9",
     },
     Command {
+        id: "prev_tab",
+        label: "Previous list tab",
+        scope: Scope::Main,
+        default_accel: "Cmd+Alt+ArrowLeft",
+    },
+    Command {
+        id: "next_tab",
+        label: "Next list tab",
+        scope: Scope::Main,
+        default_accel: "Cmd+Alt+ArrowRight",
+    },
+    Command {
+        id: "prev_project",
+        label: "Previous project",
+        scope: Scope::Main,
+        default_accel: "Cmd+Shift+[",
+    },
+    Command {
+        id: "next_project",
+        label: "Next project",
+        scope: Scope::Main,
+        default_accel: "Cmd+Shift+]",
+    },
+    Command {
+        id: "move_up",
+        label: "Move task up",
+        scope: Scope::Main,
+        default_accel: "Cmd+Alt+ArrowUp",
+    },
+    Command {
+        id: "move_down",
+        label: "Move task down",
+        scope: Scope::Main,
+        default_accel: "Cmd+Alt+ArrowDown",
+    },
+    Command {
+        id: "select_all",
+        label: "Select all tasks",
+        scope: Scope::Main,
+        default_accel: "Cmd+A",
+    },
+    Command {
         id: "clear_draft",
         label: "Clear capture draft",
         scope: Scope::Tray,
