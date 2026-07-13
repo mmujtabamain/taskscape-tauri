@@ -8,9 +8,10 @@
 //! `+` key so `+` stays an unambiguous separator). Examples: `Cmd+Enter`,
 //! `Cmd+Shift+Backspace`, `Cmd+1`.
 //!
-//! User overrides live in the shared `settings` table under one key
-//! ([`HOTKEYS_KEY`]) as a JSON object `{ commandId: accel }`. An absent id means
-//! "use the default"; an empty string means "intentionally unbound".
+//! User overrides live in the shared settings store (`~/.taskscape/settings.json`,
+//! see [`crate::settings`]) under one key ([`HOTKEYS_KEY`]) as a JSON object
+//! `{ commandId: accel }`. An absent id means "use the default"; an empty string
+//! means "intentionally unbound".
 
 use std::collections::BTreeMap;
 
@@ -19,7 +20,7 @@ use serde::Serialize;
 
 use crate::storage::Store;
 
-/// Settings-table key holding the JSON override map.
+/// Settings key holding the JSON override map.
 pub const HOTKEYS_KEY: &str = "hotkeys";
 
 /// Where a command is dispatched — and its conflict namespace: the same combo

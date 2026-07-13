@@ -12,6 +12,12 @@ pub fn db_path() -> PathBuf {
     root_dir().join("taskscape.db")
 }
 
+/// Application settings file: `~/.taskscape/settings.json`. Kept out of the
+/// database file so copying `taskscape.db` carries data without preferences.
+pub fn settings_path() -> PathBuf {
+    root_dir().join("settings.json")
+}
+
 /// Directory holding files copied in via "copy" attachments.
 pub fn attachments_dir() -> PathBuf {
     root_dir().join("attachments")

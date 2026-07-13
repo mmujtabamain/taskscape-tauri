@@ -2,13 +2,13 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
-use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, LoaderTrait,
     QueryFilter, QueryOrder, Set, SqlxSqliteConnector, TransactionTrait,
 };
 
-use crate::entities::{attachments, lists, projects, settings, task_notes, tasks};
+use crate::entities::{attachments, lists, projects, task_notes, tasks};
 use crate::models::{Attachment, LinkType, List, Note, Project, Task};
 use crate::util::{new_id, now_millis};
 
@@ -37,27 +37,17 @@ impl Store {
     }
 
     // ---- settings (shared key/value, e.g. the last active list) -----------
+    //
+    // Persisted as JSON at `~/.taskscape/settings.json`, deliberately outside the
+    // database — see [`crate::settings`]. The signatures stay `async` so every
+    // caller is unchanged despite the file-backed store being synchronous.
 
     pub async fn get_setting(&self, key: &str) -> Result<Option<String>> {
-        Ok(settings::Entity::find_by_id(key.to_string())
-            .one(&self.db)
-            .await?
-            .map(|m| m.value))
+        Ok(crate::settings::get(key))
     }
 
     pub async fn set_setting(&self, key: &str, value: &str) -> Result<()> {
-        settings::Entity::insert(settings::ActiveModel {
-            key: Set(key.to_string()),
-            value: Set(value.to_string()),
-        })
-        .on_conflict(
-            OnConflict::column(settings::Column::Key)
-                .update_column(settings::Column::Value)
-                .to_owned(),
-        )
-        .exec(&self.db)
-        .await?;
-        Ok(())
+        crate::settings::set(key, value)
     }
 
     // ---- projects --------------------------------------------------------

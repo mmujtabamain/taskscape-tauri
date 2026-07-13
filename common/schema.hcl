@@ -207,18 +207,3 @@ table "task_notes" {
     columns = [column.task_id]
   }
 }
-
-table "settings" {
-  schema = schema.main
-  column "key" {
-    null = false
-    type = text
-  }
-  column "value" {
-    null = false
-    type = text
-  }
-  primary_key {
-    columns = [column.key]
-  }
-}

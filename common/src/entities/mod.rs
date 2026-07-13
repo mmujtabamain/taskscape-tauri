@@ -5,6 +5,5 @@ pub mod prelude;
 pub mod attachments;
 pub mod lists;
 pub mod projects;
-pub mod settings;
 pub mod task_notes;
 pub mod tasks;

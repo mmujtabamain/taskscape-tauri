@@ -8,8 +8,9 @@ Everything both apps share: persistence, screenshots, attachments, and the HTTP 
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `lib.rs`         | Re-exports (`Store`, `Project`, `List`, `Task`, `Note`, `Attachment`, `LinkType`) and the port constants `MAIN_PORT`/`TRAY_PORT`.      |
 | `models.rs`      | Serde **domain** structs: `Project`, `List`, `Task`, `Note`, `Attachment`, and `LinkType` (`Reference` \| `Copy`). The JSON contract.  |
-| `hotkeys.rs`     | The hotkey system's source of truth: command catalog, canonical accel format, `resolve`/`set_binding` (conflict-checked) over the `settings` table (key `hotkeys`). The frontend twin is `common-ui/src/hotkeys.ts`. |
+| `hotkeys.rs`     | The hotkey system's source of truth: command catalog, canonical accel format, `resolve`/`set_binding` (conflict-checked) over the settings store (`~/.taskscape/settings.json`, key `hotkeys`). The frontend twin is `common-ui/src/hotkeys.ts`. |
 | `storage.rs`     | `Store` — the async SeaORM handle. All DB reads/writes; maps entities → domain models.                                                 |
+| `settings.rs`    | File-backed app **settings** — a string→string map persisted as JSON at `~/.taskscape/settings.json`, kept out of the DB. Backs `Store::get/set_setting` (atomic writes, read-through).                                                             |
 | `entities/`      | **Generated** SeaORM entities (`sea-orm-cli`, via `gen-entities.sh`). Never serialized to the frontend — mapped in `storage.rs`.       |
 | `migrations.rs`  | Runtime applier: embeds `common/migrations/*.sql` and applies unrecorded versions at startup. Atlas authors the SQL; it's not shipped. |
 | `paths.rs`       | Locations under `~/.taskscape/` and `ensure_dirs()`.                                                                                   |
@@ -46,8 +47,11 @@ for the full design.
 **Tables** (all with full referential integrity):
 `projects` → `lists` (FK, cascade) → `tasks` (FK, cascade; plus a self-referential
 `parent_id` FK, cascade, so deleting a task drops its whole subtree in the DB) →
-`attachments` and `task_notes` (both FK, cascade). Plus a `settings` key/value
-table. `sort_order` is `REAL NOT NULL` everywhere. Indexes on every FK column.
+`attachments` and `task_notes` (both FK, cascade). `sort_order` is `REAL NOT NULL`
+everywhere. Indexes on every FK column. App **settings** are deliberately *not* in
+the DB — they live in a separate file-backed key/value store (`settings.rs`,
+`~/.taskscape/settings.json`) so copying `taskscape.db` carries data without
+preferences.
 
 **Entities vs. domain models.** SeaORM entity `Model`s live in `entities/` and are
 **mapped** to the `models.rs` structs at the `Store` boundary (`to_task`,
@@ -55,7 +59,7 @@ table. `sort_order` is `REAL NOT NULL` everywhere. Indexes on every FK column.
 with `common/gen-entities.sh` after a schema change (it normalizes SQLite's loose
 numeric typing to the domain's `i64` millis / `f64` ordering keys).
 
-**Method groups:** settings (`get/set_setting`), projects (`create/list/rename/delete_project`,
+**Method groups:** settings (`get/set_setting` — file-backed, see `settings.rs`), projects (`create/list/rename/delete_project`,
 `default_project`), lists (`create/list/reorder/rename/delete_list`), tasks
 (`create/list/all/update/get/delete/move/reorder_task`), attachments
 (`add/list/get/update/delete_attachment`), notes (`list/create/update/delete_note`).
