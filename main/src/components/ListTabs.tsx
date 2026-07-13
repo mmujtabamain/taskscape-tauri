@@ -2,8 +2,8 @@ import { Icon } from '@taskscape/common-ui/Icon';
 import { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import type { List } from '../api';
+import { readDroppedIds } from '../stores/dragStore';
 import { useContextMenu } from './contextMenuContext';
-import { TASK_SET_MIME } from './TaskRow';
 
 const TAB_MIME = 'application/x-list-tab';
 
@@ -172,18 +172,17 @@ export function ListTabs({
                 setTabOver((v) => (v?.id === list.id ? null : v));
               }}
               onDrop={(e) => {
-                const setJson = e.dataTransfer.getData(TASK_SET_MIME);
-                const taskId = e.dataTransfer.getData('application/x-task');
+                const taskIds = readDroppedIds(e);
                 const tabId = e.dataTransfer.getData(TAB_MIME);
                 setDropOver(null);
                 const over = tabOver;
                 setTabOver(null);
-                if (setJson) {
+                if (taskIds.length > 1) {
                   e.preventDefault();
-                  onDropTaskSet(JSON.parse(setJson) as string[], list.id);
-                } else if (taskId) {
+                  onDropTaskSet(taskIds, list.id);
+                } else if (taskIds.length === 1) {
                   e.preventDefault();
-                  onDropTask(taskId, list.id);
+                  onDropTask(taskIds[0], list.id);
                 } else if (tabId && tabId !== list.id) {
                   e.preventDefault();
                   onReorder(tabId, list.id, over?.before ?? true);

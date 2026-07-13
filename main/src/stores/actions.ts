@@ -58,10 +58,10 @@ export function setTasksDone(ids: string[], done: boolean) {
     invert: async () => {
       patchMany(prevTrue, { done: true });
       patchMany(prevFalse, { done: false });
-      await Promise.all([
-        prevTrue.length ? api.setTasksDone(prevTrue, true) : null,
-        prevFalse.length ? api.setTasksDone(prevFalse, false) : null,
-      ]);
+      // Sequential, not Promise.all: two overlapping write transactions deadlock
+      // in SQLite WAL (see reposition).
+      if (prevTrue.length) await api.setTasksDone(prevTrue, true);
+      if (prevFalse.length) await api.setTasksDone(prevFalse, false);
     },
   });
 }
@@ -140,16 +140,19 @@ function reposition(label: string, ops: Op[]): Promise<void> {
   let snaps: Snap[] = [];
   return run({
     label,
+    // Moves run SEQUENTIALLY, never Promise.all: each move_task is its own
+    // begin→read→write→commit transaction, and two overlapping read-then-write
+    // transactions deadlock in SQLite WAL (SQLITE_BUSY_SNAPSHOT, which the busy
+    // timeout can't retry) — so a concurrent multi-move silently drops all but
+    // the first. Awaiting one before the next keeps every op on its own snapshot.
     apply: async () => {
       const { taskById, load } = useTaskStore.getState();
       snaps = ops.map((o) => taskById[o.id]).filter(Boolean).map(snapOf);
-      await Promise.all(
-        ops.map((o) => api.moveTask(o.id, o.parentId, o.listArg, o.sort))
-      );
+      for (const o of ops) await api.moveTask(o.id, o.parentId, o.listArg, o.sort);
       await load();
     },
     invert: async () => {
-      await Promise.all(snaps.map(restore));
+      for (const s of snaps) await restore(s);
       await useTaskStore.getState().load();
     },
   });

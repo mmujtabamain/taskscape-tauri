@@ -381,18 +381,14 @@ Tiered **P1 · P2 · P3**; effort **S/M/L**; **FE** = frontend-only, **BE** = ne
 - **P2·S·FE — Collapse all / Expand all** (footer button + shortcut).
 - **P2·M·FE — Per-pane sort control** (manual / created / alphabetical / done-last) + **filter chip**
   (all / active / completed).
-- **P2·S·FE — "Focus mode"** — zoom the pane into one subtree (breadcrumb back).
 - **P2·S·FE — Drag multiple to reorder** (falls out of C.4).
 - **P2·M·FE — Indent / outdent with Tab / ⇧Tab** (reparent to previous sibling / promote).
-- **P3·M·FE — Virtualised list** (only if perf demands). **P3·S·FE — Row density toggle.**
 
 ### D.2 Selection & bulk actions (beyond C.2/C.3)
 
 - **P1·S·FE — Selection count + Clear** always visible when active.
-- **P2·M·BE — Bulk Duplicate**, **bulk Convert to subtasks of…**.
 - **P2·S·FE — Invert selection / Select all completed / Select all in subtree.**
 - **P2·S·FE — Persist last selection** across a refresh.
-- **P3·M·BE — Bulk edit** (append/prefix/suffix titles, set/clear done).
 
 ### D.3 Keyboard & command surface
 
@@ -405,13 +401,6 @@ Tiered **P1 · P2 · P3**; effort **S/M/L**; **FE** = frontend-only, **BE** = ne
   helper exists).
 - **P2·S·BE — `new_list` / `new_project`** shortcuts. **P3·M·FE — Chorded shortcuts** ("g then l").
 
-### D.4 Search (beyond C.5)
-
-- **P2·M·FE — Saved / recent searches** + scoped quick-filters ("has attachments", "has notes").
-- **P2·S·FE — Search result list mode** — flat ranked results across scope, click to jump.
-- **P3·M·BE — Full-text note search** (real note HTML, not just the derived `notes` preview; FTS index
-  or Rust query).
-
 ### D.5 Preview panel (beyond C.3)
 
 - **P1·S·FE — ⌘C copies the inspected task/selection**; ⌘⌫ deletes from the panel.
@@ -422,24 +411,19 @@ Tiered **P1 · P2 · P3**; effort **S/M/L**; **FE** = frontend-only, **BE** = ne
 ### D.6 Lists & tabs
 
 - **P1·S·FE — Double-click tab to rename inline.** **P2·S·FE — Tab overflow** (scroll / "more" menu).
-- **P2·S·FE — Colour / emoji per list** (schema add — confirm first). **P2·S·FE — Duplicate / archive list.**
 - **P3·M·BE — List templates.**
 
 ### D.7 Projects
 
 - **P1·S·FE — ⌘⇧[ / ] switch project**; palette quick-switcher.
-- **P2·S·FE — Reorder projects, project colour, task counts in the switcher.** **P3·M·BE — Archive project.**
+- **P2·S·FE — Reorder projects, project colour, task counts in the switcher.**
 
 ### D.8 Split view & layout
 
 - **P1·S·FE — Swap panes shortcut**; **reset split ratio** (double-click the resizer).
-- **P2·S·FE — Remember per-list scroll position.** **P2·S·FE — Vertical (stacked) split.**
-- **P3·M·FE — 3-pane / grid** for wide monitors.
 
 ### D.9 Notes & attachments
 
-- **P1·S·FE — Paste image into a note** → attach + @mention (screenshot flow exists; clipboard-image is
-  the gap).
 - **P2·S·FE — Drag a file onto a task row** to attach. **P2·S·FE — Attachment quick-look** on hover/space.
 - **P3·M·BE — Note templates / slash-commands.**
 
@@ -450,14 +434,12 @@ Tiered **P1 · P2 · P3**; effort **S/M/L**; **FE** = frontend-only, **BE** = ne
 - **P1·M·BE — Trash / recently deleted** (soft-delete `deleted_at` + restore/purge) — the durable base
   for undoable delete (B3).
 - **P2·S·FE — Toast with "Undo"** after delete/move/bulk (short-lived `invert()` of the last command).
-- **P2·M·BE — Autosave backup / export project.** **P3·M·BE — Task activity log.**
+- **P2·M·BE — Autosave backup / export project.**
 
 ### D.11 Accessibility & polish
 
 - **P1·S·FE — Focus-visible rings** everywhere; **ARIA** on the checkbox/selection handle.
 - **P1·S·FE — Respect reduced-motion** (infra exists via `useLowPowerMode`; audit animations).
-- **P2·S·FE — Screen-reader labels** for icon-only buttons. **P2·S·FE — High-contrast pass** on
-  selection/drop colours.
 
 > _Removed from this plan (per direction): App-level onboarding/window items and Tray/capture-bar QOL.
 > Onboarding + multiple themes will be planned separately later._

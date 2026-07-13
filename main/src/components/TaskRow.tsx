@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { List, Task } from '../api';
+import { beginTaskDrag, endTaskDrag, readDroppedIds } from '../stores/dragStore';
 import { absoluteDateTime, relativeTime } from '../time';
 import { useContextMenu, type MenuItem } from './contextMenuContext';
 import { Icon } from '@taskscape/common-ui/Icon';
@@ -42,10 +43,6 @@ export interface ClickMods {
   shiftKey: boolean;
 }
 
-/** MIME payload for a multi-task drag: a JSON id array of the selection's
- *  forest roots, in visual order. Single drags still carry `application/x-task`. */
-export const TASK_SET_MIME = 'application/x-task-set';
-
 export interface RowCtx {
   childrenByParent: Record<string, Task[]>;
   collapsed: Set<string>;
@@ -77,6 +74,8 @@ export interface RowCtx {
   composeFor: string | null;
   setComposeFor: (id: string | null) => void;
   isVisible: (t: Task) => boolean;
+  /** Order a sibling group by the pane's sort + direction (for rendering). */
+  orderChildren: (tasks: Task[]) => Task[];
   forceExpand: boolean;
   /** Active search query for this pane, for highlighting matched text ('' = off). */
   query: string;
@@ -103,6 +102,7 @@ export type BaseRowCtx = Omit<
   | 'onBulkMove'
   | 'onBulkDelete'
   | 'isVisible'
+  | 'orderChildren'
   | 'forceExpand'
   | 'query'
 >;
@@ -122,7 +122,9 @@ export function TaskRow({
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
 
-  const children = (ctx.childrenByParent[task.id] ?? []).filter(ctx.isVisible);
+  const children = ctx.orderChildren(
+    (ctx.childrenByParent[task.id] ?? []).filter(ctx.isVisible)
+  );
   const doneChildren = children.filter((c) => c.done).length;
   const expanded = ctx.forceExpand || !ctx.collapsed.has(task.id);
   const picked = ctx.selectedIds.has(task.id);
@@ -263,19 +265,18 @@ export function TaskRow({
         data-task-id={task.id}
         draggable
         onDragStart={(e) => {
+          // The primary id rides on the DataTransfer for drop-target detection
+          // and single-drag fallback; the actual id set (whole selection when
+          // this row is part of it, else just this row) travels in the drag
+          // store, which WKWebView carries reliably where a 2nd MIME type won't.
           e.dataTransfer.setData('application/x-task', task.id);
-          // Dragging a row that's part of a multi-selection carries the whole
-          // set (its forest roots); a row outside the selection drags alone.
-          if (ctx.selectedIds.has(task.id) && ctx.selectedIds.size > 1) {
-            e.dataTransfer.setData(
-              TASK_SET_MIME,
-              JSON.stringify(ctx.selectionRoots())
-            );
-          }
+          const multi = ctx.selectedIds.has(task.id) && ctx.selectedIds.size > 1;
+          beginTaskDrag(multi ? ctx.selectionRoots() : [task.id]);
           e.dataTransfer.effectAllowed = 'move';
           ctx.setDraggingId(task.id);
         }}
         onDragEnd={() => {
+          endTaskDrag();
           ctx.setDraggingId(null);
           ctx.setDropTarget(null);
         }}
@@ -301,23 +302,21 @@ export function TaskRow({
             ctx.setDropTarget(null);
         }}
         onDrop={(e) => {
-          const setJson = e.dataTransfer.getData(TASK_SET_MIME);
-          const draggedId = e.dataTransfer.getData('application/x-task');
+          const ids = readDroppedIds(e);
           ctx.setDropTarget(null);
-          if (!setJson && !draggedId) return;
+          if (ids.length === 0) return;
           // Consume the drop here (even a self-drop) so it can't fall through
           // to the pane's root-drop.
           e.preventDefault();
           e.stopPropagation();
           const zone = zoneFromEvent(e);
-          if (setJson) {
-            const ids = JSON.parse(setJson) as string[];
+          if (ids.length > 1) {
             if (ids.includes(task.id)) return;
             ctx.onDropSetOnRow(ids, task, zone);
             return;
           }
-          if (draggedId === task.id) return;
-          ctx.onDropOnRow(draggedId, task, zone);
+          if (ids[0] === task.id) return;
+          ctx.onDropOnRow(ids[0], task, zone);
         }}
         onMouseDown={(e) => {
           // Stop ⇧-click range-select from smearing a native text selection

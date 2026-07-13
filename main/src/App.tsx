@@ -41,6 +41,7 @@ import { useSelectionStore } from './stores/selectionStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTaskStore } from './stores/taskStore';
 import { flattenVisible } from './stores/visibility';
+import { useViewStore, type PaneView } from './stores/viewStore';
 
 const EMPTY_IDS: Set<string> = new Set();
 
@@ -375,6 +376,16 @@ function App() {
     };
   }, [importList, exportList, activeList]);
 
+  // The standalone filter overlay window streams a pane's edited view back here.
+  useEffect(() => {
+    const un = listen<{ paneId: string; view: PaneView }>('overlay-apply', (e) =>
+      useViewStore.getState().set(e.payload.paneId, e.payload.view)
+    );
+    return () => {
+      un.then((fn) => fn());
+    };
+  }, []);
+
   // ----- navigation helpers -----
   const cycleTab = (dir: -1 | 1) => {
     const n = listsInProject.length;
@@ -642,14 +653,27 @@ function App() {
           const prev = sibs[sibs.findIndex((s) => s.id === t.id) - 1];
           if (prev) void actDropOnRow(t.id, prev, 'nest');
         }
-      } else if (e.key === ' ' && selectedTask) {
-        e.preventDefault();
-        toggleDone(selectedTask);
+      } else if (e.key === ' ') {
+        // Space toggles the whole selection when one is live (flip to all-done,
+        // or all-undone when they already are), else the single previewed task.
+        const selIds = focusedListId ? [...paneSel(focusedListId).ids] : [];
+        if (selIds.length > 0) {
+          e.preventDefault();
+          const allDone = selIds.every((id) => taskById[id]?.done);
+          void actSetTasksDone(selIds, !allDone);
+        } else if (selectedTask) {
+          e.preventDefault();
+          toggleDone(selectedTask);
+        }
       } else if ((e.key === 'F2' || e.key === 'Enter') && selectedTask) {
         e.preventDefault();
         beginTitleEdit(selectedTask.id);
       } else if (e.key === 'Escape') {
         if (overlayOpen()) return;
+        if (trashOpen) {
+          setTrashOpen(false);
+          return;
+        }
         const listId = focusedListId;
         if (listId && paneSel(listId).ids.size > 0) useSelectionStore.getState().clear(listId);
         else focus(null);
@@ -777,7 +801,7 @@ function App() {
             </div>
           )}
 
-          {layout.previewOpen && (
+          {(layout.previewOpen || trashOpen) && (
             <>
               <Resizer
                 onResize={(x, rect) =>
@@ -790,6 +814,9 @@ function App() {
                 style={{ width: layout.previewW }}
                 className="border-edge-2l dark:border-edge-2d shrink-0 border-l"
               >
+                {trashOpen ? (
+                  <TrashPane onClose={() => setTrashOpen(false)} />
+                ) : (
                 <PreviewPanel
                   task={selectedTask}
                   childrenByParent={childrenByParent}
@@ -828,6 +855,7 @@ function App() {
                     useSelectionStore.getState().focus(id);
                   }}
                 />
+                )}
               </aside>
             </>
           )}
@@ -844,7 +872,6 @@ function App() {
         <CommandPalette getCommands={buildCommands} onClose={() => setPaletteOpen(false)} />
       )}
       {cheatOpen && <CheatSheet onClose={() => setCheatOpen(false)} />}
-      {trashOpen && <TrashPane onClose={() => setTrashOpen(false)} />}
       <Toast />
     </ContextMenuProvider>
   );

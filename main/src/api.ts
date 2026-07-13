@@ -160,6 +160,11 @@ export const api = {
   presentWindow: (width: number, height: number) =>
     invoke<void>('present_window', { width, height }),
   openSettings: () => invoke<void>('open_settings'),
+
+  // filter overlay window (per-pane sort/filter, edited in its own window)
+  openOverlay: (props: unknown) => invoke<void>('open_overlay', { props }),
+  overlayCurrent: () => invoke<unknown>('overlay_current'),
+  closeOverlay: () => invoke<void>('close_overlay'),
   setWindowTheme: (dark: boolean) => invoke<void>('set_window_theme', { dark }),
   /** Whether macOS is in Low Power Mode right now (always false off macOS). */
   isLowPowerMode: () => invoke<boolean>('is_low_power_mode'),

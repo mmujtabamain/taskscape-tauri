@@ -39,6 +39,11 @@ async fn resolve_dark(store: &Store, window: &tauri::WebviewWindow) -> bool {
 /// still pending when the window goes away means the modal never answered.
 struct ModalState(Mutex<Option<(String, serde_json::Value)>>);
 
+/// The props (which pane + its current view) for the standalone `overlay` filter
+/// window, fetched by that window on load / on refresh. Like the modal window, it
+/// is a single reused panel that is only ever hidden, never destroyed.
+struct OverlayState(Mutex<Option<serde_json::Value>>);
+
 /// Sender into the note-write queue. Autosave streams `update_note` calls as the
 /// user types; enqueuing them (instead of writing inline) lets a single worker
 /// apply them in arrival order, off the command path, so concurrent edits to the
@@ -744,6 +749,66 @@ fn close_modal(
     Ok(())
 }
 
+/// Open the per-pane filter overlay window for the given props (pane id + name +
+/// its current view). Reuses the single hidden panel; a first open builds it.
+/// Edits stream back to the main window as `overlay-apply` events (from the
+/// overlay's frontend), so there is no request/response result to plumb here.
+#[tauri::command]
+fn open_overlay(
+    app: AppHandle,
+    state: State<'_, OverlayState>,
+    props: serde_json::Value,
+) -> Result<(), String> {
+    *state.0.lock().unwrap() = Some(props);
+    if let Some(window) = app.get_webview_window("overlay") {
+        app.emit_to("overlay", "overlay-refresh", ()).map_err(err)?;
+        window.show().map_err(err)?;
+        window.set_focus().map_err(err)?;
+        return Ok(());
+    }
+    let window = WebviewWindowBuilder::new(
+        &app,
+        "overlay",
+        WebviewUrl::App("index.html#overlay".into()),
+    )
+    .title("Filters")
+    .inner_size(340., 420.)
+    .resizable(false)
+    .minimizable(false)
+    .maximizable(false)
+    .decorations(false)
+    .shadow(true)
+    .visible(false)
+    .skip_taskbar(true)
+    .build()
+    .map_err(err)?;
+    let w = window.clone();
+    window
+        .run_on_main_thread(move || panels::style_panel(&w))
+        .map_err(err)?;
+    Ok(())
+}
+
+/// The pending overlay props, fetched by the overlay window on load and on every
+/// `overlay-refresh`.
+#[tauri::command]
+fn overlay_current(state: State<'_, OverlayState>) -> Result<serde_json::Value, String> {
+    state
+        .0
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "no overlay pending".to_string())
+}
+
+#[tauri::command]
+fn close_overlay(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("overlay") {
+        let _ = window.hide();
+    }
+    Ok(())
+}
+
 /// Show the settings window, creating it on first use. It stays hidden until
 /// its content calls `present_window`.
 #[tauri::command]
@@ -851,6 +916,7 @@ pub fn run() {
         })
         .manage(store)
         .manage(ModalState(Mutex::new(None)))
+        .manage(OverlayState(Mutex::new(None)))
         .manage(NoteQueue(note_tx))
         .setup(move |app| {
             #[cfg(target_os = "macos")]
@@ -930,7 +996,7 @@ pub fn run() {
             ("main", WindowEvent::Destroyed) => window.app_handle().exit(0),
             // Panels hide instead of closing: destroying a class-swapped
             // NSPanel aborts with a foreign exception during teardown.
-            ("modal" | "settings", WindowEvent::CloseRequested { api, .. }) => {
+            ("modal" | "settings" | "overlay", WindowEvent::CloseRequested { api, .. }) => {
                 api.prevent_close();
                 if window.label() == "modal" {
                     let pending = window.state::<ModalState>().0.lock().unwrap().take();
@@ -1009,6 +1075,9 @@ pub fn run() {
             modal_current,
             present_window,
             close_modal,
+            open_overlay,
+            overlay_current,
+            close_overlay,
             open_settings,
             set_window_theme,
             is_low_power_mode,

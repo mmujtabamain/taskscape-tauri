@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@taskscape/common-ui/Icon';
-import type { List, Task } from '../api';
+import { api, type List, type Task } from '../api';
 import {
   dropOnRoot as actDropOnRoot,
   dropSetOnRoot as actDropSetOnRoot,
 } from '../stores/actions';
+import { readDroppedIds } from '../stores/dragStore';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useProjectStore } from '../stores/projectStore';
 import { directMatches, useSearchStore } from '../stores/searchStore';
@@ -14,16 +15,16 @@ import { useTaskStore } from '../stores/taskStore';
 import {
   flattenVisible,
   isVisibleInPane,
+  orderForPane,
   paneSearching,
 } from '../stores/visibility';
-import { useViewStore } from '../stores/viewStore';
+import { isViewActive, useViewStore, type PaneView } from '../stores/viewStore';
 import { useContextMenu } from './contextMenuContext';
 import {
   TaskRow,
   type BaseRowCtx,
   type ClickMods,
   type RowCtx,
-  TASK_SET_MIME,
 } from './TaskRow';
 
 /** Per-pane selection state + actions, built by App and injected here. Split
@@ -79,6 +80,8 @@ export function TaskPane({
   // Reactive subscriptions: re-render this pane whenever anything that changes
   // its visible tree changes. The visibility helpers read current store state.
   const roots = useTaskStore((s) => s.rootsByList[list.id] ?? EMPTY_ROOTS);
+  // Subscribe (no captured value) so the pane re-renders — and re-sorts/filters
+  // via the live-reading visibility helpers — whenever this pane's view changes.
   useLayoutStore((s) => s.collapsed);
   useSettingsStore((s) => s.showCompleted);
   useViewStore((s) => s.byPane[list.id]);
@@ -89,7 +92,10 @@ export function TaskPane({
   const query = searchActive ? (paneSearch?.query ?? '') : '';
   const searching = paneSearching(list.id);
 
-  const visibleRoots = roots.filter((t) => isVisibleInPane(t, list.id));
+  const visibleRoots = orderForPane(
+    list.id,
+    roots.filter((t) => isVisibleInPane(t, list.id))
+  );
 
   // Rows augmented with this pane's selection + per-pane visibility/highlight.
   const paneCtx = useMemo<RowCtx>(
@@ -103,6 +109,7 @@ export function TaskPane({
       onBulkMove: sel.bulkMove,
       onBulkDelete: sel.bulkDelete,
       isVisible: (t: Task) => isVisibleInPane(t, list.id),
+      orderChildren: (tasks: Task[]) => orderForPane(list.id, tasks),
       forceExpand: searching,
       query,
     }),
@@ -189,6 +196,12 @@ export function TaskPane({
               placeholder={`Search ${list.name}`}
               onFocus={() => onFocusPane(list.id)}
               onChange={(e) => useSearchStore.getState().setQuery(list.id, e.target.value)}
+              onBlur={() => {
+                // An empty search field that loses focus leaves search mode, so
+                // the composer returns instead of a dangling blank search bar.
+                if (!useSearchStore.getState().get(list.id).query.trim())
+                  useSearchStore.getState().close(list.id);
+              }}
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === 'Escape') useSearchStore.getState().close(list.id);
@@ -252,17 +265,11 @@ export function TaskPane({
         }}
         onDrop={(e) => {
           setRootDropOver(false);
-          const setJson = e.dataTransfer.getData(TASK_SET_MIME);
-          if (setJson) {
-            e.preventDefault();
-            void actDropSetOnRoot(JSON.parse(setJson) as string[], list.id);
-            return;
-          }
-          const draggedId = e.dataTransfer.getData('application/x-task');
-          if (draggedId) {
-            e.preventDefault();
-            void actDropOnRoot(draggedId, list.id);
-          }
+          const ids = readDroppedIds(e);
+          if (ids.length === 0) return;
+          e.preventDefault();
+          if (ids.length > 1) void actDropSetOnRoot(ids, list.id);
+          else void actDropOnRoot(ids[0], list.id);
         }}
       >
         <div ref={contentRef} className="relative pb-6">
@@ -300,7 +307,13 @@ export function TaskPane({
       {sel.ids.size > 0 ? (
         <BulkBar sel={sel} count={sel.ids.size} otherLists={ctx.otherLists} />
       ) : (
-        <StatsBar listId={list.id} done={done} total={total} pct={pct} />
+        <StatsBar
+          listId={list.id}
+          listName={list.name}
+          done={done}
+          total={total}
+          pct={pct}
+        />
       )}
     </section>
   );
@@ -422,18 +435,20 @@ function BulkBar({
 /** The footer stats + a per-pane sort/filter control (D.1). */
 function StatsBar({
   listId,
+  listName,
   done,
   total,
   pct,
 }: {
   listId: string;
+  listName: string;
   done: number;
   total: number;
   pct: number;
 }) {
   return (
     <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d text-content-3l dark:text-content-3d flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
-      <ViewControl listId={listId} />
+      <ViewControl listId={listId} listName={listName} />
       <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
       <span>
         {done}/{total} done
@@ -453,35 +468,15 @@ function StatsBar({
   );
 }
 
-/** Per-pane sort + filter, opened from the footer (D.1). */
-function ViewControl({ listId }: { listId: string }) {
-  const menu = useContextMenu();
+/** Per-pane sort + filter. Opens the standalone `overlay` filter window for this
+ *  pane; lights up while the pane's view differs from the defaults (D.1). */
+function ViewControl({ listId, listName }: { listId: string; listName: string }) {
   const view = useViewStore((s) => s.byPane[listId]);
-  const sort = view?.sort ?? 'manual';
-  const filter = view?.filter ?? 'all';
-  const check = (on: boolean) => (on ? 'check' : undefined);
-  const open = (e: React.MouseEvent) => {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    menu.open({
-      x: r.left,
-      y: r.bottom + 6,
-      items: [
-        { id: 'sort:manual', label: 'Sort: Manual', icon: check(sort === 'manual') },
-        { id: 'sort:created', label: 'Sort: Date created', icon: check(sort === 'created') },
-        { id: 'sort:alpha', label: 'Sort: Alphabetical', icon: check(sort === 'alpha') },
-        { id: 'sort:done-last', label: 'Sort: Done last', icon: check(sort === 'done-last') },
-        { id: 'filter:all', label: 'Show: All', icon: check(filter === 'all'), dividerAbove: true },
-        { id: 'filter:active', label: 'Show: Active only', icon: check(filter === 'active') },
-        { id: 'filter:completed', label: 'Show: Completed only', icon: check(filter === 'completed') },
-      ],
-      onPick: (id) => {
-        const s = useViewStore.getState();
-        if (id.startsWith('sort:')) s.setSort(listId, id.slice(5) as never);
-        if (id.startsWith('filter:')) s.setFilter(listId, id.slice(7) as never);
-      },
-    });
+  const active = view ? isViewActive(view) : false;
+  const open = () => {
+    const current: PaneView = useViewStore.getState().get(listId);
+    void api.openOverlay({ paneId: listId, paneName: listName, view: current });
   };
-  const active = sort !== 'manual' || filter !== 'all';
   return (
     <button
       onClick={open}
@@ -493,6 +488,7 @@ function ViewControl({ listId }: { listId: string }) {
       }`}
     >
       <Icon name="tune" size={14} weight={300} />
+      {active && <span className="text-[11px] tracking-normal normal-case">Filtered</span>}
     </button>
   );
 }
