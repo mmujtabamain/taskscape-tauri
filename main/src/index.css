@@ -24,30 +24,17 @@
   font-display: swap;
 }
 
-/* Theme is driven by a `.dark` class on <html> (set in lib/theme.ts from the
-   saved preference or the system appearance), so a manual override always wins. */
-@custom-variant dark (&:where(.dark, .dark *));
-
+/* The `@custom-variant dark`, the theme-swapping alias `.dark` overrides, and
+   `--icon-wght` are shared with the tray, so they live in tokens.css. Only the
+   traffic-light disc colors are specific to this app. */
 :root {
-  /* ── App-specific (traffic-light discs + icon weight, theme-swapping) ────── */
   --tl-inactive-ring: #cececf;
   --tl-inactive-fill: #c5c5c6;
-  --icon-wght: 350;
 }
 
 .dark {
-  --surface-1: var(--surface-1d);
-  --edge-2: var(--edge-2d);
-  --edge-3: var(--edge-3d);
-  --content-1: var(--content-1d);
-  --content-3: var(--content-3d);
-  --accent-500: var(--accent-500d);
-  --selection-1: var(--selection-1d);
-  --focus-1: var(--focus-1d);
-
   --tl-inactive-ring: #5a5a5c;
   --tl-inactive-fill: #4e4e50;
-  --icon-wght: 300;
 }
 
 /* Base element defaults live in @layer base so Tailwind utilities (a later

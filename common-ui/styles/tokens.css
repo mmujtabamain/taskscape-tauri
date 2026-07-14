@@ -14,6 +14,13 @@
 
    Utilities are always explicit per theme:  bg-surface-1l dark:bg-surface-1d
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Theme is driven by a `.dark` class on <html> (set from the saved preference or
+   the system appearance — main: lib/theme.ts · tray: theme.ts), so a manual
+   override always wins. Lives here, in the shared file, so BOTH apps' `dark:`
+   utilities key off the class and not `prefers-color-scheme`. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* ── Surfaces ──────────────────────────────────────────────── light │ dark */
   --surface-0l: oklch(0.944 0.003 255);
@@ -88,6 +95,24 @@
   --accent-500: var(--accent-500l);
   --selection-1: var(--selection-1l);
   --focus-1: var(--focus-1l);
+
+  /* Material Symbols optical weight — thinner in dark (see Icon.tsx). */
+  --icon-wght: 350;
+}
+
+/* Dark values for the theme-swapping aliases + icon weight, applied under the
+   `.dark` class the two apps toggle on <html>. */
+.dark {
+  --surface-1: var(--surface-1d);
+  --edge-2: var(--edge-2d);
+  --edge-3: var(--edge-3d);
+  --content-1: var(--content-1d);
+  --content-3: var(--content-3d);
+  --accent-500: var(--accent-500d);
+  --selection-1: var(--selection-1d);
+  --focus-1: var(--focus-1d);
+
+  --icon-wght: 300;
 }
 
 /* ── Tailwind utility bridge ──────────────────────────────────────────────────

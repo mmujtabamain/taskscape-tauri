@@ -28,10 +28,6 @@
 /* Tokens unique to the tray (not in the shared file): the single-value accent
    used by the capture button + spinner, the count-badge halo, content-4. */
 @theme {
-  --color-content-4l: oklch(0.62 0.013 264); /* placeholder */
-  --color-content-4d: oklch(0.57 0.011 262);
-  --color-accent-400: oklch(0.68 0.17 252);
-  --color-accent-500: oklch(0.6 0.2 255);
   --color-halo-1l: oklch(0.995 0.001 255);
   --color-halo-1d: oklch(0.24 0.005 260);
 }
@@ -52,12 +48,6 @@ body,
   /* The card is capped to fit the (fixed) window; never let focusing the notes
      editor scroll the whole page and push the title off-screen. */
   overflow: hidden;
-}
-
-/* Follow the system light/dark appearance (drives Tailwind's `dark:` variant
-   and any native control rendering). */
-:root {
-  color-scheme: light dark;
 }
 
 /* Toggled from App.tsx while the user is typing to hide the mouse pointer (it
