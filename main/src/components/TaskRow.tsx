@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Icon } from '@taskscape/common-ui/Icon';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type { List, Task } from '../api';
-import { beginTaskDrag, endTaskDrag, readDroppedIds } from '../stores/dragStore';
+import { useAltPressed } from '../stores/altKeyStore';
+import {
+  beginTaskDrag,
+  endTaskDrag,
+  readDroppedIds,
+} from '../stores/dragStore';
 import { absoluteDateTime, relativeTime } from '../time';
 import { useContextMenu, type MenuItem } from './contextMenuContext';
-import { Icon } from '@taskscape/common-ui/Icon';
 
 export type DropZone = 'before' | 'after' | 'nest';
 
@@ -23,7 +28,7 @@ function highlight(text: string, query: string): ReactNode {
     out.push(
       <mark
         key={key++}
-        className="rounded-[3px] bg-accent-500l/25 dark:bg-accent-500d/30 text-inherit"
+        className="bg-accent-500l/25 dark:bg-accent-500d/30 rounded-[3px] text-inherit"
       >
         {text.slice(hit, hit + needle.length)}
       </mark>
@@ -119,8 +124,6 @@ export function TaskRow({
   ctx: RowCtx;
 }) {
   const menu = useContextMenu();
-  const [flash, setFlash] = useState(false);
-  const flashTimer = useRef<number | null>(null);
 
   const children = ctx.orderChildren(
     (ctx.childrenByParent[task.id] ?? []).filter(ctx.isVisible)
@@ -134,22 +137,7 @@ export function TaskRow({
   const drop = ctx.dropTarget?.taskId === task.id ? ctx.dropTarget : null;
   const nestHighlight = drop?.zone === 'nest';
 
-  useEffect(
-    () => () => {
-      if (flashTimer.current) window.clearTimeout(flashTimer.current);
-    },
-    []
-  );
-
   const toggleDone = () => {
-    if (!task.done) {
-      // The lamp flashes the accent for a beat, then settles to the dim done state.
-      setFlash(true);
-      if (flashTimer.current) window.clearTimeout(flashTimer.current);
-      flashTimer.current = window.setTimeout(() => setFlash(false), 340);
-    } else {
-      setFlash(false);
-    }
     ctx.onToggleDone(task);
   };
 
@@ -159,7 +147,12 @@ export function TaskRow({
     const n = ctx.selectedIds.size;
     const bulk = n >= 2 && ctx.selectedIds.has(task.id);
     if (bulk) ctx.select(task.id);
-    else ctx.onRowClick(task.id, { metaKey: false, ctrlKey: false, shiftKey: false });
+    else
+      ctx.onRowClick(task.id, {
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+      });
 
     const moveSubmenu = ctx.otherLists.map((l) => ({
       id: `move:${l.id}`,
@@ -270,7 +263,8 @@ export function TaskRow({
           // this row is part of it, else just this row) travels in the drag
           // store, which WKWebView carries reliably where a 2nd MIME type won't.
           e.dataTransfer.setData('application/x-task', task.id);
-          const multi = ctx.selectedIds.has(task.id) && ctx.selectedIds.size > 1;
+          const multi =
+            ctx.selectedIds.has(task.id) && ctx.selectedIds.size > 1;
           beginTaskDrag(multi ? ctx.selectionRoots() : [task.id]);
           e.dataTransfer.effectAllowed = 'move';
           ctx.setDraggingId(task.id);
@@ -350,7 +344,7 @@ export function TaskRow({
         {/* Inset row separator (starts at the text column, keeps the gutter clean). */}
         <span
           className="bg-edge-1l dark:bg-edge-1d pointer-events-none absolute right-0 bottom-0 h-px"
-          style={{ left: depth * INDENT + 64 }}
+          style={{ left: depth * INDENT + 44 }}
         />
 
         {/* Drop indicator: accent line at target depth, with its index-dot terminal. */}
@@ -359,20 +353,11 @@ export function TaskRow({
             className={`z-raised bg-accent-500l dark:bg-accent-500d pointer-events-none absolute right-3 h-0.5 ${
               drop.zone === 'before' ? '-top-px' : '-bottom-px'
             }`}
-            style={{ left: depth * INDENT + 64 }}
+            style={{ left: depth * INDENT + 44 }}
           >
             <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-0.75 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
           </span>
         )}
-
-        {/* Selection handle: leftmost gutter, distinct from the done checkbox.
-            Revealed on row hover; stays lit while the row is picked. */}
-        <span className="grid w-5 shrink-0 place-items-center">
-          <SelectHandle
-            picked={picked}
-            onToggle={() => ctx.onToggleSelect(task.id)}
-          />
-        </span>
 
         {/* Disclosure chevron, left of the checkbox in the gutter. */}
         <span className="grid w-5 shrink-0 place-items-center">
@@ -401,7 +386,12 @@ export function TaskRow({
         </span>
 
         <span className="grid w-6 shrink-0 place-items-center">
-          <Check done={task.done} flashing={flash} onToggle={toggleDone} />
+          <Check
+            done={task.done}
+            picked={picked}
+            onToggleDone={toggleDone}
+            onToggleSelect={() => ctx.onToggleSelect(task.id)}
+          />
         </span>
 
         <div className="ml-2.5 min-w-0 flex-1 py-2">
@@ -501,105 +491,94 @@ export function TaskRow({
   );
 }
 
-/** The ambient-selection handle: a hollow circle revealed on row hover, filled
- *  accent while the row is picked. Distinct from the square done lamp beside it
- *  — this one never marks done, it only adds to the selection. */
-function SelectHandle({
-  picked,
-  onToggle,
-}: {
-  picked: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-      onDoubleClick={(e) => e.stopPropagation()}
-      title={picked ? 'Deselect' : 'Select'}
-      aria-pressed={picked}
-      className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] transition-all ${
-        picked
-          ? 'bg-accent-500l dark:bg-accent-500d text-on-accent border-transparent opacity-100'
-          : 'border-edge-3l dark:border-edge-3d hover:border-content-3l dark:hover:border-content-3d text-transparent opacity-0 group-hover/row:opacity-100'
-      }`}
-    >
-      <Icon name="check" size={11} weight={700} />
-    </button>
-  );
-}
-
-/** The lamp well: ghost check on hover, accent wipe + drawn stroke on check,
- *  instant cheap uncheck (unchecking is error correction, never ceremony). */
+/** One checkbox, two roles chosen by the Option key. By default it's a round
+ *  select handle — click adds the row to the ambient selection, and a picked row
+ *  fills accent with no check inside. Hold Option and it squares off into the
+ *  done lamp: ghost check on hover, accent wipe + drawn stroke on check, instant
+ *  cheap uncheck (unchecking is error correction, never ceremony). The action
+ *  follows the modifier live off the click, so it's always right even if the
+ *  tracked hold state lags. */
 function Check({
   done,
-  flashing,
-  onToggle,
+  picked,
+  onToggleDone,
+  onToggleSelect,
 }: {
   done: boolean;
-  flashing: boolean;
-  onToggle: () => void;
+  picked: boolean;
+  onToggleDone: () => void;
+  onToggleSelect: () => void;
 }) {
-  const title = done ? 'Mark not done' : 'Mark done';
+  const alt = useAltPressed();
+
+  const doneMode = alt;
+  const active = doneMode ? done : picked;
+
+  const title = doneMode
+    ? done
+      ? 'Mark not done'
+      : 'Mark done'
+    : picked
+      ? 'Deselect'
+      : 'Select';
+
+  const shape = doneMode ? 'rounded-field' : 'rounded-full';
+
   return (
     <button
+      title={title}
+      aria-pressed={active}
+      className={`group/check relative flex h-4.5 w-4.5 items-center justify-center overflow-hidden ${shape} border-[1.5px] ${
+        active
+          ? 'border-done-lamp-1l dark:border-done-lamp-1d bg-done-lamp-1l dark:bg-done-lamp-1d'
+          : 'border-edge-3l dark:border-edge-3d group-hover/row:border-content-3l dark:group-hover/row:border-content-3d'
+      }`}
       onClick={(e) => {
         e.stopPropagation();
-        onToggle();
+        if (e.altKey) return onToggleDone();
+        onToggleSelect();
       }}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="group/check rounded-field relative h-4.5 w-4.5 shrink-0 overflow-hidden"
-      title={title}
     >
-      <span
-        className={`rounded-field absolute inset-0 border-[1.5px] transition-colors duration-100 ${
-          done
-            ? 'border-transparent'
-            : 'border-edge-3l dark:border-edge-3d group-hover/row:border-content-3l dark:group-hover/row:border-content-3d'
-        }`}
-      />
-      <span
-        className={`absolute inset-0 ${flashing ? 'bg-accent-500l dark:bg-accent-500d' : 'bg-done-lamp-1l dark:bg-done-lamp-1d'}`}
-        style={{
-          clipPath: done ? 'inset(0 0 0 0)' : 'inset(100% 0 0 0)',
-          transition: done
-            ? 'clip-path 140ms cubic-bezier(0.2,0,0,1), background-color 150ms 240ms'
-            : 'clip-path 100ms cubic-bezier(0.3,0,1,1)',
-        }}
-      />
-      <svg viewBox="0 0 12 12" className="absolute inset-0 m-auto h-3.5 w-3.5">
-        <path
-          d="M2.5 6.5 L5 8.8 L9.5 3.6"
-          fill="none"
-          stroke="var(--on-accent)"
-          strokeWidth={1.8}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray={12}
-          strokeDashoffset={done ? 0 : 12}
-          style={{
-            transition: done
-              ? 'stroke-dashoffset 160ms cubic-bezier(0.2,0,0,1) 80ms'
-              : 'stroke-dashoffset 80ms',
-          }}
-        />
-      </svg>
-      {!done && (
-        <svg
-          viewBox="0 0 12 12"
-          className="absolute inset-0 m-auto h-3.5 w-3.5 opacity-0 transition-opacity duration-100 group-hover/check:opacity-30"
-        >
-          <path
-            d="M2.5 6.5 L5 8.8 L9.5 3.6"
-            fill="none"
-            stroke="var(--content-3)"
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+      {/* Selection indicator */}
+      {!doneMode && picked && (
+        <span className="bg-content-1d size-2 rounded-full" />
+      )}
+
+      {/* Done fill */}
+      {doneMode && (
+        <>
+          {done && (
+            <div className=" size-full"></div>
+          )}
+          {/* Animated check */}
+          <svg
+            viewBox="0 0 12 12"
+            className="absolute inset-0 m-auto h-3.5 w-3.5"
+          >
+            <path
+              d="M2.5 6.5 L5 8.8 L9.5 3.6"
+              fill="none"
+              stroke={done ? 'var(--on-accent)' : 'var(--content-3)'}
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={12}
+              strokeDashoffset={done ? 0 : 12}
+              opacity={done ? 1 : undefined}
+              className={
+                !done
+                  ? 'opacity-0 transition-opacity duration-100 group-hover/check:opacity-30'
+                  : undefined
+              }
+              style={{
+                transition: done
+                  ? 'stroke-dashoffset 160ms cubic-bezier(0.2,0,0,1) 80ms'
+                  : 'stroke-dashoffset 80ms',
+              }}
+            />
+          </svg>
+        </>
       )}
     </button>
   );
