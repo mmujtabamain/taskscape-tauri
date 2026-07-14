@@ -760,7 +760,10 @@ fn plaintext_to_html(s: &str) -> String {
 
 /// Crude tag-strip for deriving searchable plaintext from note HTML. Every tag
 /// boundary becomes whitespace so adjacent blocks don't run together.
-fn strip_html(html: &str) -> String {
+/// Reduce sanitized note HTML to a single line of plaintext (tags dropped,
+/// entities decoded, whitespace collapsed). Used for the derived `notes`
+/// preview and by the "copy tasks" markdown export.
+pub fn strip_html(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut in_tag = false;
     for ch in html.chars() {

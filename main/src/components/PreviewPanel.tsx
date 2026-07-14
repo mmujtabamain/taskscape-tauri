@@ -382,9 +382,12 @@ function TaskInspector({
     el.style.height = `${el.scrollHeight}px`;
   }, [task.title, titleDraft, editingTitle]);
 
-  const copyTitle = async () => {
+  // Copy the task the same way every other copy path does — through the backend
+  // markdown render, so the title and all its notes travel together.
+  const copyTask = async () => {
     try {
-      await navigator.clipboard.writeText(task.title);
+      const md = await api.copyTasks([task.id]);
+      await navigator.clipboard.writeText(md || task.title);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -591,8 +594,8 @@ function TaskInspector({
               <Icon name="edit" size={15} weight={300} />
             </button>
             <button
-              onClick={copyTitle}
-              title={copied ? 'Copied' : 'Copy title'}
+              onClick={copyTask}
+              title={copied ? 'Copied' : 'Copy task'}
               className={headBtn}
             >
               <Icon name={copied ? 'check' : 'content_copy'} size={15} />

@@ -271,7 +271,8 @@ fn group_by_parent(tasks: &[Task]) -> (Vec<&Task>, HashMap<&str, Vec<&Task>>) {
 /// Render selected tasks as a Markdown checklist. The output holds *exactly* the
 /// selected tasks in tree order; a task's indent is how many of its ancestors are
 /// also selected, so selecting a parent + child nests the child while a lone
-/// selected child renders flush left.
+/// selected child renders flush left. Each task's note blocks follow it as
+/// plaintext lines, indented one level deeper.
 fn render_markdown<'a>(
     node: &'a Task,
     depth: usize,
@@ -287,6 +288,21 @@ fn render_markdown<'a>(
         out.push_str(if node.done { "- [x] " } else { "- [ ] " });
         out.push_str(&node.title);
         out.push('\n');
+        for note in &node.note_items {
+            let text = taskscape_common::storage::strip_html(&note.content);
+            if text.is_empty() {
+                continue;
+            }
+            // Blockquote, aligned to the list item's content column: `>` opens a
+            // real block so the note renders as a quoted description under the
+            // task instead of being slurped into its title line.
+            for _ in 0..depth + 1 {
+                out.push_str("  ");
+            }
+            out.push_str("> ");
+            out.push_str(&text);
+            out.push('\n');
+        }
     }
     let child_depth = depth + usize::from(picked);
     if let Some(kids) = children.get(node.id.as_str()) {
