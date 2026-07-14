@@ -3,7 +3,7 @@
 // optimistically to `taskStore` before the api round-trip. Drag/positioning math
 // lives here too (the store is the single owner of sort_order arithmetic).
 import { api, type Task } from '../api';
-import type { DropZone } from '../components/TaskRow';
+import type { DropZone } from './dragStore';
 import { collapseToRoots } from '../lib/selection';
 import { effSort } from './derive';
 import { useHistoryStore, type Command } from './history';

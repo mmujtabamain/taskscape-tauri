@@ -1,57 +1,39 @@
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { cn } from '@taskscape/common-ui/cn';
 import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { api, type List, type Project } from '../api';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { api } from '../api';
+import { splitTargetId } from '../commands/view';
 import { isMac } from '../lib/platform';
 import { useLowPowerMode } from '../lib/reducedMotion';
+import { useHotkeyStore } from '../stores/hotkeyStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useListStore } from '../stores/listStore';
 import { ListTabs } from './ListTabs';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { WindowControls } from './WindowControls';
 
-interface Props {
-  projects: Project[];
-  selectedProjectId: string | null;
-  onSelectProject: (id: string) => void;
-  onCreateProject: () => void;
-  onRenameProject: (project: Project) => void;
-  onDeleteProject: (project: Project) => void;
-
-  lists: List[];
-  activeListId: string | null;
-  splitListId: string | null;
-  focusedListId: string | null;
-  counts: Record<string, number>;
-  onSelectList: (id: string) => void;
-  onCreateList: () => void;
-  onRenameList: (list: List) => void;
-  onRenameListInline: (id: string, name: string) => void;
-  onDeleteList: (list: List) => void;
-  onExportList: (list: List) => void;
-  onToggleSplit: (id: string) => void;
-  onSwapPanes: () => void;
-  onDropTaskOnTab: (taskId: string, listId: string) => void;
-  onDropTaskSetOnTab: (ids: string[], listId: string) => void;
-  onReorderList: (draggedId: string, targetId: string, before: boolean) => void;
-
-  previewOpen: boolean;
-  onTogglePreview: () => void;
-
-  /** Effective hotkey combos by command id, for the hint labels. */
-  hotkeys: Record<string, string>;
-}
-
-export function TitleBar(props: Props) {
+/** The window chrome: project switcher, list tabs, and the view controls. A thin
+ *  layout shell — each child self-sources its own state from the stores. */
+export function TitleBar() {
   const reducedMotion = useLowPowerMode();
+  const splitListId = useLayoutStore((s) => s.splitListId);
+  const previewOpen = useLayoutStore((s) => s.previewOpen);
+  const hotkeys = useHotkeyStore((s) => s.map);
+  // Subscribe (values unused) so the split button's availability re-evaluates
+  // when the project's lists or the left pane change.
+  useLayoutStore((s) => s.activeListId);
+  useListStore((s) => s.lists);
+  const splitTarget = splitTargetId();
 
-  const splitTarget =
-    props.splitListId ??
-    props.lists.find((l) => l.id !== props.activeListId)?.id ??
-    null;
-
-  // "  ⌘F"-style suffix for a tooltip/placeholder; empty when unbound.
+  // "  ⌘F"-style suffix for a tooltip; empty when unbound.
   const hint = (id: string) => {
-    const accel = formatAccel(props.hotkeys[id] ?? '');
+    const accel = formatAccel(hotkeys[id] ?? '');
     return accel ? `  ${accel}` : '';
+  };
+
+  const toggleSplit = () => {
+    if (splitTarget) useLayoutStore.getState().toggleSplit(splitTarget);
   };
 
   return (
@@ -73,32 +55,10 @@ export function TitleBar(props: Props) {
       </div>
 
       <div className="flex items-center pr-4">
-        <ProjectSwitcher
-          projects={props.projects}
-          selectedId={props.selectedProjectId}
-          onSelect={props.onSelectProject}
-          onCreate={props.onCreateProject}
-          onRename={props.onRenameProject}
-          onDelete={props.onDeleteProject}
-        />
+        <ProjectSwitcher />
       </div>
 
-      <ListTabs
-        lists={props.lists}
-        activeListId={props.activeListId}
-        splitListId={props.splitListId}
-        focusedListId={props.focusedListId}
-        onSelect={props.onSelectList}
-        onCreate={props.onCreateList}
-        onRename={props.onRenameList}
-        onRenameInline={props.onRenameListInline}
-        onDelete={props.onDeleteList}
-        onExport={props.onExportList}
-        onToggleSplit={props.onToggleSplit}
-        onDropTask={props.onDropTaskOnTab}
-        onDropTaskSet={props.onDropTaskSetOnTab}
-        onReorder={props.onReorderList}
-      />
+      <ListTabs />
 
       <div className="flex items-center gap-2 pr-3 pl-3">
         {reducedMotion && (
@@ -110,25 +70,25 @@ export function TitleBar(props: Props) {
           </div>
         )}
 
-        {props.splitListId != null && (
+        {splitListId != null && (
           <BarButton
             icon="swap_horiz"
             title="Swap panes"
-            onClick={props.onSwapPanes}
+            onClick={() => useLayoutStore.getState().swapPanes()}
           />
         )}
         <BarButton
           icon="vertical_split"
-          active={props.splitListId != null}
+          active={splitListId != null}
           disabled={splitTarget == null}
-          title={props.splitListId ? 'Close split view' : 'Split view'}
-          onClick={() => splitTarget && props.onToggleSplit(splitTarget)}
+          title={splitListId ? 'Close split view' : 'Split view'}
+          onClick={toggleSplit}
         />
         <BarButton
-          icon={props.previewOpen ? 'right_panel_close' : 'right_panel_open'}
-          active={props.previewOpen}
-          title={`${props.previewOpen ? 'Hide' : 'Show'} preview panel${hint('toggle_preview')}`}
-          onClick={props.onTogglePreview}
+          icon={previewOpen ? 'right_panel_close' : 'right_panel_open'}
+          active={previewOpen}
+          title={`${previewOpen ? 'Hide' : 'Show'} preview panel${hint('toggle_preview')}`}
+          onClick={() => useLayoutStore.getState().togglePreview()}
         />
         <BarButton
           icon="settings"
@@ -160,11 +120,12 @@ function BarButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`rounded-control hover:bg-wash-1l dark:hover:bg-wash-1d grid h-8 w-8 place-items-center transition-colors ${
+      className={cn(
+        'rounded-control hover:bg-wash-1l dark:hover:bg-wash-1d grid h-8 w-8 place-items-center transition-colors disabled:pointer-events-none disabled:opacity-35',
         active
           ? 'text-content-1l dark:text-content-1d'
           : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
-      } disabled:pointer-events-none disabled:opacity-35`}
+      )}
     >
       <Icon name={icon} size={19} weight={300} filled={active} />
     </button>

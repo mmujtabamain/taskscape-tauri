@@ -1,3 +1,4 @@
+import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -121,11 +122,12 @@ export function CommandPalette({
                   data-idx={i}
                   onMouseMove={() => setActive(i)}
                   onClick={() => runAt(i)}
-                  className={`flex w-full items-center gap-2.5 px-3.5 py-1.5 text-left text-[13.5px] ${
+                  className={cn(
+                    'flex w-full items-center gap-2.5 px-3.5 py-1.5 text-left text-[13.5px]',
                     i === active
                       ? 'bg-selection-1l dark:bg-selection-1d text-content-1l dark:text-content-1d'
                       : 'text-content-2l dark:text-content-2d'
-                  }`}
+                  )}
                 >
                   <Icon
                     name={cmd.icon ?? 'chevron_right'}

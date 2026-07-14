@@ -1,3 +1,4 @@
+import { cn } from '@taskscape/common-ui/cn';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { setOverlay } from '../lib/overlays';
@@ -98,7 +99,10 @@ function MenuPanel({
     <div
       ref={ref}
       style={nested ? undefined : { left: pos.x, top: pos.y }}
-      className={`${nested ? '' : 'absolute'} rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu min-w-44 border py-1`}
+      className={cn(
+        !nested && 'absolute',
+        'rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu min-w-44 border py-1'
+      )}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item) => (
@@ -112,11 +116,12 @@ function MenuPanel({
             onClick={() => {
               if (!item.submenu) onPick(item.id);
             }}
-            className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] transition-colors ${
+            className={cn(
+              'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] transition-colors disabled:pointer-events-none disabled:opacity-40',
               item.danger
                 ? 'text-danger-500l dark:text-danger-500d hover:bg-danger-100l dark:hover:bg-danger-100d'
                 : 'text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d'
-            } disabled:pointer-events-none disabled:opacity-40`}
+            )}
           >
             {item.icon && (
               <Icon
@@ -173,7 +178,10 @@ function Submenu({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={ref}
-      className={`absolute top-0 -mt-1 ${side === 'right' ? 'left-full ml-0.5' : 'right-full mr-0.5'}`}
+      className={cn(
+        'absolute top-0 -mt-1',
+        side === 'right' ? 'left-full ml-0.5' : 'right-full mr-0.5'
+      )}
     >
       {children}
     </div>

@@ -1,26 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Project } from '../api';
-import { setOverlay } from '../lib/overlays';
 import { Icon } from '@taskscape/common-ui/Icon';
+import { useEffect, useRef, useState } from 'react';
+import {
+  createProject,
+  deleteProject,
+  renameProject,
+  selectProject,
+} from '../commands/projects';
+import { setOverlay } from '../lib/overlays';
+import { useProjectStore } from '../stores/projectStore';
 
-interface Props {
-  projects: Project[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onCreate: () => void;
-  onRename: (project: Project) => void;
-  onDelete: (project: Project) => void;
-}
-
-/** The recessed pill in the titlebar — the one machined "well" in the chrome. */
-export function ProjectSwitcher({
-  projects,
-  selectedId,
-  onSelect,
-  onCreate,
-  onRename,
-  onDelete,
-}: Props) {
+/** The recessed pill in the titlebar — the one machined "well" in the chrome.
+ *  Self-sources the project list and active id from the store. */
+export function ProjectSwitcher() {
+  const projects = useProjectStore((s) => s.projects);
+  const selectedId = useProjectStore((s) => s.activeId);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const selected = projects.find((p) => p.id === selectedId) ?? null;
@@ -68,14 +61,12 @@ export function ProjectSwitcher({
               key={p.id}
               className="group hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 cursor-default items-center gap-2 px-3"
               onClick={() => {
-                onSelect(p.id);
+                selectProject(p.id);
                 setOpen(false);
               }}
             >
               <span className="text-accent-500l dark:text-accent-500d flex w-4 items-center">
-                {p.id === selectedId && (
-                  <Icon name="check" size={15} weight={900} />
-                )}
+                {p.id === selectedId && <Icon name="check" size={15} weight={900} />}
               </span>
               <span className="text-content-1l dark:text-content-1d flex-1 truncate text-[13.5px]">
                 {p.name}
@@ -84,7 +75,7 @@ export function ProjectSwitcher({
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
-                  onRename(p);
+                  void renameProject(p);
                 }}
                 className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 transition-opacity group-hover:opacity-100"
                 title="Rename project"
@@ -95,7 +86,7 @@ export function ProjectSwitcher({
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
-                  onDelete(p);
+                  void deleteProject(p);
                 }}
                 className="rounded-field text-content-3l dark:text-content-3d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 place-items-center opacity-0 transition-opacity group-hover:opacity-100"
                 title="Delete project"
@@ -108,7 +99,7 @@ export function ProjectSwitcher({
           <button
             onClick={() => {
               setOpen(false);
-              onCreate();
+              void createProject();
             }}
             className="hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 w-full items-center gap-2 px-3 text-left"
           >

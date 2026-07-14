@@ -1,3 +1,4 @@
+import { cn } from '@taskscape/common-ui/cn';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useState } from 'react';
 import { isMac } from '../lib/platform';
@@ -103,21 +104,21 @@ function WinControls() {
   return (
     <div className="flex h-full items-stretch" data-no-drag>
       <button
-        className={`${base} hover:bg-wash-2l dark:hover:bg-wash-2d`}
+        className={cn(base, 'hover:bg-wash-2l dark:hover:bg-wash-2d')}
         onClick={() => win.minimize()}
         title="Minimize"
       >
         <Icon name="remove" size={20} />
       </button>
       <button
-        className={`${base} hover:bg-wash-2l dark:hover:bg-wash-2d`}
+        className={cn(base, 'hover:bg-wash-2l dark:hover:bg-wash-2d')}
         onClick={() => win.toggleMaximize()}
         title={maximized ? 'Restore' : 'Maximize'}
       >
         <Icon name={maximized ? 'filter_none' : 'crop_square'} size={14} />
       </button>
       <button
-        className={`${base} hover:bg-[#e81123] hover:text-white`}
+        className={cn(base, 'hover:bg-[#e81123] hover:text-white')}
         onClick={() => win.close()}
         title="Close"
       >

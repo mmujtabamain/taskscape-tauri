@@ -1,3 +1,4 @@
+import { cn } from '@taskscape/common-ui/cn';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useRef, useState } from 'react';
@@ -162,7 +163,7 @@ function OverlayContent({ paneId, paneName, view: initial }: OverlayProps) {
           {isMac && <OverlayClose onClose={close} />}
           <div
             data-tauri-drag-region
-            className={`flex min-w-0 flex-1 items-center gap-2 ${isMac ? 'pr-4' : 'pr-2 pl-4'}`}
+            className={cn('flex min-w-0 flex-1 items-center gap-2', isMac ? 'pr-4' : 'pr-2 pl-4')}
           >
             <Icon
               name="tune"
@@ -299,11 +300,12 @@ function Segmented<T extends string>({
           <button
             key={o.id}
             onClick={() => onChange(o.id)}
-            className={`rounded-field h-7 px-2 text-[12.5px] font-medium transition-colors ${
+            className={cn(
+              'rounded-field h-7 px-2 text-[12.5px] font-medium transition-colors',
               on
                 ? 'bg-accent-500l dark:bg-accent-500d text-on-accent'
                 : 'bg-surface-0l dark:bg-surface-0d text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d'
-            }`}
+            )}
           >
             {o.label}
           </button>
@@ -334,11 +336,12 @@ function DirButton({
       onClick={() => onPick(dir)}
       disabled={disabled}
       title={label}
-      className={`rounded-field flex h-7 flex-1 items-center justify-center gap-1 text-[12px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+      className={cn(
+        'rounded-field flex h-7 flex-1 items-center justify-center gap-1 text-[12px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40',
         on
           ? 'bg-accent-500l dark:bg-accent-500d text-on-accent'
           : 'bg-surface-0l dark:bg-surface-0d text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d'
-      }`}
+      )}
     >
       <Icon name={icon} size={15} />
       {label}
@@ -363,11 +366,12 @@ function Toggle({
       className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-8 items-center gap-2.5 px-2 transition-colors"
     >
       <span
-        className={`grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border-[1.5px] transition-colors ${
+        className={cn(
+          'grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border-[1.5px] transition-colors',
           on
             ? 'bg-accent-500l dark:bg-accent-500d border-transparent'
             : 'border-edge-3l dark:border-edge-3d'
-        }`}
+        )}
       >
         {on && <Icon name="check" size={12} weight={700} className="text-on-accent" />}
       </span>

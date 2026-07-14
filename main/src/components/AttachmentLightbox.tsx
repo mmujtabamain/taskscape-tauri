@@ -1,3 +1,4 @@
+import { cn } from '@taskscape/common-ui/cn';
 import { useEffect, useState } from 'react';
 import { api, type Attachment } from '../api';
 import {
@@ -38,11 +39,12 @@ function BarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`rounded-control grid h-8 w-8 shrink-0 place-items-center text-white/70 transition-colors ${
+      className={cn(
+        'rounded-control grid h-8 w-8 shrink-0 place-items-center text-white/70 transition-colors',
         danger
           ? 'hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white'
           : 'hover:bg-white/15 hover:text-white'
-      }`}
+      )}
     >
       <Icon name={name} size={17} />
     </button>

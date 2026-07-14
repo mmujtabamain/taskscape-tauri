@@ -15,6 +15,12 @@ export interface HotkeyBinding {
   default: string;
 }
 
+/** Collapse the catalog to an `id → accel` lookup (both apps build this). */
+export const bindingsToMap = (
+  bindings: HotkeyBinding[]
+): Record<string, string> =>
+  Object.fromEntries(bindings.map((b) => [b.id, b.accel]));
+
 const isMac = navigator.userAgent.includes('Mac');
 
 interface Parsed {

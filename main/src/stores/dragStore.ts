@@ -4,6 +4,9 @@
 // on dragend. The primary id still rides on `application/x-task` so drop targets
 // can detect a task drag (in dragover, DataTransfer values are unreadable) and
 // so single drags keep working with no store at all.
+/** Where a dragged row lands relative to its drop target. */
+export type DropZone = 'before' | 'after' | 'nest';
+
 let draggedIds: string[] | null = null;
 
 /** Record the ids this drag carries: the selection's forest roots for a

@@ -1,3 +1,4 @@
+import { applyDark } from '@taskscape/common-ui/theme';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { api } from './api';
 
@@ -9,8 +10,7 @@ import { api } from './api';
 /** Re-resolve the effective theme and apply it. Called on startup, on every
  *  reveal, and when the OS appearance flips. */
 export async function refreshTheme(): Promise<void> {
-  const dark = await api.getDark().catch(() => false);
-  document.documentElement.classList.toggle('dark', dark);
+  applyDark(await api.getDark().catch(() => false));
 }
 
 export function initTheme(): void {

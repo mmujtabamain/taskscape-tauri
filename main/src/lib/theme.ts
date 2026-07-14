@@ -1,3 +1,4 @@
+import { applyDark } from '@taskscape/common-ui/theme';
 import { emit, listen } from '@tauri-apps/api/event';
 import { api } from '../api';
 
@@ -8,7 +9,7 @@ let pref: ThemePref = 'system';
 
 function apply() {
   const dark = pref === 'dark' || (pref === 'system' && media.matches);
-  document.documentElement.classList.toggle('dark', dark);
+  applyDark(dark);
   document.documentElement.style.colorScheme =
     pref === 'system' ? 'light dark' : pref;
   // Keep the native window background matched (main window only; the command

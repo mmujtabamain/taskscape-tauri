@@ -1,16 +1,43 @@
+import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { useEffect, useRef, type ReactNode } from 'react';
-import type { List, Task } from '../api';
+import { memo, useEffect, useRef, type ReactNode } from 'react';
+import {
+  dropOnRow as actDropOnRow,
+  dropSetOnRow as actDropSetOnRow,
+  move as actMove,
+  toggleDone as actToggleDone,
+} from '../stores/actions';
 import { useAltPressed } from '../stores/altKeyStore';
 import {
   beginTaskDrag,
   endTaskDrag,
   readDroppedIds,
+  type DropZone,
 } from '../stores/dragStore';
+import { useLayoutStore } from '../stores/layoutStore';
+import { useListStore } from '../stores/listStore';
+import { useProjectStore } from '../stores/projectStore';
+import { useSearchStore } from '../stores/searchStore';
+import { useSelectionStore } from '../stores/selectionStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useTaskStore } from '../stores/taskStore';
+import { useUiStore } from '../stores/uiStore';
+import { useViewStore } from '../stores/viewStore';
+import { isVisibleInPane, orderForPane } from '../stores/visibility';
+import {
+  beginTitleEdit,
+  bulkDelete,
+  bulkMove,
+  bulkSetDone,
+  copyToClipboard,
+  createSubtask,
+  requestDeleteTask,
+  selectionRootsOf,
+} from '../commands/tasks';
+import { paneRowClick, paneToggleSelect } from '../lib/paneSelection';
 import { absoluteDateTime, relativeTime } from '../time';
 import { useContextMenu, type MenuItem } from './contextMenuContext';
-
-export type DropZone = 'before' | 'after' | 'nest';
+import { usePaneId } from './paneContext';
 
 /** Wrap case-insensitive matches of `query` in an accent `<mark>`. Text is plain
  *  (titles / notes preview), so this is injection-safe. */
@@ -40,216 +67,142 @@ function highlight(text: string, query: string): ReactNode {
   return out;
 }
 
-/** Modifier keys that shape a row click: plain (select single), ⌘ (toggle),
- *  ⇧ (range from the anchor). */
-export interface ClickMods {
-  metaKey: boolean;
-  ctrlKey: boolean;
-  shiftKey: boolean;
-}
-
-export interface RowCtx {
-  childrenByParent: Record<string, Task[]>;
-  collapsed: Set<string>;
-  toggleCollapsed: (id: string) => void;
-  selectedTaskId: string | null;
-  /** Preview a task without touching the multi-selection. */
-  select: (id: string) => void;
-  /** This pane's ambient multi-selection (ids picked for bulk actions). */
-  selectedIds: Set<string>;
-  /** A row was clicked — apply plain / ⌘ / ⇧ semantics against the selection. */
-  onRowClick: (id: string, mods: ClickMods) => void;
-  /** The selection handle toggled a row's membership. */
-  onToggleSelect: (id: string) => void;
-  /** The selection's forest roots in visual order — the multi-drag payload. */
-  selectionRoots: () => string[];
-  /** Copy the given tasks to the clipboard as a Markdown checklist. */
-  onCopy: (ids: string[]) => void;
-  /** Bulk-set done on this pane's whole selection. */
-  onBulkSetDone: (done: boolean) => void;
-  /** Bulk-move this pane's selection to another list. */
-  onBulkMove: (listId: string) => void;
-  /** Delete this pane's whole selection (with confirmation). */
-  onBulkDelete: () => void;
-  requestRename: (id: string) => void;
-  dropTarget: { taskId: string; zone: DropZone } | null;
-  setDropTarget: (t: { taskId: string; zone: DropZone } | null) => void;
-  draggingId: string | null;
-  setDraggingId: (id: string | null) => void;
-  composeFor: string | null;
-  setComposeFor: (id: string | null) => void;
-  isVisible: (t: Task) => boolean;
-  /** Order a sibling group by the pane's sort + direction (for rendering). */
-  orderChildren: (tasks: Task[]) => Task[];
-  forceExpand: boolean;
-  /** Active search query for this pane, for highlighting matched text ('' = off). */
-  query: string;
-  otherLists: List[];
-  onToggleDone: (task: Task) => void;
-  onRequestDelete: (task: Task) => void;
-  onMoveToList: (id: string, listId: string) => void;
-  onPromote: (task: Task) => void;
-  onCreateSubtask: (parentId: string, title: string) => void;
-  onDropOnRow: (draggedId: string, target: Task, zone: DropZone) => void;
-  onDropSetOnRow: (ids: string[], target: Task, zone: DropZone) => void;
-}
-
-/** The shared row context App builds once for both panes. Each `TaskPane`
- *  completes it into a full `RowCtx` by adding its own per-pane selection,
- *  visibility, and search-driven expansion. */
-export type BaseRowCtx = Omit<
-  RowCtx,
-  | 'selectedIds'
-  | 'onRowClick'
-  | 'onToggleSelect'
-  | 'selectionRoots'
-  | 'onBulkSetDone'
-  | 'onBulkMove'
-  | 'onBulkDelete'
-  | 'isVisible'
-  | 'orderChildren'
-  | 'forceExpand'
-  | 'query'
->;
-
 const INDENT = 24;
 
-export function TaskRow({
-  task,
+/** Everything a row reads from the stores, scoped to its pane. Co-located here so
+ *  each row subscribes to just the slices it needs — with `React.memo` on the
+ *  row, an unrelated update re-renders only the rows whose slices changed, not
+ *  the whole forest. */
+function useRowState(taskId: string) {
+  const listId = usePaneId();
+  const task = useTaskStore((s) => s.taskById[taskId]);
+  const kids = useTaskStore((s) => s.childrenByParent[taskId]);
+  // Subscribe (value unused) so a row re-derives its visible/ordered children
+  // whenever the pane's sort/filter, completed toggle, or search changes.
+  useViewStore((s) => s.byPane[listId]);
+  useSettingsStore((s) => s.showCompleted);
+  const query = useSearchStore((s) => s.byPane[listId]?.query ?? '');
+  const searching = query.trim().length > 0;
+  const collapsedHere = useLayoutStore((s) => s.collapsed.has(taskId));
+  const picked = useSelectionStore(
+    (s) => s.byPane[listId]?.ids.has(taskId) ?? false
+  );
+  const isPreview = useSelectionStore((s) => s.selectedTaskId === taskId);
+  const dragging = useUiStore((s) => s.draggingId === taskId);
+  const drop = useUiStore((s) =>
+    s.dropTarget?.taskId === taskId ? s.dropTarget : null
+  );
+
+  const children = orderForPane(
+    listId,
+    (kids ?? []).filter((t) => isVisibleInPane(t, listId))
+  );
+
+  return {
+    listId,
+    task,
+    children,
+    expanded: searching || !collapsedHere,
+    picked,
+    selected: isPreview || picked,
+    dragging,
+    drop,
+    query,
+  };
+}
+
+function zoneFromEvent(e: React.DragEvent): DropZone {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const y = (e.clientY - r.top) / r.height;
+  if (y < 0.3) return 'before';
+  if (y > 0.7) return 'after';
+  return 'nest';
+}
+
+export const TaskRow = memo(function TaskRow({
+  taskId,
   depth,
-  ctx,
 }: {
-  task: Task;
+  taskId: string;
   depth: number;
-  ctx: RowCtx;
 }) {
   const menu = useContextMenu();
+  const composing = useUiStore((s) => s.composeFor === taskId);
+  const { listId, task, children, expanded, picked, selected, dragging, drop, query } =
+    useRowState(taskId);
 
-  const children = ctx.orderChildren(
-    (ctx.childrenByParent[task.id] ?? []).filter(ctx.isVisible)
-  );
+  if (!task) return null;
+
   const doneChildren = children.filter((c) => c.done).length;
-  const expanded = ctx.forceExpand || !ctx.collapsed.has(task.id);
-  const picked = ctx.selectedIds.has(task.id);
-  // Highlight the preview-selected row and every picked row.
-  const selected = ctx.selectedTaskId === task.id || picked;
-  const dragging = ctx.draggingId === task.id;
-  const drop = ctx.dropTarget?.taskId === task.id ? ctx.dropTarget : null;
   const nestHighlight = drop?.zone === 'nest';
 
-  const toggleDone = () => {
-    ctx.onToggleDone(task);
-  };
+  const toggleDone = () => void actToggleDone(task);
 
   const openMenu = (x: number, y: number) => {
     // Right-clicking a row inside a multi-selection acts on the whole set;
     // right-clicking any other row selects just it first (standard behaviour).
-    const n = ctx.selectedIds.size;
-    const bulk = n >= 2 && ctx.selectedIds.has(task.id);
-    if (bulk) ctx.select(task.id);
-    else
-      ctx.onRowClick(task.id, {
-        metaKey: false,
-        ctrlKey: false,
-        shiftKey: false,
-      });
+    const selectedIds = useSelectionStore.getState().paneSel(listId).ids;
+    const n = selectedIds.size;
+    const bulk = n >= 2 && selectedIds.has(task.id);
+    if (bulk) useSelectionStore.getState().focus(task.id);
+    else paneRowClick(listId, task.id, { metaKey: false, ctrlKey: false, shiftKey: false });
 
-    const moveSubmenu = ctx.otherLists.map((l) => ({
-      id: `move:${l.id}`,
-      label: l.name,
-    }));
+    const otherLists = useListStore
+      .getState()
+      .listsInProject(useProjectStore.getState().activeId);
+    const moveSubmenu = otherLists.map((l) => ({ id: `move:${l.id}`, label: l.name }));
     const items: MenuItem[] = bulk
       ? [
           { id: 'copy', label: `Copy ${n} tasks`, icon: 'content_copy' },
-          {
-            id: 'done',
-            label: `Mark ${n} done`,
-            icon: 'task_alt',
-            dividerAbove: true,
-          },
-          {
-            id: 'undone',
-            label: `Mark ${n} not done`,
-            icon: 'radio_button_unchecked',
-          },
+          { id: 'done', label: `Mark ${n} done`, icon: 'task_alt', dividerAbove: true },
+          { id: 'undone', label: `Mark ${n} not done`, icon: 'radio_button_unchecked' },
           {
             id: 'move',
             label: 'Move to list',
             icon: 'arrow_forward',
-            disabled: ctx.otherLists.length === 0,
+            disabled: otherLists.length === 0,
             submenu: moveSubmenu,
           },
-          {
-            id: 'delete',
-            label: `Delete ${n} tasks…`,
-            icon: 'delete',
-            danger: true,
-            dividerAbove: true,
-          },
+          { id: 'delete', label: `Delete ${n} tasks…`, icon: 'delete', danger: true, dividerAbove: true },
         ]
       : [
           { id: 'copy', label: 'Copy', icon: 'content_copy' },
-          {
-            id: 'subtask',
-            label: 'Add subtask',
-            icon: 'subdirectory_arrow_right',
-            dividerAbove: true,
-          },
+          { id: 'subtask', label: 'Add subtask', icon: 'subdirectory_arrow_right', dividerAbove: true },
           { id: 'rename', label: 'Rename', icon: 'edit' },
           {
             id: 'move',
             label: 'Move to list',
             icon: 'arrow_forward',
-            disabled: ctx.otherLists.length === 0,
+            disabled: otherLists.length === 0,
             submenu: moveSubmenu,
           },
           ...(task.parent_id
-            ? [
-                {
-                  id: 'promote',
-                  label: 'Promote to top level',
-                  icon: 'north_west',
-                },
-              ]
+            ? [{ id: 'promote', label: 'Promote to top level', icon: 'north_west' }]
             : []),
-          {
-            id: 'delete',
-            label: 'Delete task…',
-            icon: 'delete',
-            danger: true,
-            dividerAbove: true,
-          },
+          { id: 'delete', label: 'Delete task…', icon: 'delete', danger: true, dividerAbove: true },
         ];
     menu.open({
       x,
       y,
       items,
       onPick: (id) => {
-        if (id === 'copy') ctx.onCopy(bulk ? [...ctx.selectedIds] : [task.id]);
-        if (id === 'done') ctx.onBulkSetDone(true);
-        if (id === 'undone') ctx.onBulkSetDone(false);
-        if (id === 'subtask') ctx.setComposeFor(task.id);
-        if (id === 'rename') ctx.requestRename(task.id);
-        if (id === 'promote') ctx.onPromote(task);
+        if (id === 'copy') void copyToClipboard(bulk ? [...selectedIds] : [task.id]);
+        if (id === 'done') bulkSetDone(listId, true);
+        if (id === 'undone') bulkSetDone(listId, false);
+        if (id === 'subtask') useUiStore.getState().setComposeFor(task.id);
+        if (id === 'rename') beginTitleEdit(task.id);
+        if (id === 'promote') void actMove(task.id, null, task.list_id);
         if (id === 'delete') {
-          if (bulk) ctx.onBulkDelete();
-          else ctx.onRequestDelete(task);
+          if (bulk) void bulkDelete(listId);
+          else void requestDeleteTask(task);
         }
         if (id.startsWith('move:')) {
-          const listId = id.slice(5);
-          if (bulk) ctx.onBulkMove(listId);
-          else ctx.onMoveToList(task.id, listId);
+          const target = id.slice(5);
+          if (bulk) void bulkMove(listId, target);
+          else void actMove(task.id, null, target);
         }
       },
     });
-  };
-
-  const zoneFromEvent = (e: React.DragEvent): DropZone => {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const y = (e.clientY - r.top) / r.height;
-    if (y < 0.3) return 'before';
-    if (y > 0.7) return 'after';
-    return 'nest';
   };
 
   return (
@@ -263,16 +216,15 @@ export function TaskRow({
           // this row is part of it, else just this row) travels in the drag
           // store, which WKWebView carries reliably where a 2nd MIME type won't.
           e.dataTransfer.setData('application/x-task', task.id);
-          const multi =
-            ctx.selectedIds.has(task.id) && ctx.selectedIds.size > 1;
-          beginTaskDrag(multi ? ctx.selectionRoots() : [task.id]);
+          const ids = useSelectionStore.getState().paneSel(listId).ids;
+          const multi = ids.has(task.id) && ids.size > 1;
+          beginTaskDrag(multi ? selectionRootsOf(listId) : [task.id]);
           e.dataTransfer.effectAllowed = 'move';
-          ctx.setDraggingId(task.id);
+          useUiStore.getState().setDraggingId(task.id);
         }}
         onDragEnd={() => {
           endTaskDrag();
-          ctx.setDraggingId(null);
-          ctx.setDropTarget(null);
+          useUiStore.getState().endDrag();
         }}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes('application/x-task')) return;
@@ -280,37 +232,36 @@ export function TaskRow({
           // bubbles to the pane's root-drop handler (which would un-nest it).
           e.preventDefault();
           e.stopPropagation();
-          if (ctx.draggingId === task.id) return;
+          if (useUiStore.getState().draggingId === task.id) return;
           e.dataTransfer.dropEffect = 'move';
           const zone = zoneFromEvent(e);
-          if (drop?.zone !== zone || ctx.dropTarget?.taskId !== task.id)
-            ctx.setDropTarget({ taskId: task.id, zone });
+          const cur = useUiStore.getState().dropTarget;
+          if (cur?.taskId !== task.id || cur?.zone !== zone)
+            useUiStore.getState().setDropTarget({ taskId: task.id, zone });
         }}
         onDragLeave={(e) => {
           if (
-            !(e.currentTarget as HTMLElement).contains(
-              e.relatedTarget as Node
-            ) &&
+            !(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node) &&
             drop
           )
-            ctx.setDropTarget(null);
+            useUiStore.getState().setDropTarget(null);
         }}
         onDrop={(e) => {
           const ids = readDroppedIds(e);
-          ctx.setDropTarget(null);
+          useUiStore.getState().setDropTarget(null);
           if (ids.length === 0) return;
-          // Consume the drop here (even a self-drop) so it can't fall through
-          // to the pane's root-drop.
+          // Consume the drop here (even a self-drop) so it can't fall through to
+          // the pane's root-drop.
           e.preventDefault();
           e.stopPropagation();
           const zone = zoneFromEvent(e);
           if (ids.length > 1) {
             if (ids.includes(task.id)) return;
-            ctx.onDropSetOnRow(ids, task, zone);
+            void actDropSetOnRow(ids, task, zone);
             return;
           }
           if (ids[0] === task.id) return;
-          ctx.onDropOnRow(ids[0], task, zone);
+          void actDropOnRow(ids[0], task, zone);
         }}
         onMouseDown={(e) => {
           // Stop ⇧-click range-select from smearing a native text selection
@@ -318,7 +269,7 @@ export function TaskRow({
           if (e.shiftKey) e.preventDefault();
         }}
         onClick={(e) =>
-          ctx.onRowClick(task.id, {
+          paneRowClick(listId, task.id, {
             metaKey: e.metaKey,
             ctrlKey: e.ctrlKey,
             shiftKey: e.shiftKey,
@@ -332,13 +283,15 @@ export function TaskRow({
           e.preventDefault();
           openMenu(e.clientX, e.clientY);
         }}
-        className={`group/row relative flex min-h-10 items-center pr-3 transition-colors duration-75 ${
+        className={cn(
+          'group/row relative flex min-h-10 items-center pr-3 transition-colors duration-75',
           selected
             ? 'bg-selection-1l dark:bg-selection-1d'
-            : 'hover:bg-wash-1l dark:hover:bg-wash-1d'
-        } ${nestHighlight ? 'rounded-field bg-selection-1l dark:bg-selection-1d ring-accent-500l dark:ring-accent-500d ring-1 ring-inset' : ''} ${
-          dragging ? 'opacity-40' : ''
-        }`}
+            : 'hover:bg-wash-1l dark:hover:bg-wash-1d',
+          nestHighlight &&
+            'rounded-field bg-selection-1l dark:bg-selection-1d ring-accent-500l dark:ring-accent-500d ring-1 ring-inset',
+          dragging && 'opacity-40'
+        )}
         style={{ paddingLeft: depth * INDENT }}
       >
         {/* Inset row separator (starts at the text column, keeps the gutter clean). */}
@@ -350,9 +303,10 @@ export function TaskRow({
         {/* Drop indicator: accent line at target depth, with its index-dot terminal. */}
         {drop && drop.zone !== 'nest' && (
           <span
-            className={`z-raised bg-accent-500l dark:bg-accent-500d pointer-events-none absolute right-3 h-0.5 ${
+            className={cn(
+              'z-raised bg-accent-500l dark:bg-accent-500d pointer-events-none absolute right-3 h-0.5',
               drop.zone === 'before' ? '-top-px' : '-bottom-px'
-            }`}
+            )}
             style={{ left: depth * INDENT + 44 }}
           >
             <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-0.75 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
@@ -365,21 +319,23 @@ export function TaskRow({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                ctx.toggleCollapsed(task.id);
+                useLayoutStore.getState().toggleCollapsed(task.id);
               }}
               onDoubleClick={(e) => e.stopPropagation()}
-              className={`rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 place-items-center transition-opacity ${
-                expanded
-                  ? 'opacity-0 group-hover/row:opacity-100'
-                  : 'opacity-100'
-              }`}
+              className={cn(
+                'rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 place-items-center transition-opacity',
+                expanded ? 'opacity-0 group-hover/row:opacity-100' : 'opacity-100'
+              )}
               title={expanded ? 'Collapse' : 'Expand'}
             >
               <Icon
                 name="chevron_right"
                 size={16}
                 weight={300}
-                className={`transition-transform duration-100 ${expanded ? 'rotate-90' : ''}`}
+                className={cn(
+                  'transition-transform duration-100',
+                  expanded && 'rotate-90'
+                )}
               />
             </button>
           )}
@@ -390,35 +346,40 @@ export function TaskRow({
             done={task.done}
             picked={picked}
             onToggleDone={toggleDone}
-            onToggleSelect={() => ctx.onToggleSelect(task.id)}
+            onToggleSelect={() => paneToggleSelect(listId, task.id)}
           />
         </span>
 
         <div className="ml-2.5 min-w-0 flex-1 py-2">
           <div
-            className={`truncate text-[14px] leading-4.75 font-medium ${
+            className={cn(
+              'truncate text-[14px] leading-4.75 font-medium',
               task.done
                 ? 'strike strike-on text-content-3l dark:text-content-3d'
                 : 'text-content-1l dark:text-content-1d'
-            }`}
+            )}
           >
-            {highlight(task.title, ctx.query)}
+            {highlight(task.title, query)}
           </div>
           {task.notes && (
             <div
-              className={`truncate text-[12.5px] leading-4.25 ${
+              className={cn(
+                'truncate text-[12.5px] leading-4.25',
                 task.done
                   ? 'text-content-3l dark:text-content-3d opacity-55'
                   : 'text-content-2l dark:text-content-2d'
-              }`}
+              )}
             >
-              {highlight(task.notes, ctx.query)}
+              {highlight(task.notes, query)}
             </div>
           )}
         </div>
 
         <div
-          className={`ml-2.5 flex shrink-0 items-center gap-2.5 ${task.done ? 'opacity-55' : ''}`}
+          className={cn(
+            'ml-2.5 flex shrink-0 items-center gap-2.5',
+            task.done && 'opacity-55'
+          )}
         >
           {!expanded && children.length > 0 && (
             <span className="text-content-3l dark:text-content-3d text-[11px] font-semibold tabular-nums">
@@ -448,7 +409,7 @@ export function TaskRow({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              ctx.setComposeFor(task.id);
+              useUiStore.getState().setComposeFor(task.id);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
             className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 transition-opacity duration-100 group-hover/row:opacity-100"
@@ -459,9 +420,7 @@ export function TaskRow({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const r = (
-                e.currentTarget as HTMLElement
-              ).getBoundingClientRect();
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
@@ -473,31 +432,30 @@ export function TaskRow({
         </div>
       </div>
 
-      {(children.length > 0 || ctx.composeFor === task.id) && expanded && (
+      {(children.length > 0 || composing) && expanded && (
         <div className="relative">
           {children.map((child) => (
-            <TaskRow key={child.id} task={child} depth={depth + 1} ctx={ctx} />
+            <TaskRow key={child.id} taskId={child.id} depth={depth + 1} />
           ))}
-          {ctx.composeFor === task.id && (
+          {composing && (
             <SubtaskComposer
               depth={depth + 1}
-              onSubmit={(title) => ctx.onCreateSubtask(task.id, title)}
-              onDismiss={() => ctx.setComposeFor(null)}
+              onSubmit={(title) => void createSubtask(task.id, title)}
+              onDismiss={() => useUiStore.getState().setComposeFor(null)}
             />
           )}
         </div>
       )}
     </div>
   );
-}
+});
 
 /** One checkbox, two roles chosen by the Option key. By default it's a round
  *  select handle — click adds the row to the ambient selection, and a picked row
  *  fills accent with no check inside. Hold Option and it squares off into the
  *  done lamp: ghost check on hover, accent wipe + drawn stroke on check, instant
- *  cheap uncheck (unchecking is error correction, never ceremony). The action
- *  follows the modifier live off the click, so it's always right even if the
- *  tracked hold state lags. */
+ *  cheap uncheck. The action follows the modifier live off the click, so it's
+ *  always right even if the tracked hold state lags. */
 function Check({
   done,
   picked,
@@ -510,7 +468,6 @@ function Check({
   onToggleSelect: () => void;
 }) {
   const alt = useAltPressed();
-
   const doneMode = alt;
   const active = doneMode ? done : picked;
 
@@ -522,17 +479,17 @@ function Check({
       ? 'Deselect'
       : 'Select';
 
-  const shape = doneMode ? 'rounded-field' : 'rounded-full';
-
   return (
     <button
       title={title}
       aria-pressed={active}
-      className={`group/check relative flex h-4.5 w-4.5 items-center justify-center overflow-hidden ${shape} border-[1.5px] ${
+      className={cn(
+        'group/check relative flex h-4.5 w-4.5 items-center justify-center overflow-hidden border-[1.5px]',
+        doneMode ? 'rounded-field' : 'rounded-full',
         active
           ? 'border-done-lamp-1l dark:border-done-lamp-1d bg-done-lamp-1l dark:bg-done-lamp-1d'
           : 'border-edge-3l dark:border-edge-3d group-hover/row:border-content-3l dark:group-hover/row:border-content-3d'
-      }`}
+      )}
       onClick={(e) => {
         e.stopPropagation();
         if (e.altKey) return onToggleDone();
@@ -541,21 +498,14 @@ function Check({
       onDoubleClick={(e) => e.stopPropagation()}
     >
       {/* Selection indicator */}
-      {!doneMode && picked && (
-        <span className="bg-content-1d size-2 rounded-full" />
-      )}
+      {!doneMode && picked && <span className="bg-content-1d size-2 rounded-full" />}
 
       {/* Done fill */}
       {doneMode && (
         <>
-          {done && (
-            <div className=" size-full"></div>
-          )}
+          {done && <div className="size-full"></div>}
           {/* Animated check */}
-          <svg
-            viewBox="0 0 12 12"
-            className="absolute inset-0 m-auto h-3.5 w-3.5"
-          >
+          <svg viewBox="0 0 12 12" className="absolute inset-0 m-auto h-3.5 w-3.5">
             <path
               d="M2.5 6.5 L5 8.8 L9.5 3.6"
               fill="none"

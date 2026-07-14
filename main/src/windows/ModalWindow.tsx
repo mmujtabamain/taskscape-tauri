@@ -1,3 +1,4 @@
+import { cn } from '@taskscape/common-ui/cn';
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
@@ -84,7 +85,7 @@ function ModalControls({ onClose }: { onClose: () => void }) {
           onClick={d.live ? onClose : undefined}
           title={d.label}
           aria-disabled={!d.live}
-          className={`block size-3.25 ${d.live ? '' : 'cursor-default'}`}
+          className={cn('block size-3.25', !d.live && 'cursor-default')}
         >
           <svg
             viewBox="0 0 85.4 85.4"
@@ -281,9 +282,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
 
           <div
             data-tauri-drag-region
-            className={`flex min-w-0 flex-1 items-center ${
-              "isMac ? 'pr-4' : 'pr-2 pl-4'"
-            }`}
+            className={cn('flex min-w-0 flex-1 items-center', isMac ? 'pr-4' : 'pr-2 pl-4')}
           >
             <h1
               data-tauri-drag-region
@@ -300,7 +299,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
           <div className="flex items-start gap-3.5 px-4 pt-1.5 pb-5">
             {props.icon && (
               <div
-                className={`rounded-control grid size-9 shrink-0 place-items-center ${BADGE_TONE[tone]}`}
+                className={cn('rounded-control grid size-9 shrink-0 place-items-center', BADGE_TONE[tone])}
               >
                 <Icon name={props.icon} size={20} />
               </div>
@@ -388,9 +387,10 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                           if (props.input?.initialValue)
                             e.currentTarget.select();
                         }}
-                        className={`rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-focus-1l dark:focus:ring-focus-1d h-9 w-full pl-3 text-[13px] focus:ring-2 ${
+                        className={cn(
+                          'rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-focus-1l dark:focus:ring-focus-1d h-9 w-full pl-3 text-[13px] focus:ring-2',
                           props.input.suggest ? 'pr-9' : 'pr-3'
-                        }`}
+                        )}
                       />
                     )}
                     {props.input.suggest && (
@@ -418,7 +418,7 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
               key={b.id}
               type="button"
               onClick={() => press(b, i === props.buttons.length - 1)}
-              className={`${BTN} ${BTN_VARIANT[b.variant ?? 'ghost']}`}
+              className={cn(BTN, BTN_VARIANT[b.variant ?? 'ghost'])}
             >
               {b.label}
             </button>
