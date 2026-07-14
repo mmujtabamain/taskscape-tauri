@@ -7,7 +7,10 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
 
 #[cfg(target_os = "macos")]
 use crate::setup::{allow_over_fullscreen, order_front_regardless};
-use crate::{capture::spawn_capture, focus_or_launch_main_async};
+use crate::{
+    capture::{region_mode, spawn_capture, spawn_capture_with, CaptureUi},
+    focus_or_launch_main_async,
+};
 
 /// Somewhere no display can reach — the window "rests" here while hidden so that
 /// a one-frame show-before-move never flashes at a stale on-screen position.
@@ -35,6 +38,14 @@ fn show_mini(app: &AppHandle, window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
     order_front_regardless(window);
     let _ = window.emit("mini-shown", ());
+}
+
+/// Reveal the mini bar from a background thread's `run_on_main_thread` callback
+/// (the deferred-reveal region-capture path): derive the app handle from the
+/// window and show it at the cursor.
+pub(crate) fn reveal_mini(window: &tauri::WebviewWindow) {
+    let app = window.app_handle().clone();
+    show_mini(&app, window);
 }
 
 /// Toggle the mini window: hide if visible, otherwise show it at the cursor.
@@ -123,22 +134,42 @@ pub async fn open_main(window: tauri::WebviewWindow) {
 /// Screenshot button: capture the screen and attach it. Fire-and-forget — the
 /// frontend shows a spinner and attaches the result when the `screenshot-*`
 /// events arrive, exactly like the ⌘⇧Return path. Each click adds another shot.
+/// The button lives in the (visible) bar, so a region grab dims it to 25% while
+/// the user selects rather than leaving it in the way.
 #[tauri::command]
 pub fn capture_and_attach(window: tauri::WebviewWindow) {
-    spawn_capture(&window);
+    spawn_capture_with(
+        &window,
+        CaptureUi {
+            reveal_on_success: false,
+            dim_during_capture: region_mode(),
+        },
+    );
 }
 
-/// ⌘⇧Return handler: summon the bar *instantly* (so the keypress has immediate
-/// feedback), then capture in the background. The bar shows a spinner until the
-/// shot lands and is attached, staying on screen the whole time.
+/// ⌘⇧Return handler. Full-screen: summon the bar *instantly* (immediate
+/// feedback; the bar is excluded from the grab), then capture. Region: don't
+/// reveal a closed bar until the user finalizes a selection — so it never covers
+/// the screen — and dim an already-open bar to 25% while selecting.
 pub fn capture_and_show(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
-    if !window.is_visible().unwrap_or(false) {
-        show_mini(app, &window);
+    let visible = window.is_visible().unwrap_or(false);
+    if region_mode() {
+        spawn_capture_with(
+            &window,
+            CaptureUi {
+                reveal_on_success: !visible,
+                dim_during_capture: visible,
+            },
+        );
+    } else {
+        if !visible {
+            show_mini(app, &window);
+        }
+        spawn_capture(&window);
     }
-    spawn_capture(&window);
 }
 
 /// When the mini window was last revealed. A blur (`Focused(false)`) that arrives

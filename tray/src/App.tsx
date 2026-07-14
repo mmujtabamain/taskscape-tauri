@@ -110,6 +110,11 @@ function App() {
         setScreenshots((prev) => [...prev, e.payload]);
         focusTitle();
       }),
+      // Region capture cancelled — just drop the spinner, no error.
+      listen('screenshot-cancelled', () => {
+        setPending((n) => Math.max(0, n - 1));
+        focusTitle();
+      }),
       // Capture failed (e.g. Screen Recording permission) — surface it briefly.
       listen<string>('screenshot-error', (e) => {
         setPending((n) => Math.max(0, n - 1));

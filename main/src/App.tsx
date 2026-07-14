@@ -284,8 +284,17 @@ function App() {
     const title = rawTitle.trim();
     if (action === 'commit' && !title) return setDraftListId(null);
     draftBusyRef.current = true;
-    setDraftListId(null);
     try {
+      // A region capture can be cancelled — grab the shot before creating the
+      // task (and before clearing the draft) so a cancel leaves the draft as-is
+      // instead of spawning an empty task. The busy guard set above swallows any
+      // blur-'commit' the capture overlay triggers meanwhile.
+      let shotPath: string | null = null;
+      if (action === 'shot') {
+        shotPath = await api.captureScreenshot();
+        if (!shotPath) return;
+      }
+      setDraftListId(null);
       const task = await actCreateTask(
         listId,
         action === 'commit' ? title : title || 'Untitled'
@@ -293,8 +302,8 @@ function App() {
       useSelectionStore.getState().focus(task.id);
       if (action === 'note')
         setAddNoteReq((r) => ({ id: task.id, n: (r?.n ?? 0) + 1 }));
-      if (action === 'shot') {
-        await api.attachScreenshot(task.id);
+      if (shotPath) {
+        await api.addCopy(task.id, shotPath, 'screenshot.png');
         await useTaskStore.getState().load();
       }
     } finally {
@@ -310,9 +319,13 @@ function App() {
       await api.attachScreenshot(selectedTask.id);
       await useTaskStore.getState().load();
     } else if (focusedListId) {
+      // No task yet — grab the shot first so a cancelled region capture doesn't
+      // leave an empty "Untitled" task behind.
+      const path = await api.captureScreenshot();
+      if (!path) return;
       const created = await actCreateTask(focusedListId, 'Untitled');
       useSelectionStore.getState().focus(created.id);
-      await api.attachScreenshot(created.id);
+      await api.addCopy(created.id, path, 'screenshot.png');
       await useTaskStore.getState().load();
     }
   };

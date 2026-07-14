@@ -15,6 +15,13 @@ const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
+type ScreenshotMode = 'fullscreen' | 'region';
+
+const SCREENSHOT_OPTIONS: { value: ScreenshotMode; label: string }[] = [
+  { value: 'fullscreen', label: 'Full Screen' },
+  { value: 'region', label: 'Region' },
+];
+
 const PANES = [
   { id: 'general', label: 'General', icon: 'tune' },
   { id: 'shortcuts', label: 'Shortcuts', icon: 'keyboard' },
@@ -32,36 +39,70 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (next: T) => void;
+}) {
+  return (
+    <div className="rounded-control bg-surface-0l dark:bg-surface-0d flex p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`rounded-field h-7 flex-1 text-[12px] font-medium transition duration-150 ${
+            value === o.value
+              ? 'border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d border'
+              : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function GeneralPane({
   theme,
   onTheme,
   showCompleted,
   onToggleCompleted,
+  screenshotMode,
+  onScreenshotMode,
 }: {
   theme: ThemePref;
   onTheme: (next: ThemePref) => void;
   showCompleted: boolean;
   onToggleCompleted: () => void;
+  screenshotMode: ScreenshotMode;
+  onScreenshotMode: (next: ScreenshotMode) => void;
 }) {
   return (
     <div className="space-y-5">
       <section className="space-y-3">
         <SectionLabel>Appearance</SectionLabel>
-        <div className="rounded-control bg-surface-0l dark:bg-surface-0d flex p-0.5">
-          {THEME_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => onTheme(o.value)}
-              className={`rounded-field h-7 flex-1 text-[12px] font-medium transition duration-150 ${
-                theme === o.value
-                  ? 'border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d border'
-                  : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
+        <Segmented options={THEME_OPTIONS} value={theme} onChange={onTheme} />
+      </section>
+
+      <section className="space-y-3">
+        <SectionLabel>Screenshots</SectionLabel>
+        <div className="space-y-1.5">
+          <Segmented
+            options={SCREENSHOT_OPTIONS}
+            value={screenshotMode}
+            onChange={onScreenshotMode}
+          />
+          <p className="text-content-3l dark:text-content-3d text-[11px]">
+            {screenshotMode === 'region'
+              ? 'Drag to select an area, or press Space to grab a window. Esc cancels.'
+              : 'Capture the entire screen instantly.'}
+          </p>
         </div>
       </section>
 
@@ -99,6 +140,8 @@ export function SettingsWindow() {
   const [pane, setPane] = useState<PaneId>('general');
   const [theme, setThemeChoice] = useState<ThemePref>('system');
   const [showCompleted, setShowCompleted] = useState(true);
+  const [screenshotMode, setScreenshotMode] =
+    useState<ScreenshotMode>('fullscreen');
   const [loaded, setLoaded] = useState(false);
   const [presented, setPresented] = useState(false);
 
@@ -107,13 +150,15 @@ export function SettingsWindow() {
   useEffect(() => {
     let stale = false;
     void (async () => {
-      const [t, sc] = await Promise.all([
+      const [t, sc, sm] = await Promise.all([
         api.getSetting('theme').catch(() => null),
         api.getSetting('show_completed').catch(() => null),
+        api.getSetting('screenshot_mode').catch(() => null),
       ]);
       if (stale) return;
       if (t === 'system' || t === 'light' || t === 'dark') setThemeChoice(t);
       setShowCompleted(sc !== '0');
+      if (sm === 'region') setScreenshotMode('region');
       setLoaded(true);
     })();
     return () => {
@@ -143,6 +188,11 @@ export function SettingsWindow() {
   function chooseTheme(next: ThemePref) {
     setThemeChoice(next);
     void setTheme(next);
+  }
+
+  function chooseScreenshotMode(next: ScreenshotMode) {
+    setScreenshotMode(next);
+    void api.setSetting('screenshot_mode', next);
   }
 
   function toggleCompleted() {
@@ -215,6 +265,8 @@ export function SettingsWindow() {
                 onTheme={chooseTheme}
                 showCompleted={showCompleted}
                 onToggleCompleted={toggleCompleted}
+                screenshotMode={screenshotMode}
+                onScreenshotMode={chooseScreenshotMode}
               />
             ) : (
               <ShortcutsPane />

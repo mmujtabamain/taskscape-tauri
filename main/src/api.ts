@@ -177,7 +177,10 @@ export const api = {
   addCopy: (taskId: string, sourcePath: string, name?: string) =>
     invoke<Attachment>('add_copy', { taskId, sourcePath, name: name ?? null }),
   attachScreenshot: (taskId: string) =>
-    invoke<Attachment>('attach_screenshot', { taskId }),
+    invoke<Attachment | null>('attach_screenshot', { taskId }),
+  // Capture a screenshot (region or full-screen) without attaching it; returns
+  // the PNG path, or null if a region capture was cancelled.
+  captureScreenshot: () => invoke<string | null>('capture_screenshot'),
   deleteAttachment: (id: string) => invoke<void>('delete_attachment', { id }),
   renameAttachment: (id: string, name: string) =>
     invoke<Attachment>('rename_attachment', { id, name }),

@@ -14,7 +14,7 @@ Everything both apps share: persistence, screenshots, attachments, and the HTTP 
 | `entities/`      | **Generated** SeaORM entities (`sea-orm-cli`, via `gen-entities.sh`). Never serialized to the frontend — mapped in `storage.rs`.       |
 | `migrations.rs`  | Runtime applier: embeds `common/migrations/*.sql` and applies unrecorded versions at startup. Atlas authors the SQL; it's not shipped. |
 | `paths.rs`       | Locations under `~/.taskscape/` and `ensure_dirs()`.                                                                                   |
-| `screenshot.rs`  | `capture_fullscreen()` — shells out to macOS `screencapture -x`.                                                                       |
+| `screenshot.rs`  | `capture()` — shells out to macOS `screencapture`; full-screen (`-x`) or interactive region (`-i`) per the `screenshot_mode` setting.   |
 | `attachments.rs` | `attach_reference` / `attach_copy` / `rename_attachment` (async — they call `Store`).                                                  |
 | `server.rs`      | axum `data_router`, `serve(port, router)`, and the `client` helpers (`is_up`, `post_json`).                                            |
 | `util.rs`        | `now_millis()`, `new_id()` (UUID v4).                                                                                                  |
@@ -25,7 +25,7 @@ Everything both apps share: persistence, screenshots, attachments, and the HTTP 
 ~/.taskscape/
 ├── taskscape.db      # SQLite (WAL)
 ├── attachments/      # files copied in via "copy" attachments
-└── screenshots/      # PNGs from capture_fullscreen()
+└── screenshots/      # PNGs from capture()
 ```
 
 ## The database (`storage.rs`)
@@ -99,7 +99,10 @@ calls the other. Errors are wrapped by `AppError` → HTTP 500 with the message.
 
 ## Screenshots (`screenshot.rs`)
 
-macOS only: `capture_fullscreen()` runs `screencapture -x` (silent) into
-`~/.taskscape/screenshots/screenshot-<millis>.png` and returns the path. First use
-triggers the macOS Screen Recording permission prompt for that app. Non-macOS
-targets `bail!`.
+macOS only: `capture()` runs `screencapture` into
+`~/.taskscape/screenshots/screenshot-<millis>.png` and returns the path. The grab
+is full-screen (`-x`, silent) or an interactive region/window selection (`-i`)
+depending on the `screenshot_mode` setting (`CaptureMode::current()`, default
+full-screen). A cancelled region selection returns `Ok(None)` — callers treat
+that as a silent no-op. First use triggers the macOS Screen Recording permission
+prompt for that app. Non-macOS targets `bail!`.

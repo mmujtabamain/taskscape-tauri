@@ -538,18 +538,37 @@ async fn rename_attachment(
         .map_err(err)
 }
 
-/// Capture the full screen and attach it to a task as a copy. macOS prompts for
-/// Screen Recording permission the first time this app triggers a capture.
+/// Capture the screen (full-screen or interactive region, per the user's
+/// `screenshot_mode` setting) and return the saved PNG path, without attaching
+/// it to anything. Returns `None` when a region capture is cancelled. The
+/// frontend uses this to grab the shot *before* deciding whether to create a
+/// task, so a cancelled region capture leaves no empty task behind.
+#[tauri::command]
+async fn capture_screenshot() -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(taskscape_common::screenshot::capture)
+        .await
+        .map_err(err)?
+        .map_err(err)
+        .map(|opt| opt.map(|p| p.to_string_lossy().into_owned()))
+}
+
+/// Capture the screen (full-screen or interactive region, per the user's
+/// `screenshot_mode` setting) and attach it to a task as a copy. macOS prompts
+/// for Screen Recording permission the first time this app triggers a capture.
+/// Returns `None` when a region capture is cancelled.
 #[tauri::command]
 async fn attach_screenshot(
     store: State<'_, Arc<Store>>,
     task_id: String,
-) -> Result<Attachment, String> {
+) -> Result<Option<Attachment>, String> {
     // `screencapture` is a blocking shell-out — keep it off the async runtime.
-    let path = tauri::async_runtime::spawn_blocking(taskscape_common::screenshot::capture_fullscreen)
+    let Some(path) = tauri::async_runtime::spawn_blocking(taskscape_common::screenshot::capture)
         .await
         .map_err(err)?
-        .map_err(err)?;
+        .map_err(err)?
+    else {
+        return Ok(None);
+    };
     taskscape_common::attachments::attach_copy(
         &store,
         &task_id,
@@ -557,6 +576,7 @@ async fn attach_screenshot(
         Some("screenshot.png"),
     )
     .await
+    .map(Some)
     .map_err(err)
 }
 
@@ -1102,6 +1122,7 @@ pub fn run() {
             add_copy,
             delete_attachment,
             rename_attachment,
+            capture_screenshot,
             attach_screenshot,
             open_attachment,
             reveal_attachment,

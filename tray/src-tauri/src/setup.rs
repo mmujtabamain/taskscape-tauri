@@ -106,6 +106,26 @@ pub fn allow_over_fullscreen(window: &tauri::WebviewWindow) {
     }
 }
 
+/// macOS: set the mini panel's overall opacity (`NSWindow` `alphaValue`, 0–1).
+/// Used to fade the bar to 25% while an interactive region selection is in
+/// progress so it doesn't obscure the screen, then back to 1.0 afterwards.
+/// Hops onto the main thread since it touches AppKit; fire-and-forget (the fade
+/// is cosmetic, so the caller never needs to wait for it to land).
+#[cfg(target_os = "macos")]
+pub fn set_window_alpha(window: &tauri::WebviewWindow, alpha: f64) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    let win = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        if let Ok(ns_window) = win.ns_window() {
+            let ns_window = ns_window as *mut AnyObject;
+            unsafe {
+                let _: () = msg_send![ns_window, setAlphaValue: alpha];
+            }
+        }
+    });
+}
+
 /// macOS: force the window to the front of the *currently active* Space without
 /// switching Spaces. `set_focus` activates the app, which — because the window's
 /// home Space is the desktop — can drag focus back to the desktop instead of

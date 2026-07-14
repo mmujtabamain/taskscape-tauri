@@ -50,20 +50,49 @@ impl Drop for CaptureFlag {
     }
 }
 
-/// Capture the full screen off the caller's thread, driving the mini bar's UI
+/// Whether the user has chosen interactive region capture over full-screen.
+pub fn region_mode() -> bool {
+    screenshot::CaptureMode::current() == screenshot::CaptureMode::Region
+}
+
+/// How the mini bar should behave around a capture. Both fields matter only for
+/// interactive region grabs, where the bar must not obscure the screen while the
+/// user drags a selection.
+#[derive(Default, Clone, Copy)]
+pub struct CaptureUi {
+    /// Reveal the (currently hidden) bar at the cursor once a shot lands. Set on
+    /// the ⌘⇧Return path when the bar was closed and we deferred showing it so it
+    /// wouldn't cover the region selection.
+    pub reveal_on_success: bool,
+    /// Fade the (currently visible) bar to 25% for the duration of the grab,
+    /// restoring it after. Keeps an already-open bar out of the user's way during
+    /// the selection.
+    pub dim_during_capture: bool,
+}
+
+/// [`spawn_capture_with`] with no special bar handling — the bar stays put and at
+/// full opacity throughout (used for full-screen grabs and the mini-bar button).
+pub fn spawn_capture(window: &WebviewWindow) {
+    spawn_capture_with(window, CaptureUi::default());
+}
+
+/// Capture the screen off the caller's thread (full-screen or interactive
+/// region, per the user's `screenshot_mode` setting), driving the mini bar's UI
 /// with events:
 ///
 ///  - `screenshot-pending` immediately (the button shows a spinner),
-///  - then `screenshot-captured` (PNG path) on success, or `screenshot-error`
-///    (message) on failure.
+///  - then `screenshot-captured` (PNG path) on success, `screenshot-cancelled`
+///    when a region grab is aborted (Esc), or `screenshot-error` (message) on
+///    failure.
 ///
-/// The bar stays on screen (showing its spinner) throughout: it's excluded from
-/// *this* grab only by flipping its sharing type to `None` for the capture and
-/// restoring it right after ([`set_sharing_type`] / [`SharingRestore`]), so it
-/// never lands in the shot yet stays capturable by OS tools and the main app.
-/// The blocking `screencapture` shell-out never runs on the UI/hotkey thread. If
-/// a capture is already running this is a no-op.
-pub fn spawn_capture(window: &WebviewWindow) {
+/// The bar is excluded from *this* grab by flipping its sharing type to `None`
+/// for the capture and restoring it right after ([`set_sharing_type`] /
+/// [`SharingRestore`]), so it never lands in the shot yet stays capturable by OS
+/// tools and the main app. Per [`CaptureUi`] it may also be dimmed during the
+/// grab or revealed only once a region selection is finalized. The blocking
+/// `screencapture` shell-out never runs on the UI/hotkey thread. If a capture is
+/// already running this is a no-op.
+pub fn spawn_capture_with(window: &WebviewWindow, ui: CaptureUi) {
     if capturing().swap(true, Ordering::AcqRel) {
         return;
     }
@@ -71,6 +100,13 @@ pub fn spawn_capture(window: &WebviewWindow) {
     let window = window.clone();
     std::thread::spawn(move || {
         let _flag = CaptureFlag;
+        // Fade the bar down first (if it's visible) so the dim is in place before
+        // the crosshair appears; restored on any exit via the guard's drop.
+        #[cfg(target_os = "macos")]
+        let _dim = ui.dim_during_capture.then(|| {
+            crate::setup::set_window_alpha(&window, 0.25);
+            OpacityRestore(window.clone())
+        });
         // Exclude the bar from this grab only, then restore it (even on
         // error/panic) so OS tools and the main app still capture it.
         #[cfg(target_os = "macos")]
@@ -84,9 +120,20 @@ pub fn spawn_capture(window: &WebviewWindow) {
             std::thread::sleep(Duration::from_millis(60));
             SharingRestore(window.clone())
         };
-        match screenshot::capture_fullscreen().map_err(err) {
-            Ok(path) => {
+        match screenshot::capture().map_err(err) {
+            Ok(Some(path)) => {
                 let _ = window.emit("screenshot-captured", path.to_string_lossy().into_owned());
+                // Region path with the bar deferred: reveal it now that the user
+                // has finalized a selection.
+                if ui.reveal_on_success {
+                    let w = window.clone();
+                    let _ = window.run_on_main_thread(move || crate::window::reveal_mini(&w));
+                }
+            }
+            Ok(None) => {
+                // Region capture cancelled (Esc / empty selection): clear the
+                // spinner without surfacing an error. A deferred bar stays hidden.
+                let _ = window.emit("screenshot-cancelled", ());
             }
             Err(e) => {
                 eprintln!("[taskscape-tray] screenshot failed: {e}");
@@ -109,5 +156,18 @@ impl Drop for SharingRestore {
         use crate::setup::set_sharing_type;
 
         set_sharing_type(&self.0, true, false);
+    }
+}
+
+/// Restores the bar to full opacity when the capture thread unwinds — on
+/// success, cancel, error, or panic — so a dim applied for a region selection
+/// can never leak past the grab and leave the bar faded.
+#[cfg(target_os = "macos")]
+struct OpacityRestore(WebviewWindow);
+
+#[cfg(target_os = "macos")]
+impl Drop for OpacityRestore {
+    fn drop(&mut self) {
+        crate::setup::set_window_alpha(&self.0, 1.0);
     }
 }
