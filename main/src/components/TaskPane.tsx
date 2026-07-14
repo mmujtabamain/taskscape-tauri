@@ -50,8 +50,8 @@ interface Props {
   sel: PaneSelection;
   isSplit: boolean;
   onCloseSplit?: () => void;
-  onCreateTask: (listId: string, title: string) => void;
-  registerComposer: (
+  onNewTask: (listId: string) => void;
+  registerSearchFocus: (
     listId: string,
     focus: ((seed?: string) => void) | null
   ) => void;
@@ -66,12 +66,11 @@ export function TaskPane({
   sel,
   isSplit,
   onCloseSplit,
-  onCreateTask,
-  registerComposer,
+  onNewTask,
+  registerSearchFocus,
   onFocusPane,
   captureHint,
 }: Props) {
-  const composerRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -88,8 +87,7 @@ export function TaskPane({
   const paneSearch = useSearchStore((s) => s.byPane[list.id]);
   const activeProjectId = useProjectStore((s) => s.activeId);
 
-  const searchActive = paneSearch?.active ?? false;
-  const query = searchActive ? (paneSearch?.query ?? '') : '';
+  const query = paneSearch?.query ?? '';
   const searching = paneSearching(list.id);
 
   const visibleRoots = orderForPane(
@@ -128,30 +126,18 @@ export function TaskPane({
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   useEffect(() => {
-    registerComposer(list.id, (seed) => {
-      // A ⌘N / type-to-capture request leaves search mode and focuses the add box.
-      const ss = useSearchStore.getState();
-      if (ss.isActive(list.id)) ss.close(list.id);
-      const el = composerRef.current;
+    registerSearchFocus(list.id, (seed) => {
+      // ⌘F focuses the search field; a typed letter also seeds the query.
+      const el = searchRef.current;
       if (!el) return;
       el.focus();
-      if (seed) el.value += seed;
+      if (seed) {
+        const cur = useSearchStore.getState().get(list.id).query;
+        useSearchStore.getState().setQuery(list.id, cur + seed);
+      }
     });
-    return () => registerComposer(list.id, null);
-  }, [list.id, registerComposer]);
-
-  // Focus the search field the moment the pane enters search mode.
-  useEffect(() => {
-    if (searchActive) searchRef.current?.focus();
-  }, [searchActive]);
-
-  const submit = () => {
-    const el = composerRef.current;
-    const title = el?.value.trim();
-    if (!el || !title) return;
-    onCreateTask(list.id, title);
-    el.value = '';
-  };
+    return () => registerSearchFocus(list.id, null);
+  }, [list.id, registerSearchFocus]);
 
   // Direct match count for the badge (memo-cheap; recomputed per keystroke).
   const matchCount = searching
@@ -183,59 +169,49 @@ export function TaskPane({
     >
       <div className="rounded-control bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 px-3 transition-shadow focus-within:ring-1">
         <Icon
-          name={searchActive ? 'search' : 'add'}
+          name="search"
           size={18}
           weight={300}
           className="text-content-3l dark:text-content-3d shrink-0"
         />
-        {searchActive ? (
+        <input
+          ref={searchRef}
+          value={query}
+          placeholder={`Search ${list.name}`}
+          onFocus={() => onFocusPane(list.id)}
+          onChange={(e) => useSearchStore.getState().setQuery(list.id, e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+              useSearchStore.getState().clear(list.id);
+              (e.target as HTMLInputElement).blur();
+            } else if (e.key === 'Enter') cycleMatch(e.shiftKey ? -1 : 1);
+          }}
+          className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[14px] outline-none"
+        />
+        <ScopeFields listId={list.id} />
+        {query.trim() && (
           <>
-            <input
-              ref={searchRef}
-              value={query}
-              placeholder={`Search ${list.name}`}
-              onFocus={() => onFocusPane(list.id)}
-              onChange={(e) => useSearchStore.getState().setQuery(list.id, e.target.value)}
-              onBlur={() => {
-                // An empty search field that loses focus leaves search mode, so
-                // the composer returns instead of a dangling blank search bar.
-                if (!useSearchStore.getState().get(list.id).query.trim())
-                  useSearchStore.getState().close(list.id);
-              }}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === 'Escape') useSearchStore.getState().close(list.id);
-                else if (e.key === 'Enter') cycleMatch(e.shiftKey ? -1 : 1);
-              }}
-              className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[14px] outline-none"
-            />
-            <ScopeFields listId={list.id} />
-            {query.trim() && (
-              <span className="text-content-3l dark:text-content-3d shrink-0 text-[11px] font-semibold tabular-nums">
-                {matchCount}
-              </span>
-            )}
+            <span className="text-content-3l dark:text-content-3d shrink-0 text-[11px] font-semibold tabular-nums">
+              {matchCount}
+            </span>
             <button
-              onClick={() => useSearchStore.getState().close(list.id)}
-              title="Close search"
+              onClick={() => useSearchStore.getState().clear(list.id)}
+              title="Clear search"
               className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
             >
               <Icon name="close" size={15} weight={300} />
             </button>
           </>
-        ) : (
-          <input
-            ref={composerRef}
-            placeholder="Add a task — Enter to save"
-            onFocus={() => onFocusPane(list.id)}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') submit();
-              if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
-            }}
-            className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[14px] outline-none"
-          />
         )}
+        <span className="bg-edge-2l dark:bg-edge-2d h-4 w-px shrink-0" />
+        <button
+          onClick={() => onNewTask(list.id)}
+          title="New task"
+          className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+        >
+          <Icon name="add" size={18} weight={400} />
+        </button>
         {isSplit && onCloseSplit && (
           <button
             onClick={onCloseSplit}
@@ -296,8 +272,8 @@ export function TaskPane({
                 {searching
                   ? 'Try a different search or scope'
                   : captureHint
-                    ? `Add a task above, or press ${captureHint} anywhere to capture one`
-                    : 'Add a task above'}
+                    ? `Press + or ⌘N to add a task, or ${captureHint} anywhere to capture one`
+                    : 'Press + or ⌘N to add a task'}
               </p>
             </div>
           )}

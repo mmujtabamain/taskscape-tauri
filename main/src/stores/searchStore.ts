@@ -1,7 +1,8 @@
-// Per-pane inline search (C.5): each pane owns its own query/scope/fields and an
-// `active` flag (the composer becomes a search field while active). One shared,
-// memoized engine computes the match set, so two panes with the same query only
-// tokenise once.
+// Per-pane inline search (C.5): each pane owns its own query/scope/fields. The
+// search field is always visible (there is no separate add-task composer), so a
+// non-empty query is the only thing that turns filtering on. One shared, memoized
+// engine computes the match set, so two panes with the same query only tokenise
+// once.
 import { create } from 'zustand';
 import type { Task } from '../api';
 import { useListStore } from './listStore';
@@ -14,26 +15,20 @@ export interface PaneSearch {
   query: string;
   scope: SearchScope;
   fields: SearchFields;
-  active: boolean;
 }
 
 const DEFAULT: PaneSearch = {
   query: '',
   scope: 'list',
   fields: 'both',
-  active: false,
 };
 
 interface SearchState {
   byPane: Record<string, PaneSearch>;
   get: (paneId: string) => PaneSearch;
-  /** True while the pane is in search mode (composer shows the search field). */
-  isActive: (paneId: string) => boolean;
-  /** Enter search mode (⌘F). */
-  open: (paneId: string) => void;
-  /** Leave search mode + clear the query (Escape). */
-  close: (paneId: string) => void;
   setQuery: (paneId: string, query: string) => void;
+  /** Empty the query (Escape / the clear button). */
+  clear: (paneId: string) => void;
   setScope: (paneId: string, scope: SearchScope) => void;
   setFields: (paneId: string, fields: SearchFields) => void;
 }
@@ -41,19 +36,10 @@ interface SearchState {
 export const useSearchStore = create<SearchState>((set, get) => ({
   byPane: {},
   get: (paneId) => get().byPane[paneId] ?? DEFAULT,
-  isActive: (paneId) => (get().byPane[paneId] ?? DEFAULT).active,
 
-  open: (paneId) =>
+  clear: (paneId) =>
     set((s) => ({
-      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), active: true } },
-    })),
-
-  close: (paneId) =>
-    set((s) => ({
-      byPane: {
-        ...s.byPane,
-        [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), active: false, query: '' },
-      },
+      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), query: '' } },
     })),
 
   setQuery: (paneId, query) =>

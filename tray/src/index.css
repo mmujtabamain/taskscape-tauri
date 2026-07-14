@@ -36,25 +36,10 @@
   --color-halo-1d: oklch(0.24 0.005 260);
 }
 
-/* No `.dark` class here — the tray follows the system appearance. Give the
-   shared theme-swap aliases (used by the injected .note-rt/.att-chip CSS) and
-   the Material Symbols optical weight their light defaults, dark under system. */
-:root {
-  --icon-wght: 350;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface-1: var(--surface-1d);
-    --edge-2: var(--edge-2d);
-    --edge-3: var(--edge-3d);
-    --content-1: var(--content-1d);
-    --content-3: var(--content-3d);
-    --accent-500: var(--accent-500d);
-    --selection-1: var(--selection-1d);
-    --focus-1: var(--focus-1d);
-    --icon-wght: 300;
-  }
-}
+/* The tray tracks the system appearance by toggling the shared `.dark` class on
+   <html> from main.tsx (it has no user override, unlike the main app). That
+   drives both Tailwind's `dark:` variant and the theme-swap aliases + Material
+   Symbols weight defined for `:root`/`.dark` in the shared tokens.css. */
 
 /* The window backing stays transparent (there is no native vibrancy anymore) so
    the opaque card's rounded corners render against nothing — the card itself
@@ -64,6 +49,9 @@ body,
 #root {
   overscroll-behavior: none;
   background: transparent;
+  /* The card is capped to fit the (fixed) window; never let focusing the notes
+     editor scroll the whole page and push the title off-screen. */
+  overflow: hidden;
 }
 
 /* Follow the system light/dark appearance (drives Tailwind's `dark:` variant

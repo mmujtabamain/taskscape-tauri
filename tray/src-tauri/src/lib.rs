@@ -11,6 +11,7 @@ use crate::{capture::capture_target, hotkeys::*, task::submit_capture, window::*
 #[cfg(target_os = "macos")]
 use crate::{setup::allow_over_fullscreen, space::observe_space_changes};
 use axum::{extract::State as AxumState, http::StatusCode, routing::post, Router};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use taskscape_common::{server, Store, MAIN_PORT, TRAY_PORT};
 use tauri::{
@@ -22,6 +23,21 @@ use tauri_plugin_global_shortcut::ShortcutState;
 
 pub fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
+}
+
+/// Whether the main app's window is currently focused/frontmost, as reported by
+/// main over HTTP (`/main-focused` · `/main-blurred`). When true, the global
+/// capture and screenshot combos act on the main window instead of the mini bar.
+fn main_focused() -> &'static AtomicBool {
+    static FOCUSED: OnceLock<AtomicBool> = OnceLock::new();
+    FOCUSED.get_or_init(|| AtomicBool::new(false))
+}
+
+/// Fire-and-forget POST to the main app (it's frontmost, so it acts on itself).
+fn route_to_main(path: &'static str) {
+    tauri::async_runtime::spawn(async move {
+        let _ = server::client::post_json(MAIN_PORT, path, &serde_json::json!({})).await;
+    });
 }
 
 /// Bring the main app forward: ask a running instance to focus (HTTP), otherwise
@@ -84,10 +100,33 @@ pub fn run() {
                         let state = global_hotkeys().lock().unwrap();
                         (state.toggle, state.screenshot)
                     };
+                    // When the main app is frontmost these act on it instead of
+                    // the mini bar: ⌘Enter starts a new task, ⌘⇧Enter attaches a
+                    // screenshot to the selected task (see main's HTTP routes).
                     if Some(*shortcut) == toggle {
-                        toggle_mini(app);
+                        let bar = app.get_webview_window("main");
+                        let open = bar
+                            .as_ref()
+                            .and_then(|w| w.is_visible().ok())
+                            .unwrap_or(false);
+                        if open {
+                            // ⌘Enter is a global shortcut, so it never reaches the
+                            // focused mini bar's webview — let it decide: submit
+                            // from the notes editor, or dismiss from the title.
+                            if let Some(w) = bar {
+                                let _ = w.emit("capture-enter", ());
+                            }
+                        } else if main_focused().load(Ordering::Acquire) {
+                            route_to_main("/new-task");
+                        } else {
+                            toggle_mini(app);
+                        }
                     } else if Some(*shortcut) == screenshot {
-                        capture_and_show(app);
+                        if main_focused().load(Ordering::Acquire) {
+                            route_to_main("/attach-screenshot");
+                        } else {
+                            capture_and_show(app);
+                        }
                     }
                 })
                 .build(),
@@ -98,6 +137,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             hide_mini,
             list_hotkeys,
+            get_dark,
             capture_target,
             open_main,
             capture_and_attach,
@@ -174,6 +214,21 @@ fn window_setup(
             post(|AxumState(app): AxumState<AppHandle>| async move {
                 refresh_global_shortcuts(app.clone());
                 let _ = app.emit_to("main", "hotkeys-changed", ());
+                StatusCode::OK
+            }),
+        )
+        // Main reports its focus so the global combos know whether to act on it.
+        .route(
+            "/main-focused",
+            post(|| async {
+                main_focused().store(true, Ordering::Release);
+                StatusCode::OK
+            }),
+        )
+        .route(
+            "/main-blurred",
+            post(|| async {
+                main_focused().store(false, Ordering::Release);
                 StatusCode::OK
             }),
         )

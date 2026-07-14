@@ -36,7 +36,6 @@ import { useHotkeyStore } from './stores/hotkeyStore';
 import { useLayoutStore } from './stores/layoutStore';
 import { useListStore } from './stores/listStore';
 import { useProjectStore } from './stores/projectStore';
-import { useSearchStore } from './stores/searchStore';
 import { useSelectionStore } from './stores/selectionStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useTaskStore } from './stores/taskStore';
@@ -82,7 +81,15 @@ function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [cheatOpen, setCheatOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
-  const composers = useRef(new Map<string, (seed?: string) => void>());
+  // A new task drafted in the preview: it has no DB row (and no list row) until it
+  // gets content. `draftListId` is the list it will land in — at most one draft at
+  // a time. `addNoteReq` opens the note editor on the row a draft's "Add note"
+  // just created.
+  const [draftListId, setDraftListId] = useState<string | null>(null);
+  const [addNoteReq, setAddNoteReq] = useState<{ id: string; n: number } | null>(
+    null
+  );
+  const searchFocusers = useRef(new Map<string, (seed?: string) => void>());
 
   // ----- lifecycle: one bootstrap wires events + does the first load -----
   useEffect(() => {
@@ -199,11 +206,6 @@ function App() {
   };
 
   // ----- tasks -----
-  const createTask = async (listId: string, title: string) => {
-    useLayoutStore.getState().setPaneFocus(listId);
-    const task = await actCreateTask(listId, title);
-    useSelectionStore.getState().focus(task.id);
-  };
   const createSubtask = async (parentId: string, title: string) => {
     // Un-collapse the parent so the new subtask is visible.
     const { collapsed, setCollapsed } = useLayoutStore.getState();
@@ -254,6 +256,85 @@ function App() {
     setTitleEditReq((r) => ({ id, n: (r?.n ?? 0) + 1 }));
   };
   const clearTitleEditReq = useCallback(() => setTitleEditReq(null), []);
+  const clearAddNoteReq = useCallback(() => setAddNoteReq(null), []);
+
+  // "+" / ⌘N: open an empty draft in the preview — no DB row yet. It becomes a
+  // real task only once it gets content (see `runDraftAction`).
+  const startNewTask = (listId: string) => {
+    useLayoutStore.getState().setPaneFocus(listId);
+    useSelectionStore.getState().clear(listId);
+    useSelectionStore.getState().focus(null);
+    useLayoutStore.getState().setPreviewOpen(true);
+    setDraftListId(listId);
+  };
+
+  // The draft got content (or was dismissed). Create the DB row now — named after
+  // the typed title, else "Untitled" for a note/screenshot — select it, and hand
+  // off to the real inspector. 'cancel' / an empty 'commit' just drop the draft.
+  // The `busy` guard swallows the DraftInspector's unmount blur (it fires an extra
+  // 'commit' as the form is torn down) so a single action can't create two rows.
+  const draftBusyRef = useRef(false);
+  const runDraftAction = async (
+    rawTitle: string,
+    action: 'commit' | 'note' | 'shot' | 'cancel'
+  ) => {
+    const listId = draftListId;
+    if (!listId || draftBusyRef.current) return;
+    if (action === 'cancel') return setDraftListId(null);
+    const title = rawTitle.trim();
+    if (action === 'commit' && !title) return setDraftListId(null);
+    draftBusyRef.current = true;
+    setDraftListId(null);
+    try {
+      const task = await actCreateTask(
+        listId,
+        action === 'commit' ? title : title || 'Untitled'
+      );
+      useSelectionStore.getState().focus(task.id);
+      if (action === 'note')
+        setAddNoteReq((r) => ({ id: task.id, n: (r?.n ?? 0) + 1 }));
+      if (action === 'shot') {
+        await api.attachScreenshot(task.id);
+        await useTaskStore.getState().load();
+      }
+    } finally {
+      draftBusyRef.current = false;
+    }
+  };
+
+  // ⌘⇧Enter forwarded from the tray while this window is frontmost: attach a
+  // screenshot to the selected task, or create an "Untitled" one for it if none
+  // is selected (a screenshot is content, so the row is created immediately).
+  const attachShotHere = async () => {
+    if (selectedTask) {
+      await api.attachScreenshot(selectedTask.id);
+      await useTaskStore.getState().load();
+    } else if (focusedListId) {
+      const created = await actCreateTask(focusedListId, 'Untitled');
+      useSelectionStore.getState().focus(created.id);
+      await api.attachScreenshot(created.id);
+      await useTaskStore.getState().load();
+    }
+  };
+
+  // The tray forwards ⌘Enter / ⌘⇧Enter here when this window is frontmost; keep
+  // the handlers current (they read live selection/list) behind a stable ref.
+  const routeActionsRef = useRef({ newTask: () => {}, attachShot: () => {} });
+  useEffect(() => {
+    routeActionsRef.current = {
+      newTask: () => {
+        if (focusedListId) void startNewTask(focusedListId);
+      },
+      attachShot: () => void attachShotHere(),
+    };
+  });
+  useEffect(() => {
+    const subs = [
+      listen('new-task', () => routeActionsRef.current.newTask()),
+      listen('attach-screenshot', () => routeActionsRef.current.attachShot()),
+    ];
+    return () => subs.forEach((s) => s.then((f) => f()));
+  }, []);
 
   const copyToClipboard = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
@@ -356,10 +437,10 @@ function App() {
     onCopy: copyToClipboard,
   };
 
-  const registerComposer = useCallback(
+  const registerSearchFocus = useCallback(
     (listId: string, focus: ((seed?: string) => void) | null) => {
-      if (focus) composers.current.set(listId, focus);
-      else composers.current.delete(listId);
+      if (focus) searchFocusers.current.set(listId, focus);
+      else searchFocusers.current.delete(listId);
     },
     []
   );
@@ -433,8 +514,8 @@ function App() {
       { id: 'toggle_completed', group: 'View', label: 'Show / hide completed', icon: 'visibility', accel: accel('toggle_completed'), run: () => useSettingsStore.getState().toggleShowCompleted() },
       { id: 'collapse_all', group: 'View', label: 'Collapse all', icon: 'unfold_less', accel: accel('collapse_all'), run: collapseAll },
       { id: 'expand_all', group: 'View', label: 'Expand all', icon: 'unfold_more', accel: accel('expand_all'), run: expandAll },
-      { id: 'new_task', group: 'Task', label: 'New task', icon: 'add', accel: accel('new_task'), run: () => { if (focusedListId) composers.current.get(focusedListId)?.(); } },
-      { id: 'search', group: 'Task', label: 'Search this list', icon: 'search', accel: accel('search'), run: () => { if (focusedListId) useSearchStore.getState().open(focusedListId); } },
+      { id: 'new_task', group: 'Task', label: 'New task', icon: 'add', accel: accel('new_task'), run: () => { if (focusedListId) void startNewTask(focusedListId); } },
+      { id: 'search', group: 'Task', label: 'Search this list', icon: 'search', accel: accel('search'), run: () => { if (focusedListId) searchFocusers.current.get(focusedListId)?.(); } },
       { id: 'undo', group: 'Task', label: 'Undo', icon: 'undo', accel: accel('undo'), run: () => void useHistoryStore.getState().undo() },
       { id: 'redo', group: 'Task', label: 'Redo', icon: 'redo', accel: accel('redo'), run: () => void useHistoryStore.getState().redo() },
       { id: 'new_list', group: 'Manage', label: 'New list', icon: 'playlist_add', accel: accel('new_list'), run: createList },
@@ -469,12 +550,12 @@ function App() {
 
       if (pressed('search')) {
         e.preventDefault();
-        if (focusedListId) useSearchStore.getState().open(focusedListId);
+        if (focusedListId) searchFocusers.current.get(focusedListId)?.();
         return;
       }
       if (pressed('new_task')) {
         e.preventDefault();
-        if (focusedListId) composers.current.get(focusedListId)?.();
+        if (focusedListId) void startNewTask(focusedListId);
         return;
       }
       if (pressed('open_settings')) {
@@ -687,10 +768,10 @@ function App() {
         !e.ctrlKey &&
         !overlayOpen()
       ) {
-        const composer = focusedListId ? composers.current.get(focusedListId) : undefined;
-        if (composer) {
+        const focusSearch = focusedListId ? searchFocusers.current.get(focusedListId) : undefined;
+        if (focusSearch) {
           e.preventDefault();
-          composer(e.key);
+          focusSearch(e.key);
         }
       }
     };
@@ -710,6 +791,9 @@ function App() {
       })()
     : [];
   const listNameById = (listId: string) => lists.find((l) => l.id === listId)?.name ?? null;
+  const projectNameOfList = (listId: string) =>
+    projects.find((p) => p.id === lists.find((l) => l.id === listId)?.project_id)
+      ?.name ?? null;
 
   // ----- layout -----
   return (
@@ -755,8 +839,8 @@ function App() {
                   ctx={ctx}
                   sel={makeSel(activeList.id)}
                   isSplit={false}
-                  onCreateTask={createTask}
-                  registerComposer={registerComposer}
+                  onNewTask={startNewTask}
+                  registerSearchFocus={registerSearchFocus}
                   onFocusPane={(id) => useLayoutStore.getState().setPaneFocus(id)}
                   captureHint={formatAccel(hotkeyMap['toggle_capture_bar'] ?? '')}
                 />
@@ -778,8 +862,8 @@ function App() {
                       sel={makeSel(splitList.id)}
                       isSplit
                       onCloseSplit={() => useLayoutStore.getState().closeSplit()}
-                      onCreateTask={createTask}
-                      registerComposer={registerComposer}
+                      onNewTask={startNewTask}
+                      registerSearchFocus={registerSearchFocus}
                       onFocusPane={(id) => useLayoutStore.getState().setPaneFocus(id)}
                       captureHint={formatAccel(hotkeyMap['toggle_capture_bar'] ?? '')}
                     />
@@ -836,6 +920,12 @@ function App() {
                   onClose={() => useLayoutStore.getState().setPreviewOpen(false)}
                   titleEditReq={titleEditReq}
                   onTitleEditStarted={clearTitleEditReq}
+                  addNoteReq={addNoteReq}
+                  onAddNoteStarted={clearAddNoteReq}
+                  draftListId={draftListId}
+                  draftProjectName={draftListId ? projectNameOfList(draftListId) : null}
+                  draftListName={draftListId ? listNameById(draftListId) : null}
+                  onDraftAction={runDraftAction}
                   selectionTasks={selectionTasks}
                   listNameById={listNameById}
                   moveTargets={listsInProject}

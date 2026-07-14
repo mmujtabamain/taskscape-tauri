@@ -984,6 +984,22 @@ pub fn run() {
                         StatusCode::OK
                     }),
                 )
+                // The tray forwards its global ⌘Enter / ⌘⇧Enter here when this
+                // window is frontmost, so they act on it instead of the mini bar.
+                .route(
+                    "/new-task",
+                    post(|AxumState(app): AxumState<AppHandle>| async move {
+                        let _ = app.emit("new-task", ());
+                        StatusCode::OK
+                    }),
+                )
+                .route(
+                    "/attach-screenshot",
+                    post(|AxumState(app): AxumState<AppHandle>| async move {
+                        let _ = app.emit("attach-screenshot", ());
+                        StatusCode::OK
+                    }),
+                )
                 .with_state(handle);
             let router = server::data_router(server_store.clone()).merge(app_routes);
             tauri::async_runtime::spawn(async move {
@@ -1010,6 +1026,15 @@ pub fn run() {
             // Closing the main window quits the app — otherwise the hidden,
             // never-destroyed panels would keep the process alive headless.
             ("main", WindowEvent::Destroyed) => window.app_handle().exit(0),
+            // Report focus to the tray so its global ⌘Enter / ⌘⇧Enter act on this
+            // window (new task / screenshot) while it's frontmost.
+            ("main", WindowEvent::Focused(focused)) => {
+                let path = if *focused { "/main-focused" } else { "/main-blurred" };
+                tauri::async_runtime::spawn(async move {
+                    let _ = server::client::post_json(TRAY_PORT, path, &serde_json::json!({}))
+                        .await;
+                });
+            }
             // Panels hide instead of closing: destroying a class-swapped
             // NSPanel aborts with a foreign exception during teardown.
             ("modal" | "settings" | "overlay", WindowEvent::CloseRequested { api, .. }) => {

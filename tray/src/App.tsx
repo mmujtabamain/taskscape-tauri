@@ -9,6 +9,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { api, type CaptureTarget } from './api';
+import { refreshTheme } from './theme';
 
 const inputClasses =
   'min-w-0 bg-transparent text-sm outline-none ' +
@@ -29,6 +30,11 @@ function App() {
   const [target, setTarget] = useState<CaptureTarget | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichTextHandle>(null);
+  // Read by the stable `mini-shown` listener, so it sees the live notes state.
+  const notesOpenRef = useRef(notesOpen);
+  // ⌘Enter is a global shortcut, so it never reaches this webview; Rust emits
+  // `capture-enter` when the bar is open. This ref keeps the latest `save`.
+  const saveRef = useRef<() => void>(() => {});
 
   const refreshTarget = () => {
     api
@@ -38,6 +44,14 @@ function App() {
   };
   const focusTitle = () =>
     requestAnimationFrame(() => titleRef.current?.focus());
+  // On reveal, land the caret where the draft was left: in the notes editor if
+  // it already holds a note, otherwise the title field.
+  const focusDraft = () =>
+    requestAnimationFrame(() => {
+      if (notesOpenRef.current && !editorRef.current?.isEmpty())
+        editorRef.current?.focus();
+      else titleRef.current?.focus();
+    });
 
   // Wipe the draft back to an empty capture. Runs on submit and on an explicit
   // clear (the Clear button / ⌘⇧⌫) — never on a plain dismiss, so a half-typed
@@ -74,9 +88,17 @@ function App() {
       listen('mini-shown', () => {
         refreshTarget();
         loadHotkeys();
-        focusTitle();
+        void refreshTheme();
+        focusDraft();
       }),
       listen('hotkeys-changed', loadHotkeys),
+      // ⌘Enter while the bar is open (global; can't reach the webview, so Rust
+      // forwards it): submit when the notes editor is focused, otherwise dismiss.
+      listen('capture-enter', () => {
+        if ((document.activeElement as HTMLElement | null)?.isContentEditable)
+          saveRef.current();
+        else api.hideMini();
+      }),
       // A capture is in flight (button or ⌘⇧Return) — show the spinner.
       listen('screenshot-pending', () => {
         setError(null);
@@ -185,6 +207,13 @@ function App() {
     clearDraft();
   };
 
+  // Keep the refs the Rust-driven listeners read (mini-shown, capture-enter)
+  // pointed at the latest render's values.
+  useEffect(() => {
+    notesOpenRef.current = notesOpen;
+    saveRef.current = save;
+  });
+
   // Not a toggle: every trigger captures and attaches another screenshot. The
   // work happens in the background and reports back via the `screenshot-*` events.
   const addScreenshot = () => {
@@ -228,7 +257,7 @@ function App() {
     >
       {/* Title row — just the task title now; the screenshot control lives in
           the footer so there's one clear home for it (and its spinner/count). */}
-      <div data-tauri-drag-region className="flex h-10 items-center px-3 py-2">
+      <div data-tauri-drag-region className="flex h-10 shrink-0 items-center px-3 py-2">
         <input
           ref={titleRef}
           autoFocus
@@ -274,9 +303,11 @@ function App() {
             attachments={[]}
             placeholder="Notes ..."
             minHeightClass="min-h-16"
+            maxHeightClass="max-h-40"
             floatingToolbar={false}
             wrapperClassName=""
             toolbarClassName="border-edge-1l dark:border-edge-1d gap-1 border-t px-2 py-1.5"
+            submitOnModEnter
             onSubmit={save}
             onEscape={() => api.hideMini()}
             // Leaving the notes empty collapses the panel back to the hint —
@@ -302,7 +333,7 @@ function App() {
       {/* Footer — target (project / list, opens main) + the screenshot button. */}
       <div
         data-tauri-drag-region
-        className="flex items-center justify-between gap-2 px-3 py-2"
+        className="flex shrink-0 items-center justify-between gap-2 px-3 py-2"
       >
         <button
           onClick={() => api.openMain()}

@@ -14,6 +14,28 @@ pub async fn list_hotkeys(
     hotkeys::resolve(&store).await.map_err(err)
 }
 
+/// Whether the mini bar should render dark, resolved exactly like the main app:
+/// the shared Appearance setting ("dark"/"light"), otherwise the current system
+/// appearance. Resolved in Rust (via `window.theme()`, not the webview's
+/// `prefers-color-scheme`, which an accessory NSPanel doesn't report reliably) so
+/// the tray matches the theme the user picked in the main window.
+#[tauri::command]
+pub async fn get_dark(
+    window: tauri::WebviewWindow,
+    store: State<'_, Arc<Store>>,
+) -> Result<bool, String> {
+    Ok(
+        match store.get_setting("theme").await.map_err(err)?.as_deref() {
+            Some("dark") => true,
+            Some("light") => false,
+            _ => window
+                .theme()
+                .map(|t| t == tauri::Theme::Dark)
+                .unwrap_or(false),
+        },
+    )
+}
+
 /// The OS-global shortcuts as currently registered, resolved from the user's
 /// hotkey settings. The plugin's handler dispatches by comparing against these.
 #[derive(Default)]

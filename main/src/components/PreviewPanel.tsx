@@ -42,6 +42,19 @@ interface PreviewPanelProps {
    *  `onTitleEditStarted` clears it so a later request can re-trigger. */
   titleEditReq: { id: string; n: number } | null;
   onTitleEditStarted: () => void;
+  /** Open the note editor on this task (used after a draft's "Add note" creates
+   *  it). Mirrors `titleEditReq`. */
+  addNoteReq?: { id: string; n: number } | null;
+  onAddNoteStarted?: () => void;
+  /** When set (and no task is selected), the panel shows a draft new-task form
+   *  for this list — no DB row exists yet; `onDraftAction` creates it on content. */
+  draftListId?: string | null;
+  draftProjectName?: string | null;
+  draftListName?: string | null;
+  onDraftAction?: (
+    title: string,
+    action: 'commit' | 'note' | 'shot' | 'cancel'
+  ) => void;
 
   // ----- multi-select (focused pane's selection; >1 shows the multi inspector) -----
   selectionTasks?: Task[];
@@ -215,6 +228,8 @@ function TaskInspector({
   onClose,
   titleEditReq,
   onTitleEditStarted,
+  addNoteReq,
+  onAddNoteStarted,
 }: InspectorProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task.title);
@@ -364,6 +379,14 @@ function TaskInspector({
   useEffect(() => {
     if (renameRequested) onTitleEditStarted();
   }, [renameRequested, onTitleEditStarted]);
+
+  // A draft's "Add note" promotes the draft to this task and asks us to open the
+  // note editor straight away (same during-render + clear-in-effect pattern).
+  const addNoteRequested = addNoteReq?.id === task.id;
+  if (addNoteRequested && !addingNote) setAddingNote(true);
+  useEffect(() => {
+    if (addNoteRequested) onAddNoteStarted?.();
+  }, [addNoteRequested, onAddNoteStarted]);
 
   // Focus and select when editing opens, from any trigger.
   useEffect(() => {
@@ -521,6 +544,7 @@ function TaskInspector({
               rows={1}
               spellCheck={false}
               readOnly={!editingTitle}
+              placeholder="Untitled"
               value={editingTitle ? titleDraft : task.title}
               onChange={(e) => setTitleDraft(e.target.value)}
               onClick={() => {
@@ -537,7 +561,7 @@ function TaskInspector({
                   setEditingTitle(false);
                 }
               }}
-              className={`font-display text-content-1l dark:text-content-1d rounded-field -ml-1 block w-full cursor-text resize-none overflow-hidden border-0 bg-transparent px-1 py-0 text-[18px] leading-6 font-semibold outline-none ${
+              className={`font-display text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d rounded-field -ml-1 block w-full cursor-text resize-none overflow-hidden border-0 bg-transparent px-1 py-0 text-[18px] leading-6 font-semibold outline-none ${
                 editingTitle
                   ? 'bg-surface-0l dark:bg-surface-0d ring-surface-0l dark:ring-surface-0d ring-2'
                   : ''
@@ -1014,6 +1038,13 @@ export function PreviewPanel(props: PreviewPanelProps) {
     <div className="bg-surface-1l dark:bg-surface-1d flex h-full flex-col overflow-hidden">
       {task ? (
         <TaskInspector key={task.id} {...props} task={task} />
+      ) : props.draftListId ? (
+        <DraftInspector
+          key={props.draftListId}
+          projectName={props.draftProjectName ?? null}
+          listName={props.draftListName ?? null}
+          onAction={(t, a) => props.onDraftAction?.(t, a)}
+        />
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 text-center">
           <Icon
@@ -1030,6 +1061,94 @@ export function PreviewPanel(props: PreviewPanelProps) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The new-task draft: a title field plus "start with" actions, shown before any
+ *  DB row exists. Typing a title (commit) creates the task with that title; the
+ *  actions create it as "Untitled" and add a note / screenshot. Escape or a
+ *  click-away with no title drops the draft — nothing is written. */
+function DraftInspector({
+  projectName,
+  listName,
+  onAction,
+}: {
+  projectName: string | null;
+  listName: string | null;
+  onAction: (title: string, action: 'commit' | 'note' | 'shot' | 'cancel') => void;
+}) {
+  const [title, setTitle] = useState('');
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+  const noBlur = (e: React.MouseEvent) => e.preventDefault();
+  const startBtn =
+    'rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-2l dark:text-content-2d hover:border-content-3l dark:hover:border-content-3d hover:text-content-1l dark:hover:text-content-1d flex h-10 flex-1 items-center justify-center gap-1.5 border border-dashed text-[13px] font-semibold transition-colors';
+  return (
+    <div className="animate-rise flex min-h-0 flex-1 flex-col">
+      <div className="relative shrink-0 p-4">
+        <span className="bg-accent-500l dark:bg-accent-500d absolute top-4.75 left-0 h-4 w-0.5" />
+        <div className="flex items-start gap-2.5">
+          <span className="border-edge-3l dark:border-edge-3d mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-field border-[1.5px]" />
+          <div className="min-w-0 flex-1">
+            <textarea
+              ref={ref}
+              rows={1}
+              spellCheck={false}
+              value={title}
+              placeholder="Untitled"
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => onAction(title, 'commit')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onAction(title, 'commit');
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  onAction('', 'cancel');
+                }
+              }}
+              className="font-display text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d bg-surface-0l dark:bg-surface-0d ring-surface-0l dark:ring-surface-0d rounded-field -ml-1 block w-full resize-none overflow-hidden border-0 px-1 py-0 text-[18px] leading-6 font-semibold ring-2 outline-none"
+            />
+            <div className="text-content-3l dark:text-content-3d mt-2.5 flex items-center gap-1.5 text-[11.5px]">
+              <Icon name="folder_open" size={13} weight={300} className="shrink-0" />
+              <span className="text-content-2l dark:text-content-2d truncate">
+                {projectName ?? '—'}
+              </span>
+              {listName && <span className="shrink-0">/ {listName}</span>}
+            </div>
+          </div>
+          <button
+            onMouseDown={noBlur}
+            onClick={() => onAction('', 'cancel')}
+            title="Discard draft"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+          >
+            <Icon name="last_page" size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="p-4 pt-0">
+        <SectionHeader label="Start with" />
+        <div className="flex gap-2">
+          <button onMouseDown={noBlur} onClick={() => onAction(title, 'note')} className={startBtn}>
+            <Icon name="add" size={16} />
+            Note
+          </button>
+          <button onMouseDown={noBlur} onClick={() => onAction(title, 'shot')} className={startBtn}>
+            <Icon name="screenshot_monitor" size={15} />
+            Screenshot
+          </button>
+        </div>
+        <p className="text-content-3l dark:text-content-3d mt-3 text-[12px] leading-4">
+          Type a title, add a note, or take a screenshot — the task is created the
+          moment it has something in it.
+        </p>
+      </div>
     </div>
   );
 }

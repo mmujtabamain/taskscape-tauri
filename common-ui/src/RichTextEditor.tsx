@@ -30,6 +30,9 @@ interface Props {
   initialHtml?: string;
   placeholder?: string;
   minHeightClass?: string;
+  /** Caps the editor content's height (it already scrolls); the docked toolbar
+   *  stays put below it. Used by the tray so a long note scrolls in place. */
+  maxHeightClass?: string;
   maxLength?: number;
   attachments: Attachment[];
   onOpenMention?: (name: string) => void;
@@ -37,6 +40,10 @@ interface Props {
   onChange?: () => void;
   onBlur?: () => void;
   onSubmit?: () => void;
+  /** When set, only Cmd/Ctrl+Enter fires `onSubmit`; plain Enter inserts a line
+   *  so the editor stays multi-line (the tray's notes). Default: plain Enter
+   *  submits (the main app's add-note field). */
+  submitOnModEnter?: boolean;
   autoFocus?: boolean;
   /** Resolve a URL for the toolbar's link button; return null to cancel. When
    *  omitted the link button is hidden (e.g. the tray has no modal window). */
@@ -129,12 +136,14 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
       initialHtml = '',
       placeholder,
       minHeightClass = 'min-h-24',
+      maxHeightClass,
       maxLength = 2000,
       attachments,
       onOpenMention,
       onChange,
       onBlur,
       onSubmit,
+      submitOnModEnter = false,
       autoFocus,
       onRequestLink,
       onEscape,
@@ -172,6 +181,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     // editor creation and would otherwise capture stale state/props.
     const cb = useRef({
       onSubmit,
+      submitOnModEnter,
       onEscape,
       onOpenMention,
       onChange,
@@ -244,7 +254,8 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
         attributes: {
           class: twMerge(
             'note-rt text-content-1l dark:text-content-1d w-full overflow-x-hidden overflow-y-auto px-3 py-2.5 text-[13.5px] leading-5 wrap-anywhere outline-none',
-            minHeightClass
+            minHeightClass,
+            maxHeightClass
           ),
         },
         handleKeyDown: (_view, event) => {
@@ -272,12 +283,17 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
             c.onEscape();
             return true;
           }
-          // Plain Enter submits when the parent wants it (add-note / tray). Every
-          // other Enter falls through to ProseMirror (Shift+Enter → line break,
-          // plain Enter → new paragraph / split list item).
-          if (event.key === 'Enter' && !event.shiftKey && c.onSubmit) {
-            c.onSubmit();
-            return true;
+          // Enter submits when the parent wants it: plain Enter by default
+          // (add-note), or only Cmd/Ctrl+Enter when `submitOnModEnter` is set
+          // (the tray, so plain Enter adds a line to a multi-line note). Anything
+          // that doesn't submit falls through to ProseMirror (Shift+Enter → line
+          // break, plain Enter → new paragraph / split list item).
+          if (event.key === 'Enter' && c.onSubmit) {
+            const mod = event.metaKey || event.ctrlKey;
+            if (c.submitOnModEnter ? mod : !event.shiftKey) {
+              c.onSubmit();
+              return true;
+            }
           }
           return false;
         },
@@ -353,6 +369,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     useEffect(() => {
       cb.current = {
         onSubmit,
+        submitOnModEnter,
         onEscape,
         onOpenMention,
         onChange,

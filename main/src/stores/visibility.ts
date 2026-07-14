@@ -21,7 +21,7 @@ import {
  *  the pane isn't searching. */
 export function paneSearchSet(paneId: string): Set<string> | null {
   const s = useSearchStore.getState().get(paneId);
-  if (!s.active || !s.query.trim()) return null;
+  if (!s.query.trim()) return null;
   return matchSet(
     s.query,
     s.scope,
@@ -33,7 +33,7 @@ export function paneSearchSet(paneId: string): Set<string> | null {
 
 export function paneSearching(paneId: string): boolean {
   const s = useSearchStore.getState().get(paneId);
-  return s.active && s.query.trim().length > 0;
+  return s.query.trim().length > 0;
 }
 
 // ----- refine filters (content + created-date), with subtree-keep ------------
