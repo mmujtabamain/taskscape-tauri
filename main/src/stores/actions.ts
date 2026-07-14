@@ -25,20 +25,53 @@ function isInSubtree(candidateId: string, rootId: string): boolean {
 // ----- simple invertible commands -----
 
 export function toggleDone(t: Task) {
-  const { patch } = useTaskStore.getState();
+  const { taskById, childrenByParent, patchMany } = useTaskStore.getState();
+  const targetDone = !t.done;
+
+  // Parent/child completion stays in sync both ways. Checking a task completes
+  // its whole subtree, then bubbles up: an ancestor auto-completes only once all
+  // of its children are done. Un-checking re-opens the subtree and every
+  // ancestor, since a single pending descendant means none can be complete.
+  const affected = new Set<string>();
+  const addSubtree = (id: string) => {
+    affected.add(id);
+    for (const c of childrenByParent[id] ?? []) addSubtree(c.id);
+  };
+  addSubtree(t.id);
+
+  let p = taskById[t.id]?.parent_id ?? null;
+  if (targetDone) {
+    while (p) {
+      const kids = childrenByParent[p] ?? [];
+      if (!kids.every((k) => k.done || affected.has(k.id))) break;
+      affected.add(p);
+      p = taskById[p]?.parent_id ?? null;
+    }
+  } else {
+    while (p) {
+      affected.add(p);
+      p = taskById[p]?.parent_id ?? null;
+    }
+  }
+
+  // Only the rows that actually flip — and they all flip the same way, so the
+  // inverse is a clean flip back.
+  const ids = [...affected].filter((id) => taskById[id]?.done !== targetDone);
+  if (ids.length === 0) return Promise.resolve();
+
   const set = async (done: boolean) => {
-    patch(t.id, { done });
+    patchMany(ids, { done });
     try {
-      await api.updateTask(t.id, { done });
+      await api.setTasksDone(ids, done);
     } catch (e) {
-      patch(t.id, { done: !done });
+      patchMany(ids, { done: !done });
       throw e;
     }
   };
   return run({
-    label: t.done ? 'Mark not done' : 'Mark done',
-    apply: () => set(!t.done),
-    invert: () => set(t.done),
+    label: targetDone ? 'Mark done' : 'Mark not done',
+    apply: () => set(targetDone),
+    invert: () => set(!targetDone),
   });
 }
 
