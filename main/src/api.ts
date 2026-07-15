@@ -160,6 +160,10 @@ export const api = {
   presentWindow: (width: number, height: number) =>
     invoke<void>('present_window', { width, height }),
   openSettings: () => invoke<void>('open_settings'),
+  /** Whether the settings panel is currently open (it's warmed/hidden at start). */
+  settingsCurrent: () => invoke<boolean>('settings_current'),
+  /** Reveal the main window once its webview has loaded. Idempotent. */
+  revealMain: () => invoke<void>('reveal_main'),
 
   // filter overlay window (per-pane sort/filter, edited in its own window)
   openOverlay: (props: unknown) => invoke<void>('open_overlay', { props }),

@@ -134,10 +134,16 @@ export function ModalWindow() {
         })
         .catch(() => {});
     fetch();
-    const un = listen('modal-refresh', fetch);
+    const unRefresh = listen('modal-refresh', fetch);
+    // On close the window is reused (hidden, not destroyed); dropping the content
+    // here — while it fades out — keeps the next open from flashing this modal.
+    const unClear = listen('modal-clear', () => {
+      if (!stale) setCurrent(null);
+    });
     return () => {
       stale = true;
-      un.then((fn) => fn());
+      unRefresh.then((fn) => fn());
+      unClear.then((fn) => fn());
     };
   }, []);
 

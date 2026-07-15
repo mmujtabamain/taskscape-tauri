@@ -15,6 +15,18 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
+  // Two HTML entries: the main task-manager window (`index.html`) and the shared
+  // auxiliary panels (`panels.html` — modal / overlay / settings). Splitting them
+  // keeps a panel's bundle free of the whole main app.
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        panels: fileURLToPath(new URL("./panels.html", import.meta.url)),
+      },
+    },
+  },
+
   resolve: {
     // Shared widgets in ../common-ui/src, resolved from source
     // via `@taskscape/common-ui/*`.

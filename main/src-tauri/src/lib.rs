@@ -2,6 +2,7 @@ mod panels;
 mod power;
 
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::{extract::State as AxumState, http::StatusCode, routing::post, Router};
@@ -43,6 +44,16 @@ struct ModalState(Mutex<Option<(String, serde_json::Value)>>);
 /// window, fetched by that window on load / on refresh. Like the modal window, it
 /// is a single reused panel that is only ever hidden, never destroyed.
 struct OverlayState(Mutex<Option<serde_json::Value>>);
+
+/// Whether the (warmed, reused) settings panel is currently open. Unlike modal /
+/// overlay it carries no props, but it still needs an open flag: the panel is
+/// created hidden at startup, so its frontend must know not to present itself
+/// until `open_settings` has actually asked for it.
+struct SettingsState(AtomicBool);
+
+/// Set once the main window has been revealed (by `reveal_main` or the startup
+/// fallback), so the two paths never double-reveal it.
+static MAIN_REVEALED: AtomicBool = AtomicBool::new(false);
 
 /// Sender into the note-write queue. Autosave streams `update_note` calls as the
 /// user types; enqueuing them (instead of writing inline) lets a single worker
@@ -673,9 +684,72 @@ fn reveal_attachment(link_type: String, location: String) -> Result<(), String> 
     tauri_plugin_opener::reveal_item_in_dir(&target).map_err(err)
 }
 
-/// Show a modal in the shared panel window (created on first use, then reused
-/// hidden — never destroyed). Its outcome comes back to "main" as a
-/// `modal-result:{id}` event via `close_modal`.
+/// Build one auxiliary panel window — hidden, primed transparent, and styled as a
+/// rounded NSPanel. Shared by startup warming ([`warm_panels`]) and the lazy
+/// fallback in the `open_*` commands. All three panels load the shared
+/// `panels.html` bundle (separate from the main app's), routed by URL fragment.
+/// `min` sets an optional minimum inner size (settings only).
+fn build_panel(
+    app: &AppHandle,
+    label: &str,
+    fragment: &str,
+    title: &str,
+    width: f64,
+    height: f64,
+    resizable: bool,
+    min: Option<(f64, f64)>,
+) -> Result<tauri::WebviewWindow, String> {
+    let url = format!("panels.html{fragment}");
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
+        .title(title)
+        .inner_size(width, height)
+        .resizable(resizable)
+        .minimizable(false)
+        .maximizable(false)
+        .decorations(false)
+        .shadow(true)
+        .visible(false)
+        .skip_taskbar(true);
+    if let Some((mw, mh)) = min {
+        builder = builder.min_inner_size(mw, mh);
+    }
+    let window = builder.build().map_err(err)?;
+    // AppKit is main-thread-only; commands (and setup) run off it.
+    let w = window.clone();
+    window
+        .run_on_main_thread(move || panels::style_panel(&w))
+        .map_err(err)?;
+    Ok(window)
+}
+
+/// Pre-build the modal / overlay / settings panels at startup (hidden) so the
+/// first time one is opened it's an instant fade-in rather than a cold webview
+/// boot. Errors are logged, not fatal — the `open_*` commands rebuild on demand.
+fn warm_panels(app: &AppHandle) {
+    let panels = [
+        ("modal", "#modal", "", 420., 240., false, None),
+        ("overlay", "#overlay", "Filters", 340., 420., false, None),
+        (
+            "settings",
+            "#settings",
+            "Settings",
+            640.,
+            520.,
+            true,
+            Some((640., 520.)),
+        ),
+    ];
+    for (label, fragment, title, w, h, resizable, min) in panels {
+        if let Err(e) = build_panel(app, label, fragment, title, w, h, resizable, min) {
+            eprintln!("[taskscape-main] failed to warm {label} panel: {e}");
+        }
+    }
+}
+
+/// Show a modal in the shared panel window (warmed at startup, then reused hidden
+/// — never destroyed). Its outcome comes back to "main" as a `modal-result:{id}`
+/// event via `close_modal`. The frontend reveals it (fade-in) via `present_window`
+/// once it has measured its content.
 #[tauri::command]
 fn open_modal(
     app: AppHandle,
@@ -694,28 +768,10 @@ fn open_modal(
             );
         }
     }
-    if app.get_webview_window("modal").is_some() {
-        app.emit_to("modal", "modal-refresh", &id).map_err(err)?;
-        return Ok(());
+    if app.get_webview_window("modal").is_none() {
+        build_panel(&app, "modal", "#modal", "", 420., 240., false, None)?;
     }
-    let window =
-        WebviewWindowBuilder::new(&app, "modal", WebviewUrl::App("index.html#modal".into()))
-            .title("")
-            .inner_size(420., 240.)
-            .resizable(false)
-            .minimizable(false)
-            .maximizable(false)
-            .decorations(false)
-            .shadow(true)
-            .visible(false)
-            .skip_taskbar(true)
-            .build()
-            .map_err(err)?;
-    // AppKit is main-thread-only; commands run on a worker thread.
-    let w = window.clone();
-    window
-        .run_on_main_thread(move || panels::style_panel(&w))
-        .map_err(err)?;
+    app.emit_to("modal", "modal-refresh", &id).map_err(err)?;
     Ok(())
 }
 
@@ -732,9 +788,10 @@ fn modal_current(state: State<'_, ModalState>) -> Result<serde_json::Value, Stri
         .ok_or_else(|| "no modal pending".to_string())
 }
 
-/// Called by a modal/settings window once its content is measured: size it,
-/// center it over the main window, and only then reveal — so the user never
-/// sees it resize or jump.
+/// Called by a modal/overlay/settings window once its content is measured: size
+/// it, center it over the main window, then show it — so the user never sees it
+/// resize or jump. The window is warmed hidden, so `show()` reveals it already
+/// laid out at the right size.
 #[tauri::command]
 fn present_window(
     window: tauri::WebviewWindow,
@@ -778,17 +835,19 @@ fn close_modal(
         *pending = None;
     }
     drop(pending);
-    // Hide, never destroy — see ModalState.
+    // Hide, never destroy — see ModalState. `modal-clear` empties the panel's
+    // content so the reused window doesn't hold this modal for the next open.
     if let Some(window) = app.get_webview_window("modal") {
-        let _ = window.hide();
+        let _ = app.emit_to("modal", "modal-clear", ());
+        panels::hide_panel(&window);
     }
     Ok(())
 }
 
 /// Open the per-pane filter overlay window for the given props (pane id + name +
-/// its current view). Reuses the single hidden panel; a first open builds it.
-/// Edits stream back to the main window as `overlay-apply` events (from the
-/// overlay's frontend), so there is no request/response result to plumb here.
+/// its current view). Reuses the warmed hidden panel (rebuilt on demand if it's
+/// somehow gone); the frontend reveals it via `present_window`. Edits stream back
+/// to the main window as `overlay-apply` events, so there is no result to plumb.
 #[tauri::command]
 fn open_overlay(
     app: AppHandle,
@@ -796,32 +855,10 @@ fn open_overlay(
     props: serde_json::Value,
 ) -> Result<(), String> {
     *state.0.lock().unwrap() = Some(props);
-    if let Some(window) = app.get_webview_window("overlay") {
-        app.emit_to("overlay", "overlay-refresh", ()).map_err(err)?;
-        window.show().map_err(err)?;
-        window.set_focus().map_err(err)?;
-        return Ok(());
+    if app.get_webview_window("overlay").is_none() {
+        build_panel(&app, "overlay", "#overlay", "Filters", 340., 420., false, None)?;
     }
-    let window = WebviewWindowBuilder::new(
-        &app,
-        "overlay",
-        WebviewUrl::App("index.html#overlay".into()),
-    )
-    .title("Filters")
-    .inner_size(340., 420.)
-    .resizable(false)
-    .minimizable(false)
-    .maximizable(false)
-    .decorations(false)
-    .shadow(true)
-    .visible(false)
-    .skip_taskbar(true)
-    .build()
-    .map_err(err)?;
-    let w = window.clone();
-    window
-        .run_on_main_thread(move || panels::style_panel(&w))
-        .map_err(err)?;
+    app.emit_to("overlay", "overlay-refresh", ()).map_err(err)?;
     Ok(())
 }
 
@@ -838,43 +875,55 @@ fn overlay_current(state: State<'_, OverlayState>) -> Result<serde_json::Value, 
 }
 
 #[tauri::command]
-fn close_overlay(app: AppHandle) -> Result<(), String> {
+fn close_overlay(app: AppHandle, state: State<'_, OverlayState>) -> Result<(), String> {
+    *state.0.lock().unwrap() = None;
     if let Some(window) = app.get_webview_window("overlay") {
-        let _ = window.hide();
+        let _ = app.emit_to("overlay", "overlay-clear", ());
+        panels::hide_panel(&window);
     }
     Ok(())
 }
 
-/// Show the settings window, creating it on first use. It stays hidden until
-/// its content calls `present_window`.
+/// Mark the (warmed, reused) settings panel open and ask its frontend to present
+/// itself. It's built at startup hidden; rebuilt on demand only if it's gone.
 #[tauri::command]
-fn open_settings(app: AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("settings") {
-        window.show().map_err(err)?;
-        window.set_focus().map_err(err)?;
+fn open_settings(app: AppHandle, state: State<'_, SettingsState>) -> Result<(), String> {
+    state.0.store(true, Ordering::SeqCst);
+    if app.get_webview_window("settings").is_none() {
+        build_panel(
+            &app,
+            "settings",
+            "#settings",
+            "Settings",
+            640.,
+            520.,
+            true,
+            Some((640., 520.)),
+        )?;
+    }
+    app.emit_to("settings", "settings-refresh", ()).map_err(err)?;
+    Ok(())
+}
+
+/// Whether the settings panel is currently open — queried by its frontend on
+/// mount so a warmed-but-not-yet-opened panel knows not to present itself.
+#[tauri::command]
+fn settings_current(state: State<'_, SettingsState>) -> bool {
+    state.0.load(Ordering::SeqCst)
+}
+
+/// Reveal the main window once its webview signals it has loaded. Idempotent
+/// (and raced against a startup fallback) via [`MAIN_REVEALED`], so the window is
+/// shown exactly once.
+#[tauri::command]
+fn reveal_main(app: AppHandle) -> Result<(), String> {
+    if MAIN_REVEALED.swap(true, Ordering::SeqCst) {
         return Ok(());
     }
-    let window = WebviewWindowBuilder::new(
-        &app,
-        "settings",
-        WebviewUrl::App("index.html#settings".into()),
-    )
-    .title("Settings")
-    .inner_size(640., 520.)
-    .min_inner_size(640., 520.)
-    .resizable(true)
-    .minimizable(false)
-    .maximizable(false)
-    .decorations(false)
-    .shadow(true)
-    .visible(false)
-    .skip_taskbar(true)
-    .build()
-    .map_err(err)?;
-    let w = window.clone();
-    window
-        .run_on_main_thread(move || panels::style_panel(&w))
-        .map_err(err)?;
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().map_err(err)?;
+        window.set_focus().map_err(err)?;
+    }
     Ok(())
 }
 
@@ -953,6 +1002,7 @@ pub fn run() {
         .manage(store)
         .manage(ModalState(Mutex::new(None)))
         .manage(OverlayState(Mutex::new(None)))
+        .manage(SettingsState(AtomicBool::new(false)))
         .manage(NoteQueue(note_tx))
         .setup(move |app| {
             #[cfg(target_os = "macos")]
@@ -973,7 +1023,27 @@ pub fn run() {
                 // ...and make the webview itself transparent while it loads, so
                 // its default white doesn't cover that themed background.
                 panels::disable_webview_white_background(&window);
+                // The window starts hidden (tauri.conf `visible: false`) and is
+                // shown by `reveal_main` once its webview has loaded.
             }
+
+            // Warm the auxiliary panels now (hidden) so the first modal / filter /
+            // settings open is an instant fade-in, not a cold webview boot.
+            warm_panels(app.handle());
+
+            // Safety net: if the frontend never calls `reveal_main` (a webview that
+            // failed to load), show the main window anyway so the app isn't stuck
+            // invisible. Whichever path fires first wins via `MAIN_REVEALED`.
+            let fallback = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(4));
+                if !MAIN_REVEALED.swap(true, Ordering::SeqCst) {
+                    if let Some(window) = fallback.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            });
 
             // Extra route so the tray process can ask this window to reload live.
             let handle = app.handle().clone();
@@ -1056,24 +1126,42 @@ pub fn run() {
                 });
             }
             // Panels hide instead of closing: destroying a class-swapped
-            // NSPanel aborts with a foreign exception during teardown.
+            // NSPanel aborts with a foreign exception during teardown. Each also
+            // clears its content and its pending state, then fades out — mirroring
+            // the `close_*` commands, for the native (⌘W / settings close) path.
             ("modal" | "settings" | "overlay", WindowEvent::CloseRequested { api, .. }) => {
                 api.prevent_close();
-                if window.label() == "modal" {
-                    let pending = window.state::<ModalState>().0.lock().unwrap().take();
-                    if let Some((id, _)) = pending {
-                        let _ = window.app_handle().emit_to(
-                            "main",
-                            &format!("modal-result:{id}"),
-                            serde_json::json!({ "buttonId": null }),
-                        );
+                let app = window.app_handle();
+                let label = window.label().to_string();
+                match label.as_str() {
+                    "modal" => {
+                        let pending = window.state::<ModalState>().0.lock().unwrap().take();
+                        if let Some((id, _)) = pending {
+                            let _ = app.emit_to(
+                                "main",
+                                &format!("modal-result:{id}"),
+                                serde_json::json!({ "buttonId": null }),
+                            );
+                        }
+                        let _ = app.emit_to("modal", "modal-clear", ());
                     }
+                    "overlay" => {
+                        *window.state::<OverlayState>().0.lock().unwrap() = None;
+                        let _ = app.emit_to("overlay", "overlay-clear", ());
+                    }
+                    "settings" => {
+                        window.state::<SettingsState>().0.store(false, Ordering::SeqCst);
+                        let _ = app.emit_to("settings", "settings-clear", ());
+                    }
+                    _ => {}
                 }
-                let _ = window.hide();
+                if let Some(webview) = app.get_webview_window(&label) {
+                    panels::hide_panel(&webview);
+                }
                 // Settings may have rebound hotkeys: tell this window's frontend
                 // to rebuild its key map, and the tray to re-register its globals.
-                if window.label() == "settings" {
-                    let _ = window.app_handle().emit_to("main", "hotkeys-changed", ());
+                if label == "settings" {
+                    let _ = app.emit_to("main", "hotkeys-changed", ());
                     tauri::async_runtime::spawn(async {
                         let _ = server::client::post_json(
                             TRAY_PORT,
@@ -1141,6 +1229,8 @@ pub fn run() {
             overlay_current,
             close_overlay,
             open_settings,
+            settings_current,
+            reveal_main,
             set_window_theme,
             is_low_power_mode,
         ])

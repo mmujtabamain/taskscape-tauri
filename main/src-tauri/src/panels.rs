@@ -227,3 +227,9 @@ fn panel_class() -> *const objc2::runtime::AnyClass {
         builder.register() as *const AnyClass as usize
     }) as *const AnyClass
 }
+
+/// Hide a reused panel window instantly. It is only ever hidden, never destroyed
+/// (destroying a class-swapped NSPanel aborts during teardown).
+pub fn hide_panel(window: &tauri::WebviewWindow) {
+    let _ = window.hide();
+}

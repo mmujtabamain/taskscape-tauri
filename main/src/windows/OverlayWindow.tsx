@@ -44,10 +44,16 @@ export function OverlayWindow() {
         })
         .catch(() => {});
     fetch();
-    const un = listen('overlay-refresh', fetch);
+    const unRefresh = listen('overlay-refresh', fetch);
+    // The panel is reused (hidden, not destroyed); clear its content on close so
+    // the next open can't flash the previous pane's filters while it fades out.
+    const unClear = listen('overlay-clear', () => {
+      if (!stale) setProps(null);
+    });
     return () => {
       stale = true;
-      un.then((fn) => fn());
+      unRefresh.then((fn) => fn());
+      unClear.then((fn) => fn());
     };
   }, []);
 
