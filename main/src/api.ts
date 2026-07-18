@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { HotkeyBinding } from '@taskscape/common-ui/hotkeys';
 import type { Attachment, LinkType } from '@taskscape/common-ui/types';
+import type { ModalResult } from './lib/modal';
 
 export type { Attachment, HotkeyBinding, LinkType };
 
@@ -152,11 +153,9 @@ export const api = {
   resetHotkey: (id: string) => invoke<void>('reset_hotkey', { id }),
 
   // windows (modals, settings)
-  openModal: (id: string, props: unknown) =>
-    invoke<void>('open_modal', { id, props }),
-  modalCurrent: () => invoke<unknown>('modal_current'),
-  closeModal: (id: string, result: unknown) =>
-    invoke<void>('close_modal', { id, result }),
+  /** Spawn the Slint modal helper and resolve with its result (the command
+   *  awaits the helper's stdout, so this promise settles when the modal closes). */
+  openModal: (props: unknown) => invoke<ModalResult>('open_modal', { props }),
   presentWindow: (width: number, height: number) =>
     invoke<void>('present_window', { width, height }),
   openSettings: () => invoke<void>('open_settings'),
@@ -165,10 +164,9 @@ export const api = {
   /** Reveal the main window once its webview has loaded. Idempotent. */
   revealMain: () => invoke<void>('reveal_main'),
 
-  // filter overlay window (per-pane sort/filter, edited in its own window)
+  // filter overlay window (per-pane sort/filter, edited in its own Slint helper;
+  // the helper streams each change back and main re-emits it as `overlay-apply`)
   openOverlay: (props: unknown) => invoke<void>('open_overlay', { props }),
-  overlayCurrent: () => invoke<unknown>('overlay_current'),
-  closeOverlay: () => invoke<void>('close_overlay'),
   setWindowTheme: (dark: boolean) => invoke<void>('set_window_theme', { dark }),
   /** Whether macOS is in Low Power Mode right now (always false off macOS). */
   isLowPowerMode: () => invoke<boolean>('is_low_power_mode'),

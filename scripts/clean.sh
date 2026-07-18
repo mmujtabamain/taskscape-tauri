@@ -24,8 +24,9 @@ run() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Rust crates (each app has its own target/; they share the ../../common crate).
-RUST_CRATES=(common main/src-tauri tray/src-tauri)
+# Rust crates (each app has its own target/; they share the ../../common crate.
+# `modals` is the standalone Slint modal/overlay helper).
+RUST_CRATES=(common main/src-tauri tray/src-tauri modals)
 
 # Vite build output + dev caches live per workspace (common-ui is source-only).
 VITE_DIRS=(main/dist tray/dist main/node_modules/.vite tray/node_modules/.vite)

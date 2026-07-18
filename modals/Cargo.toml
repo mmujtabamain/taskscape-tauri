@@ -1,0 +1,22 @@
+[package]
+name = "taskscape-modals"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone Slint modal + filter-overlay helper for Taskscape"
+
+[[bin]]
+name = "taskscape-modals"
+path = "src/main.rs"
+
+[build-dependencies]
+slint-build = "1"
+
+[dependencies]
+slint = { version = "1", features = ["raw-window-handle-06"] }
+raw-window-handle = "0.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+taskscape-common = { path = "../common" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"

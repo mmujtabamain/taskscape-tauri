@@ -47,11 +47,21 @@ find_app() {
 build_app main
 build_app tray
 
+# The standalone Slint modal/overlay helper — a plain executable (not a Tauri
+# app), so it builds with cargo, not `tauri build`.
+echo "==> Building modals helper"
+(cd "$ROOT/modals" && cargo build --release)
+MODALS_BIN="$ROOT/modals/target/release/taskscape-modals"
+
 MAIN_APP="$(find_app main)"
 TRAY_APP="$(find_app tray)"
 
 if [ -z "$MAIN_APP" ] || [ -z "$TRAY_APP" ]; then
   echo "error: could not locate built .app bundles" >&2
+  exit 1
+fi
+if [ ! -x "$MODALS_BIN" ]; then
+  echo "error: could not locate built modals helper at $MODALS_BIN" >&2
   exit 1
 fi
 
@@ -60,6 +70,13 @@ HELPERS="$MAIN_APP/Contents/Library/LoginItems"
 rm -rf "$HELPERS"
 mkdir -p "$HELPERS"
 cp -R "$TRAY_APP" "$HELPERS/"
+
+# The main app resolves this at Contents/Helpers/taskscape-modals via
+# current_exe() (see modal_helper_path() in main/src-tauri/src/lib.rs).
+echo "==> Embedding modals helper inside main app"
+MODALS_DIR="$MAIN_APP/Contents/Helpers"
+mkdir -p "$MODALS_DIR"
+cp "$MODALS_BIN" "$MODALS_DIR/taskscape-modals"
 
 echo "==> Assembling DMG"
 rm -rf "$STAGE" "$DMG"

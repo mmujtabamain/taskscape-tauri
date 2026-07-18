@@ -10,7 +10,10 @@ pub mod attachments;
 #[allow(unused_imports)]
 mod entities;
 pub mod hotkeys;
+#[cfg(target_os = "macos")]
+pub mod macos;
 mod migrations;
+pub mod modal_ipc;
 pub mod models;
 pub mod names;
 pub mod paths;

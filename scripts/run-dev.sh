@@ -37,6 +37,13 @@ if [ ! -d "$ROOT_DIR/node_modules" ]; then
   )
 fi
 
+# Build the standalone Slint modal/overlay helper once so the main app can spawn
+# it in dev, and point the main process at the built binary (packaged builds find
+# it under Contents/Helpers instead — see scripts/make-app.sh).
+log "[modals] building Slint helper…"
+run cargo build --manifest-path "$ROOT_DIR/modals/Cargo.toml"
+export TASKSCAPE_MODALS_BIN="$ROOT_DIR/modals/target/debug/taskscape-modals"
+
 run_app() {
   local dir="$1"
   log "[$dir] starting tauri dev…"
