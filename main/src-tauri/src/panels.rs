@@ -1,50 +1,81 @@
-//! macOS window mechanics for the main window's custom chrome and the frameless
-//! settings panel. The AppKit tricks live in the shared `taskscape_common::macos`
-//! module (operating on a raw `NSWindow`) so the standalone Slint modal binary
-//! reuses the exact same chrome; these are thin Tauri wrappers that hand it the
-//! window's `ns_window()`.
+//! macOS window mechanics: the main window's custom chrome and the frameless
+//! modal/settings panels. Everything here is public AppKit API.
 
 #[cfg(target_os = "macos")]
-use objc2::runtime::AnyObject;
+use std::sync::OnceLock;
 
-/// Extract the raw `NSWindow` pointer from a Tauri window, or null if unavailable.
-#[cfg(target_os = "macos")]
-fn ns_window(window: &tauri::WebviewWindow) -> *mut AnyObject {
-    window
-        .ns_window()
-        .map(|p| p as *mut AnyObject)
-        .unwrap_or(std::ptr::null_mut())
-}
-
-/// Hide the native traffic lights on the main window: the frontend draws its own
-/// controls, while the Overlay titlebar style keeps the native rounded corners,
-/// shadow, and resize behavior.
+/// Hide the native traffic lights on the main window: the frontend draws its
+/// own controls, while the Overlay titlebar style keeps the native rounded
+/// corners, shadow, and resize behavior.
 pub fn hide_traffic_lights(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
-    taskscape_common::macos::hide_traffic_lights(ns_window(window));
+    {
+        use objc2::{msg_send, runtime::AnyObject};
+
+        let Ok(ns_window) = window.ns_window() else {
+            return;
+        };
+        let ns_window = ns_window as *mut AnyObject;
+        // NSWindowButton: 0 = close, 1 = miniaturize, 2 = zoom.
+        for kind in 0usize..=2 {
+            unsafe {
+                let button: *mut AnyObject = msg_send![ns_window, standardWindowButton: kind];
+                if !button.is_null() {
+                    let _: () = msg_send![button, setHidden: true];
+                }
+            }
+        }
+    }
     #[cfg(not(target_os = "macos"))]
     let _ = window;
 }
 
-/// Paint the opaque main window's native background to match the resolved theme.
-/// Call only for the main window: the frameless settings panel keeps a
-/// `clearColor` background so its rounded-corner mask stays transparent (see
-/// [`style_panel`]). Must run on the main thread (AppKit). No-op off macOS.
+/// The main window's native background, matched to `--bg-window` in `index.css`
+/// (near-white in light, cool graphite in dark). Painting it means the load gap
+/// on launch — and the window edges during a live resize — show the themed
+/// surface instead of the default white, before/behind the webview paints.
+/// sRGB components.
+#[cfg(target_os = "macos")]
+const WINDOW_BG_LIGHT: (f64, f64, f64) = (0.955, 0.958, 0.964);
+#[cfg(target_os = "macos")]
+const WINDOW_BG_DARK: (f64, f64, f64) = (0.087, 0.091, 0.098);
+
+/// Paint the main window's native background to match the resolved theme. Call
+/// only for the opaque main window: the modal/settings panels keep a `clearColor`
+/// background so their rounded-corner mask stays transparent (see [`round_corners`]).
+/// Must run on the main thread (AppKit). No-op off macOS.
 pub fn set_window_background(window: &tauri::WebviewWindow, dark: bool) {
     #[cfg(target_os = "macos")]
-    taskscape_common::macos::set_window_background(ns_window(window), dark);
+    {
+        use objc2::{msg_send, runtime::AnyObject};
+
+        let (r, g, b) = if dark { WINDOW_BG_DARK } else { WINDOW_BG_LIGHT };
+        let Ok(ns_window) = window.ns_window() else {
+            return;
+        };
+        let ns_window = ns_window as *mut AnyObject;
+        unsafe {
+            let color: *mut AnyObject = msg_send![
+                objc2::class!(NSColor),
+                colorWithSRGBRed: r,
+                green: g,
+                blue: b,
+                alpha: 1.0_f64,
+            ];
+            let _: () = msg_send![ns_window, setBackgroundColor: color];
+        }
+    }
     #[cfg(not(target_os = "macos"))]
     let _ = (window, dark);
 }
 
-/// Stop the WKWebView from painting its own opaque white background, so the themed
-/// (opaque) `NSWindow` background from [`set_window_background`] shows through the
-/// load gap instead of a white flash. `drawsBackground` is the private KVC key
-/// wry's `transparent` feature flips at creation — set here directly at runtime so
-/// the window itself needn't become transparent (which would disturb the Overlay
-/// titlebar chrome). Runs on the webview's main thread via `with_webview`. No-op
-/// off macOS. This one is webview-specific, so it stays here rather than in the
-/// shared `macos` module.
+/// Stop the WKWebView from painting its own opaque white background, so the
+/// themed (opaque) `NSWindow` background from [`set_window_background`] shows
+/// through the load gap instead of a white flash. `drawsBackground` is the
+/// private KVC key wry's `transparent` feature flips at creation — set here
+/// directly at runtime so the window itself needn't become transparent (which
+/// would disturb the Overlay titlebar chrome). Runs on the webview's main
+/// thread via `with_webview`. No-op off macOS.
 pub fn disable_webview_white_background(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
     {
@@ -73,24 +104,128 @@ pub fn disable_webview_white_background(window: &tauri::WebviewWindow) {
     let _ = window;
 }
 
-/// Turn a frameless auxiliary window (the settings panel) into a native panel with
+/// Turn a frameless auxiliary window (modal/settings) into a native panel with
 /// rounded corners. No-op on other platforms — there the window stays a plain
 /// frameless window.
 pub fn style_panel(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
-    taskscape_common::macos::style_panel(ns_window(window));
+    {
+        convert_to_panel(window);
+        round_corners(window);
+    }
     #[cfg(not(target_os = "macos"))]
     let _ = window;
 }
 
 /// Recompute the window shadow. A panel shown right after [`style_panel`] still
-/// carries the shadow of its original square frame; invalidating after the reveal
-/// makes it hug the rounded mask.
+/// carries the shadow of its original square frame; invalidating after the
+/// reveal makes it hug the rounded mask.
 pub fn invalidate_shadow(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
-    taskscape_common::macos::invalidate_shadow(ns_window(window));
+    {
+        use objc2::{msg_send, runtime::AnyObject};
+
+        let Ok(ns_window) = window.ns_window() else {
+            return;
+        };
+        let ns_window = ns_window as *mut AnyObject;
+        unsafe {
+            let _: () = msg_send![ns_window, invalidateShadow];
+        }
+    }
     #[cfg(not(target_os = "macos"))]
     let _ = window;
+}
+
+/// macOS: round the borderless panel's corners. A non-opaque window with a
+/// clear background plus a masked content-view layer clips the (opaque)
+/// webview to the rounded shape, and the window shadow then follows it.
+#[cfg(target_os = "macos")]
+fn round_corners(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    const CORNER_RADIUS: f64 = 13.0;
+
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window as *mut AnyObject;
+    unsafe {
+        let _: () = msg_send![ns_window, setOpaque: false];
+        let clear: *mut AnyObject = msg_send![objc2::class!(NSColor), clearColor];
+        let _: () = msg_send![ns_window, setBackgroundColor: clear];
+        let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+        if content_view.is_null() {
+            return;
+        }
+        let _: () = msg_send![content_view, setWantsLayer: true];
+        let layer: *mut AnyObject = msg_send![content_view, layer];
+        if !layer.is_null() {
+            let _: () = msg_send![layer, setCornerRadius: CORNER_RADIUS];
+            let _: () = msg_send![layer, setMasksToBounds: true];
+        }
+    }
+}
+
+/// macOS: swap the window's backing `NSWindow` for a non-activating `NSPanel`
+/// — the class AppKit itself uses for this kind of auxiliary window.
+///
+/// The swap is done in place with `object_setClass`: `NSPanel` adds no instance
+/// variables over `NSWindow`, so the object keeps Tao's (larger) allocation and
+/// we simply stop using its extra `focusable` ivar. We re-provide
+/// `canBecomeKeyWindow` because a borderless panel answers it `NO` by default,
+/// which would leave the panel's inputs unfocusable.
+#[cfg(target_os = "macos")]
+fn convert_to_panel(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    // NSWindowStyleMaskNonactivatingPanel — the bit that lets a panel receive
+    // keyboard input without activating its owning application.
+    const NS_NONACTIVATING_PANEL: usize = 1 << 7;
+
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window as *mut AnyObject;
+    unsafe {
+        // Raw `object_setClass` rather than objc2's `AnyObject::set_class`: the
+        // latter debug-asserts equal instance sizes, which fails because Tao's
+        // window subclass carries an extra `focusable` ivar. Shrinking the class
+        // over a larger allocation is harmless here.
+        objc2::ffi::object_setClass(ns_window, panel_class());
+        let mask: usize = msg_send![ns_window, styleMask];
+        let _: () = msg_send![ns_window, setStyleMask: mask | NS_NONACTIVATING_PANEL];
+        // Panels hide themselves when their app deactivates; a modal that
+        // vanished on ⌘Tab would strand its pending answer, so opt out.
+        let _: () = msg_send![ns_window, setHidesOnDeactivate: false];
+    }
+}
+
+/// The lazily-registered `NSPanel` subclass used by [`convert_to_panel`], whose
+/// only job is to answer `canBecomeKeyWindow` with `YES` (the borderless panel
+/// default is `NO`). Returned as a raw pointer so it can cross the `OnceLock`.
+#[cfg(target_os = "macos")]
+fn panel_class() -> *const objc2::runtime::AnyClass {
+    use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
+
+    static CLASS: OnceLock<usize> = OnceLock::new();
+
+    extern "C" fn yes(_this: &AnyObject, _cmd: Sel) -> Bool {
+        Bool::YES
+    }
+
+    *CLASS.get_or_init(|| {
+        let superclass = objc2::class!(NSPanel);
+        let mut builder = ClassBuilder::new(c"TaskscapeModalPanel", superclass)
+            .expect("failed to register TaskscapeModalPanel");
+        unsafe {
+            builder.add_method(
+                objc2::sel!(canBecomeKeyWindow),
+                yes as extern "C" fn(_, _) -> _,
+            );
+        }
+        builder.register() as *const AnyClass as usize
+    }) as *const AnyClass
 }
 
 /// Hide a reused panel window instantly. It is only ever hidden, never destroyed

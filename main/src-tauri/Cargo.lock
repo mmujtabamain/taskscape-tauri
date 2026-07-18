@@ -4592,7 +4592,6 @@ dependencies = [
  "axum",
  "dirs 5.0.1",
  "include_dir",
- "objc2",
  "reqwest 0.12.28",
  "sea-orm",
  "serde",
@@ -4615,7 +4614,6 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
- "tokio",
 ]
 
 [[package]]

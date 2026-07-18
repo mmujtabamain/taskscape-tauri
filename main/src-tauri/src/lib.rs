@@ -13,9 +13,7 @@ use tauri::{
     WebviewWindowBuilder, WindowEvent,
 };
 use taskscape_common::{
-    hotkeys,
-    modal_ipc::{Launch, MainFrame, ModalResult, Outbound},
-    server, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT, TRAY_PORT,
+    hotkeys, server, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT, TRAY_PORT,
 };
 
 fn err<E: std::fmt::Display>(e: E) -> String {
@@ -35,28 +33,17 @@ async fn resolve_dark(store: &Store, window: &tauri::WebviewWindow) -> bool {
     }
 }
 
-/// A pre-warmed Slint helper process: its window is created, styled, and hidden
-/// off-screen, and it is blocked reading its stdin, waiting for a `Launch`. Held
-/// as separate pieces so we can write the payload (stdin) and drain the outcome
-/// (stdout) while keeping `child` alive (and `kill_on_drop`).
-struct WarmChild {
-    // Held purely to keep the process alive (and `kill_on_drop`) for as long as
-    // this struct lives; never read directly.
-    #[allow(dead_code)]
-    child: tokio::process::Child,
-    stdin: Option<tokio::process::ChildStdin>,
-    stdout: Option<tokio::process::ChildStdout>,
-}
+/// The pending modal (id + props), if any. One reusable panel window serves
+/// every modal: destroying a class-swapped NSPanel raises an Objective-C
+/// exception during teardown (fatal across the FFI boundary), so — like the
+/// tray's mini bar — the window is only ever hidden, never destroyed. An id
+/// still pending when the window goes away means the modal never answered.
+struct ModalState(Mutex<Option<(String, serde_json::Value)>>);
 
-/// One warm helper kept ready per kind, so opening a dialog is an instant reveal
-/// rather than a cold process/window boot. Each is consumed on open and a fresh
-/// warm replacement is spawned immediately (see `open_modal` / `open_overlay`). A
-/// helper whose parent dies sees its stdin close (EOF) and exits, so none are left
-/// orphaned on quit.
-struct WarmHelpers {
-    modal: Mutex<Option<WarmChild>>,
-    overlay: Mutex<Option<WarmChild>>,
-}
+/// The props (which pane + its current view) for the standalone `overlay` filter
+/// window, fetched by that window on load / on refresh. Like the modal window, it
+/// is a single reused panel that is only ever hidden, never destroyed.
+struct OverlayState(Mutex<Option<serde_json::Value>>);
 
 /// Whether the (warmed, reused) settings panel is currently open. Unlike modal /
 /// overlay it carries no props, but it still needs an open flag: the panel is
@@ -697,10 +684,11 @@ fn reveal_attachment(link_type: String, location: String) -> Result<(), String> 
     tauri_plugin_opener::reveal_item_in_dir(&target).map_err(err)
 }
 
-/// Build the settings panel window — hidden, primed transparent, and styled as a
+/// Build one auxiliary panel window — hidden, primed transparent, and styled as a
 /// rounded NSPanel. Shared by startup warming ([`warm_panels`]) and the lazy
-/// fallback in `open_settings`. Loads the `panels.html` bundle (separate from the
-/// main app's), routed by URL fragment. `min` sets an optional minimum inner size.
+/// fallback in the `open_*` commands. All three panels load the shared
+/// `panels.html` bundle (separate from the main app's), routed by URL fragment.
+/// `min` sets an optional minimum inner size (settings only).
 fn build_panel(
     app: &AppHandle,
     label: &str,
@@ -734,196 +722,70 @@ fn build_panel(
     Ok(window)
 }
 
-/// Pre-build the settings panel at startup (hidden) so its first open is an
-/// instant fade-in rather than a cold webview boot. Errors are logged, not fatal —
-/// `open_settings` rebuilds on demand. Modal + overlay moved to the standalone
-/// Slint helper, so they are no longer webview panels.
+/// Pre-build the modal / overlay / settings panels at startup (hidden) so the
+/// first time one is opened it's an instant fade-in rather than a cold webview
+/// boot. Errors are logged, not fatal — the `open_*` commands rebuild on demand.
 fn warm_panels(app: &AppHandle) {
-    if let Err(e) = build_panel(
-        app,
-        "settings",
-        "#settings",
-        "Settings",
-        640.,
-        520.,
-        true,
-        Some((640., 520.)),
-    ) {
-        eprintln!("[taskscape-main] failed to warm settings panel: {e}");
-    }
-}
-
-/// Resolve the path to the standalone Slint modal helper binary. In dev the
-/// `TASKSCAPE_MODALS_BIN` env var (set by `scripts/run-dev.sh`) points at the
-/// freshly built binary; in a packaged build it sits next to the main executable
-/// at `Taskscape.app/Contents/Helpers/taskscape-modals`.
-fn modal_helper_path() -> std::io::Result<std::path::PathBuf> {
-    use std::io::{Error, ErrorKind};
-
-    if let Ok(p) = std::env::var("TASKSCAPE_MODALS_BIN") {
-        let pb = std::path::PathBuf::from(p);
-        if pb.exists() {
-            return Ok(pb);
+    let panels = [
+        ("modal", "#modal", "", 420., 240., false, None),
+        ("overlay", "#overlay", "Filters", 340., 420., false, None),
+        (
+            "settings",
+            "#settings",
+            "Settings",
+            640.,
+            520.,
+            true,
+            Some((640., 520.)),
+        ),
+    ];
+    for (label, fragment, title, w, h, resizable, min) in panels {
+        if let Err(e) = build_panel(app, label, fragment, title, w, h, resizable, min) {
+            eprintln!("[taskscape-main] failed to warm {label} panel: {e}");
         }
     }
-    let exe = std::env::current_exe()?;
-    let dir = exe
-        .parent()
-        .ok_or_else(|| Error::new(ErrorKind::NotFound, "no exe dir"))?;
-    // Packaged: .../Contents/MacOS/taskscape-main → .../Contents/Helpers/taskscape-modals
-    if let Some(contents) = dir.parent() {
-        let helper = contents.join("Helpers").join("taskscape-modals");
-        if helper.exists() {
-            return Ok(helper);
-        }
-    }
-    // Dev fallback (when run without TASKSCAPE_MODALS_BIN): the main exe lives at
-    // <root>/main/src-tauri/target/<profile>/taskscape-main; the helper is built at
-    // <root>/modals/target/<profile>/taskscape-modals.
-    if let Some(profile) = dir.file_name() {
-        if let Some(root) = dir
-            .parent()
-            .and_then(|p| p.parent())
-            .and_then(|p| p.parent())
-            .and_then(|p| p.parent())
-        {
-            let helper = root
-                .join("modals")
-                .join("target")
-                .join(profile)
-                .join("taskscape-modals");
-            if helper.exists() {
-                return Ok(helper);
-            }
-        }
-    }
-    // Last resort: alongside the main executable.
-    let sibling = dir.join("taskscape-modals");
-    if sibling.exists() {
-        return Ok(sibling);
-    }
-    Err(Error::new(
-        ErrorKind::NotFound,
-        "taskscape-modals helper not found",
-    ))
 }
 
-/// The main window's frame (physical px + scale) so the helper can center itself
-/// over it. Falls back to a zero frame (helper then centers on screen).
-fn main_window_frame(app: &AppHandle) -> MainFrame {
-    if let Some(w) = app.get_webview_window("main") {
-        if let (Ok(pos), Ok(size), Ok(scale)) =
-            (w.outer_position(), w.outer_size(), w.scale_factor())
-        {
-            return MainFrame {
-                x: pos.x,
-                y: pos.y,
-                width: size.width as i32,
-                height: size.height as i32,
-                scale,
-            };
-        }
-    }
-    MainFrame {
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        scale: 1.0,
-    }
-}
-
-/// The resolved dark/light theme for the main window, or light if it's gone.
-async fn resolve_dark_for(app: &AppHandle, store: &Store) -> bool {
-    match app.get_webview_window("main") {
-        Some(w) => resolve_dark(store, &w).await,
-        None => false,
-    }
-}
-
-/// Spawn a pre-warmed helper of `kind` ("modal" | "overlay"): the child creates +
-/// styles its window hidden and blocks on stdin until a payload arrives. No
-/// payload is written here — that happens on open (see [`send_payload`]). Must run
-/// within the tokio runtime (all callers are async commands / tasks).
-fn spawn_warm(kind: &str) -> std::io::Result<WarmChild> {
-    let bin = modal_helper_path()?;
-    let mut child = tokio::process::Command::new(bin)
-        .arg(kind)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .kill_on_drop(true)
-        .spawn()?;
-    let stdin = child.stdin.take();
-    let stdout = child.stdout.take();
-    Ok(WarmChild {
-        child,
-        stdin,
-        stdout,
-    })
-}
-
-/// Write the launch payload to a warm helper's stdin and close it (EOF), so the
-/// child's stdin reader unblocks and shows the dialog.
-async fn send_payload(stdin: Option<tokio::process::ChildStdin>, payload: &Launch) {
-    let Some(mut stdin) = stdin else { return };
-    use tokio::io::AsyncWriteExt;
-    let bytes = serde_json::to_vec(payload).unwrap_or_default();
-    let _ = stdin.write_all(&bytes).await;
-    let _ = stdin.shutdown().await;
-}
-
-/// Read the single `{"type":"result", …}` line the modal helper writes on close.
-/// EOF (crash / kill / no output) reads as a cancel so the caller never hangs.
-async fn read_modal_result(stdout: Option<tokio::process::ChildStdout>) -> ModalResult {
-    use tokio::io::{AsyncBufReadExt, BufReader};
-
-    let Some(stdout) = stdout else {
-        return ModalResult::default();
-    };
-    let mut reader = BufReader::new(stdout);
-    let mut line = String::new();
-    match reader.read_line(&mut line).await {
-        Ok(n) if n > 0 => match serde_json::from_str::<Outbound>(line.trim()) {
-            Ok(Outbound::Result(r)) => r,
-            _ => ModalResult::default(),
-        },
-        _ => ModalResult::default(),
-    }
-}
-
-/// Open a modal: hand a pre-warmed helper the props on stdin, then await its one
-/// result line on stdout — the return value that resolves the frontend's
-/// `openModal` promise. Consumes the warm helper and immediately warms a
-/// replacement. Any spawn/read failure resolves to a cancel so a caller can never
-/// hang.
+/// Show a modal in the shared panel window (warmed at startup, then reused hidden
+/// — never destroyed). Its outcome comes back to "main" as a `modal-result:{id}`
+/// event via `close_modal`. The frontend reveals it (fade-in) via `present_window`
+/// once it has measured its content.
 #[tauri::command]
-async fn open_modal(
+fn open_modal(
     app: AppHandle,
-    store: State<'_, Arc<Store>>,
-    warm: State<'_, WarmHelpers>,
+    state: State<'_, ModalState>,
+    id: String,
     props: serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let dark = resolve_dark_for(&app, &store).await;
-    let payload = Launch {
-        kind: Launch::KIND_MODAL.to_string(),
-        props,
-        main_frame: main_window_frame(&app),
-        dark,
-    };
-    let warmed = warm.modal.lock().unwrap().take();
-    let mut wc = match warmed.or_else(|| spawn_warm(Launch::KIND_MODAL).ok()) {
-        Some(wc) => wc,
-        None => return Ok(serde_json::json!({ "buttonId": null })),
-    };
-    send_payload(wc.stdin.take(), &payload).await;
-    let stdout = wc.stdout.take();
-    // Warm a replacement for next time while the user is busy with this one.
-    if let Ok(next) = spawn_warm(Launch::KIND_MODAL) {
-        *warm.modal.lock().unwrap() = Some(next);
+) -> Result<(), String> {
+    // A modal opened over an unanswered one cancels the first, so the first
+    // caller's pending promise still resolves.
+    if let Some((old_id, _)) = state.0.lock().unwrap().replace((id.clone(), props)) {
+        if old_id != id {
+            let _ = app.emit_to(
+                "main",
+                &format!("modal-result:{old_id}"),
+                serde_json::json!({ "buttonId": null }),
+            );
+        }
     }
-    let result = read_modal_result(stdout).await;
-    drop(wc); // child already exited after printing; kill_on_drop is a no-op here.
-    serde_json::to_value(result).map_err(err)
+    if app.get_webview_window("modal").is_none() {
+        build_panel(&app, "modal", "#modal", "", 420., 240., false, None)?;
+    }
+    app.emit_to("modal", "modal-refresh", &id).map_err(err)?;
+    Ok(())
+}
+
+/// The pending modal (id + props), fetched by the shared modal window on load
+/// and on every `modal-refresh`.
+#[tauri::command]
+fn modal_current(state: State<'_, ModalState>) -> Result<serde_json::Value, String> {
+    state
+        .0
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|(id, props)| serde_json::json!({ "id": id, "props": props }))
+        .ok_or_else(|| "no modal pending".to_string())
 }
 
 /// Called by a modal/overlay/settings window once its content is measured: size
@@ -959,55 +821,66 @@ fn present_window(
     Ok(())
 }
 
-/// Open the per-pane filter overlay: spawn the Slint helper and stream each of its
-/// `{"type":"apply", paneId, view}` lines back to the main window as an
-/// `overlay-apply` event, so the list updates live (the same event/shape the
-/// frontend already consumes). There is no final result; the helper just exits on
-/// close (EOF ends the reader). A new overlay force-terminates the previous one.
 #[tauri::command]
-async fn open_overlay(
+fn close_modal(
     app: AppHandle,
-    store: State<'_, Arc<Store>>,
-    warm: State<'_, WarmHelpers>,
+    state: State<'_, ModalState>,
+    id: String,
+    result: serde_json::Value,
+) -> Result<(), String> {
+    app.emit_to("main", &format!("modal-result:{id}"), result)
+        .map_err(err)?;
+    let mut pending = state.0.lock().unwrap();
+    if pending.as_ref().is_some_and(|(cur, _)| *cur == id) {
+        *pending = None;
+    }
+    drop(pending);
+    // Hide, never destroy — see ModalState. `modal-clear` empties the panel's
+    // content so the reused window doesn't hold this modal for the next open.
+    if let Some(window) = app.get_webview_window("modal") {
+        let _ = app.emit_to("modal", "modal-clear", ());
+        panels::hide_panel(&window);
+    }
+    Ok(())
+}
+
+/// Open the per-pane filter overlay window for the given props (pane id + name +
+/// its current view). Reuses the warmed hidden panel (rebuilt on demand if it's
+/// somehow gone); the frontend reveals it via `present_window`. Edits stream back
+/// to the main window as `overlay-apply` events, so there is no result to plumb.
+#[tauri::command]
+fn open_overlay(
+    app: AppHandle,
+    state: State<'_, OverlayState>,
     props: serde_json::Value,
 ) -> Result<(), String> {
-    let dark = resolve_dark_for(&app, &store).await;
-    let payload = Launch {
-        kind: Launch::KIND_OVERLAY.to_string(),
-        props,
-        main_frame: main_window_frame(&app),
-        dark,
-    };
-    let warmed = warm.overlay.lock().unwrap().take();
-    let mut wc = match warmed.or_else(|| spawn_warm(Launch::KIND_OVERLAY).ok()) {
-        Some(wc) => wc,
-        None => return Ok(()),
-    };
-    send_payload(wc.stdin.take(), &payload).await;
-    let stdout = wc.stdout.take();
-    if let Ok(next) = spawn_warm(Launch::KIND_OVERLAY) {
-        *warm.overlay.lock().unwrap() = Some(next);
+    *state.0.lock().unwrap() = Some(props);
+    if app.get_webview_window("overlay").is_none() {
+        build_panel(&app, "overlay", "#overlay", "Filters", 340., 420., false, None)?;
     }
-    // Reader task owns the child (keeping it alive) and re-emits each streamed
-    // change until the helper exits (EOF = overlay closed).
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let _keep = wc; // hold the child open for the overlay's lifetime
-        use tokio::io::{AsyncBufReadExt, BufReader};
-        let Some(stdout) = stdout else { return };
-        let mut lines = BufReader::new(stdout).lines();
-        while let Ok(Some(line)) = lines.next_line().await {
-            if let Ok(Outbound::Apply { pane_id, view }) =
-                serde_json::from_str::<Outbound>(line.trim())
-            {
-                let _ = app.emit_to(
-                    "main",
-                    "overlay-apply",
-                    serde_json::json!({ "paneId": pane_id, "view": view }),
-                );
-            }
-        }
-    });
+    app.emit_to("overlay", "overlay-refresh", ()).map_err(err)?;
+    Ok(())
+}
+
+/// The pending overlay props, fetched by the overlay window on load and on every
+/// `overlay-refresh`.
+#[tauri::command]
+fn overlay_current(state: State<'_, OverlayState>) -> Result<serde_json::Value, String> {
+    state
+        .0
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "no overlay pending".to_string())
+}
+
+#[tauri::command]
+fn close_overlay(app: AppHandle, state: State<'_, OverlayState>) -> Result<(), String> {
+    *state.0.lock().unwrap() = None;
+    if let Some(window) = app.get_webview_window("overlay") {
+        let _ = app.emit_to("overlay", "overlay-clear", ());
+        panels::hide_panel(&window);
+    }
     Ok(())
 }
 
@@ -1127,10 +1000,8 @@ pub fn run() {
             _ => {}
         })
         .manage(store)
-        .manage(WarmHelpers {
-            modal: Mutex::new(None),
-            overlay: Mutex::new(None),
-        })
+        .manage(ModalState(Mutex::new(None)))
+        .manage(OverlayState(Mutex::new(None)))
         .manage(SettingsState(AtomicBool::new(false)))
         .manage(NoteQueue(note_tx))
         .setup(move |app| {
@@ -1156,21 +1027,9 @@ pub fn run() {
                 // shown by `reveal_main` once its webview has loaded.
             }
 
-            // Warm the settings panel now (hidden) so its first open is instant.
+            // Warm the auxiliary panels now (hidden) so the first modal / filter /
+            // settings open is an instant fade-in, not a cold webview boot.
             warm_panels(app.handle());
-
-            // Pre-warm one Slint modal + one overlay helper (each creates + styles
-            // its window hidden), so the first dialog open is an instant reveal.
-            let warm_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let warm = warm_handle.state::<WarmHelpers>();
-                if let Ok(c) = spawn_warm(Launch::KIND_MODAL) {
-                    *warm.modal.lock().unwrap() = Some(c);
-                }
-                if let Ok(c) = spawn_warm(Launch::KIND_OVERLAY) {
-                    *warm.overlay.lock().unwrap() = Some(c);
-                }
-            });
 
             // Safety net: if the frontend never calls `reveal_main` (a webview that
             // failed to load), show the main window anyway so the app isn't stuck
@@ -1266,30 +1125,52 @@ pub fn run() {
                         .await;
                 });
             }
-            // The settings panel hides instead of closing: destroying a
-            // class-swapped NSPanel aborts with a foreign exception during
-            // teardown. It clears its open flag and content, then fades out —
-            // mirroring the native (⌘W / settings close) path. (Modal + overlay
-            // are now separate Slint processes and manage their own lifecycle.)
-            ("settings", WindowEvent::CloseRequested { api, .. }) => {
+            // Panels hide instead of closing: destroying a class-swapped
+            // NSPanel aborts with a foreign exception during teardown. Each also
+            // clears its content and its pending state, then fades out — mirroring
+            // the `close_*` commands, for the native (⌘W / settings close) path.
+            ("modal" | "settings" | "overlay", WindowEvent::CloseRequested { api, .. }) => {
                 api.prevent_close();
                 let app = window.app_handle();
-                window
-                    .state::<SettingsState>()
-                    .0
-                    .store(false, Ordering::SeqCst);
-                let _ = app.emit_to("settings", "settings-clear", ());
-                if let Some(webview) = app.get_webview_window("settings") {
+                let label = window.label().to_string();
+                match label.as_str() {
+                    "modal" => {
+                        let pending = window.state::<ModalState>().0.lock().unwrap().take();
+                        if let Some((id, _)) = pending {
+                            let _ = app.emit_to(
+                                "main",
+                                &format!("modal-result:{id}"),
+                                serde_json::json!({ "buttonId": null }),
+                            );
+                        }
+                        let _ = app.emit_to("modal", "modal-clear", ());
+                    }
+                    "overlay" => {
+                        *window.state::<OverlayState>().0.lock().unwrap() = None;
+                        let _ = app.emit_to("overlay", "overlay-clear", ());
+                    }
+                    "settings" => {
+                        window.state::<SettingsState>().0.store(false, Ordering::SeqCst);
+                        let _ = app.emit_to("settings", "settings-clear", ());
+                    }
+                    _ => {}
+                }
+                if let Some(webview) = app.get_webview_window(&label) {
                     panels::hide_panel(&webview);
                 }
                 // Settings may have rebound hotkeys: tell this window's frontend
                 // to rebuild its key map, and the tray to re-register its globals.
-                let _ = app.emit_to("main", "hotkeys-changed", ());
-                tauri::async_runtime::spawn(async {
-                    let _ =
-                        server::client::post_json(TRAY_PORT, "/reload-hotkeys", &serde_json::json!({}))
-                            .await;
-                });
+                if label == "settings" {
+                    let _ = app.emit_to("main", "hotkeys-changed", ());
+                    tauri::async_runtime::spawn(async {
+                        let _ = server::client::post_json(
+                            TRAY_PORT,
+                            "/reload-hotkeys",
+                            &serde_json::json!({}),
+                        )
+                        .await;
+                    });
+                }
             }
             _ => {}
         })
@@ -1341,8 +1222,12 @@ pub fn run() {
             set_hotkey,
             reset_hotkey,
             open_modal,
+            modal_current,
             present_window,
+            close_modal,
             open_overlay,
+            overlay_current,
+            close_overlay,
             open_settings,
             settings_current,
             reveal_main,

@@ -1,3 +1,4 @@
+import { once } from '@tauri-apps/api/event';
 import { api } from '../api';
 
 export interface ModalButton {
@@ -38,12 +39,20 @@ export interface ModalResult {
   timedOut?: boolean;
 }
 
-/** Open the standalone Slint modal helper; resolves with its result when a button
- *  is chosen, the timeout fires, or it is dismissed (buttonId: null). The helper
- *  is a separate process — `open_modal` spawns it, awaits its one stdout line, and
- *  returns the result directly, so there's no event round-trip to await here. */
+/** Open a native NSPanel modal window; resolves when a button is chosen,
+ *  the timeout fires, or the panel is dismissed (buttonId: null). */
 export async function openModal(props: ModalProps): Promise<ModalResult> {
-  return api.openModal(props);
+  const id = crypto.randomUUID().slice(0, 8);
+  let resolveResult!: (r: ModalResult) => void;
+  const result = new Promise<ModalResult>((resolve) => {
+    resolveResult = resolve;
+  });
+  // Await the subscription before opening so a fast result can't slip past it.
+  await once<ModalResult>(`modal-result:${id}`, (e) =>
+    resolveResult(e.payload)
+  );
+  await api.openModal(id, props);
+  return result;
 }
 
 export async function confirmModal(opts: {
