@@ -1,4 +1,4 @@
-import { emit, listen } from '@tauri-apps/api/event';
+import { emit } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@taskscape/common-ui/Icon';
@@ -144,36 +144,8 @@ export function SettingsWindow() {
     useState<ScreenshotMode>('fullscreen');
   const [loaded, setLoaded] = useState(false);
   const [presented, setPresented] = useState(false);
-  // The panel is warmed hidden at startup, so it must not present itself until
-  // `open_settings` has actually asked for it (queried on mount, then via the
-  // `settings-refresh` event). `settings-clear` (on close) resets it to hidden.
-  const [open, setOpen] = useState(false);
 
   const presentedRef = useRef(false);
-
-  useEffect(() => {
-    let stale = false;
-    void api
-      .settingsCurrent()
-      .then((o) => {
-        if (!stale) setOpen(o);
-      })
-      .catch(() => {});
-    const unRefresh = listen('settings-refresh', () => {
-      if (!stale) setOpen(true);
-    });
-    const unClear = listen('settings-clear', () => {
-      if (stale) return;
-      setOpen(false);
-      presentedRef.current = false;
-      setPresented(false);
-    });
-    return () => {
-      stale = true;
-      unRefresh.then((fn) => fn());
-      unClear.then((fn) => fn());
-    };
-  }, []);
 
   useEffect(() => {
     let stale = false;
@@ -194,17 +166,17 @@ export function SettingsWindow() {
     };
   }, []);
 
-  // Size, center and fade the window in once it's been opened and settings have
-  // loaded (StrictMode-safe, after fonts settle). The latch is reset on close, so
-  // a later reopen presents again. The window is fixed size; panes scroll.
+  // Size, center and fade the window in once settings have loaded (StrictMode-safe,
+  // after fonts settle). The window is built fresh on open, so this runs once per
+  // window. Fixed size; panes scroll.
   useEffect(() => {
-    if (!open || !loaded || presentedRef.current) return;
+    if (!loaded || presentedRef.current) return;
     presentedRef.current = true;
     void document.fonts.ready.then(() => {
       void api.presentWindow(WIDTH, HEIGHT);
       setPresented(true);
     });
-  }, [open, loaded]);
+  }, [loaded]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

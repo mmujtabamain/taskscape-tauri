@@ -30,8 +30,11 @@ interface UiState {
   dropTarget: DropTarget | null;
   /** Shell overlays. */
   paletteOpen: boolean;
-  cheatOpen: boolean;
   trashOpen: boolean;
+  /** The pane (list id) whose Filter & Sort controls are open in the preview
+   *  panel, or null when the inspector shows. Mutually exclusive with the Trash
+   *  view (opening one closes the other). */
+  filterPaneId: string | null;
   /** A drafted new task shown in the preview with no DB row until it gets
    *  content — the list it will land in (at most one draft at a time). */
   draftListId: string | null;
@@ -46,8 +49,8 @@ interface UiState {
   /** Clear both drag fields at once (dragend). */
   endDrag: () => void;
   setPaletteOpen: (open: boolean) => void;
-  setCheatOpen: (open: boolean) => void;
   setTrashOpen: (open: boolean) => void;
+  setFilterPaneId: (id: string | null) => void;
   setDraftListId: (id: string | null) => void;
 }
 
@@ -63,8 +66,8 @@ export const useUiStore = create<UiState>((set) => ({
   draggingId: null,
   dropTarget: null,
   paletteOpen: false,
-  cheatOpen: false,
   trashOpen: false,
+  filterPaneId: null,
   draftListId: null,
 
   setComposeFor: (id) => set({ composeFor: id }),
@@ -76,7 +79,8 @@ export const useUiStore = create<UiState>((set) => ({
   setDropTarget: (t) => set({ dropTarget: t }),
   endDrag: () => set({ draggingId: null, dropTarget: null }),
   setPaletteOpen: (open) => set({ paletteOpen: open }),
-  setCheatOpen: (open) => set({ cheatOpen: open }),
-  setTrashOpen: (open) => set({ trashOpen: open }),
+  // Trash and the filter panel share the preview slot — opening one closes the other.
+  setTrashOpen: (open) => set(open ? { trashOpen: true, filterPaneId: null } : { trashOpen: false }),
+  setFilterPaneId: (id) => set(id ? { filterPaneId: id, trashOpen: false } : { filterPaneId: null }),
   setDraftListId: (id) => set({ draftListId: id }),
 }));

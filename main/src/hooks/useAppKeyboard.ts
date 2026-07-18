@@ -26,6 +26,7 @@ import { useHistoryStore } from '../stores/history';
 import { useHotkeyStore } from '../stores/hotkeyStore';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useListStore } from '../stores/listStore';
+import { useModalStore } from '../stores/modalStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -39,6 +40,11 @@ import { flattenVisible } from '../stores/visibility';
 export function useAppKeyboard(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A modal is a blocking overlay that owns the keyboard entirely (its own
+      // Escape/Enter and text input live in Modal.tsx) — the global map, which
+      // now shares the main window with it, must defer while one is open.
+      if (useModalStore.getState().current) return;
+
       const el = e.target as HTMLElement;
       const typing =
         el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
@@ -262,12 +268,13 @@ export function useAppKeyboard(): void {
           useUiStore.getState().setTrashOpen(false);
           return;
         }
+        if (useUiStore.getState().filterPaneId) {
+          useUiStore.getState().setFilterPaneId(null);
+          return;
+        }
         if (focusedListId && paneSel(focusedListId).ids.size > 0)
           useSelectionStore.getState().clear(focusedListId);
         else focus(null);
-      } else if (e.key === '?' && !overlayOpen()) {
-        e.preventDefault();
-        useUiStore.getState().setCheatOpen(true);
       } else if (
         e.key.length === 1 &&
         !e.altKey &&

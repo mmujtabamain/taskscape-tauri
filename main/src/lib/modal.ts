@@ -1,5 +1,4 @@
-import { once } from '@tauri-apps/api/event';
-import { api } from '../api';
+import { useModalStore } from '../stores/modalStore';
 
 export interface ModalButton {
   id: string;
@@ -29,30 +28,17 @@ export interface ModalProps {
   input?: ModalInput;
   /** Rendered right-aligned in order; the last one is the default (Enter). */
   buttons: ModalButton[];
-  /** Auto-dismiss after this many ms with { buttonId: null, timedOut: true }. */
-  timeoutMs?: number;
 }
 
 export interface ModalResult {
   buttonId: string | null;
   value?: string;
-  timedOut?: boolean;
 }
 
-/** Open a native NSPanel modal window; resolves when a button is chosen,
- *  the timeout fires, or the panel is dismissed (buttonId: null). */
-export async function openModal(props: ModalProps): Promise<ModalResult> {
-  const id = crypto.randomUUID().slice(0, 8);
-  let resolveResult!: (r: ModalResult) => void;
-  const result = new Promise<ModalResult>((resolve) => {
-    resolveResult = resolve;
-  });
-  // Await the subscription before opening so a fast result can't slip past it.
-  await once<ModalResult>(`modal-result:${id}`, (e) =>
-    resolveResult(e.payload)
-  );
-  await api.openModal(id, props);
-  return result;
+/** Open an in-app modal overlay (rendered by `ModalHost`); resolves when a
+ *  button is chosen, the timeout fires, or it's dismissed (buttonId: null). */
+export function openModal(props: ModalProps): Promise<ModalResult> {
+  return useModalStore.getState().open(props);
 }
 
 export async function confirmModal(opts: {
@@ -61,14 +47,12 @@ export async function confirmModal(opts: {
   icon?: string;
   confirmLabel?: string;
   danger?: boolean;
-  timeoutMs?: number;
 }): Promise<boolean> {
   const res = await openModal({
     icon: opts.icon ?? (opts.danger ? 'delete' : 'help'),
     tone: opts.danger ? 'danger' : 'default',
     title: opts.title,
     message: opts.message,
-    timeoutMs: opts.timeoutMs,
     buttons: [
       { id: 'cancel', label: 'Cancel', variant: 'ghost' },
       {

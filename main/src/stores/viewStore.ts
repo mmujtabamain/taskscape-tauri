@@ -1,7 +1,7 @@
 // Per-pane view options (D.1): how each pane sorts and filters its tasks. This
 // is display-only — it never rewrites stored sort_order; "manual" is the stored
 // order. The richer filters (direction, content, created-date) are edited in the
-// standalone `overlay` filter window and pushed back here per pane.
+// FilterPanel (hosted in the preview panel), which writes here per pane.
 import { create } from 'zustand';
 
 export type SortMode = 'manual' | 'created' | 'alpha' | 'done-last';
@@ -46,7 +46,7 @@ export function isViewActive(v: PaneView): boolean {
 interface ViewState {
   byPane: Record<string, PaneView>;
   get: (paneId: string) => PaneView;
-  /** Replace a pane's whole view (the overlay window sends the full object). */
+  /** Replace a pane's whole view with a full object. */
   set: (paneId: string, view: PaneView) => void;
   /** Merge a partial view (used by quick toggles). */
   patch: (paneId: string, partial: Partial<PaneView>) => void;

@@ -151,24 +151,15 @@ export const api = {
     invoke<void>('set_hotkey', { id, accel }),
   resetHotkey: (id: string) => invoke<void>('reset_hotkey', { id }),
 
-  // windows (modals, settings)
-  openModal: (id: string, props: unknown) =>
-    invoke<void>('open_modal', { id, props }),
-  modalCurrent: () => invoke<unknown>('modal_current'),
-  closeModal: (id: string, result: unknown) =>
-    invoke<void>('close_modal', { id, result }),
+  // windows (settings, overlay) — each built fresh on open (props passed in at
+  // build time) and destroyed on close; results/edits flow back as events.
+  // (Modals aren't windows: they render in-app; see components/Modal.tsx.)
   presentWindow: (width: number, height: number) =>
     invoke<void>('present_window', { width, height }),
   openSettings: () => invoke<void>('open_settings'),
-  /** Whether the settings panel is currently open (it's warmed/hidden at start). */
-  settingsCurrent: () => invoke<boolean>('settings_current'),
   /** Reveal the main window once its webview has loaded. Idempotent. */
   revealMain: () => invoke<void>('reveal_main'),
 
-  // filter overlay window (per-pane sort/filter, edited in its own window)
-  openOverlay: (props: unknown) => invoke<void>('open_overlay', { props }),
-  overlayCurrent: () => invoke<unknown>('overlay_current'),
-  closeOverlay: () => invoke<void>('close_overlay'),
   setWindowTheme: (dark: boolean) => invoke<void>('set_window_theme', { dark }),
   /** Whether macOS is in Low Power Mode right now (always false off macOS). */
   isLowPowerMode: () => invoke<boolean>('is_low_power_mode'),

@@ -3,9 +3,10 @@ import { Spinner } from '@taskscape/common-ui/Spinner';
 import { useEffect, useMemo, useState } from 'react';
 import { createList } from './commands/lists';
 import { buildCommands } from './commands/palette';
-import { CheatSheet } from './components/CheatSheet';
 import { CommandPalette } from './components/CommandPalette';
 import { ContextMenuProvider } from './components/ContextMenu';
+import { ModalHost } from './components/Modal';
+import { FilterPanel } from './components/preview/FilterPanel';
 import { PreviewPanel } from './components/preview/PreviewPanel';
 import { TaskPane } from './components/TaskPane';
 import { TitleBar } from './components/TitleBar';
@@ -32,8 +33,8 @@ function App() {
   const previewW = useLayoutStore((s) => s.previewW);
   const splitRatio = useLayoutStore((s) => s.splitRatio);
   const trashOpen = useUiStore((s) => s.trashOpen);
+  const filterPaneId = useUiStore((s) => s.filterPaneId);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
-  const cheatOpen = useUiStore((s) => s.cheatOpen);
 
   const ready = projectsLoaded && tasksLoaded;
   const listsInProject = useMemo(
@@ -98,7 +99,7 @@ function App() {
             </div>
           )}
 
-          {(previewOpen || trashOpen) && (
+          {(previewOpen || trashOpen || filterPaneId) && (
             <>
               <Resizer
                 onResize={(x, rect) =>
@@ -113,6 +114,11 @@ function App() {
               >
                 {trashOpen ? (
                   <TrashPane onClose={() => useUiStore.getState().setTrashOpen(false)} />
+                ) : filterPaneId ? (
+                  <FilterPanel
+                    paneId={filterPaneId}
+                    onClose={() => useUiStore.getState().setFilterPaneId(null)}
+                  />
                 ) : (
                   <PreviewPanel />
                 )}
@@ -134,7 +140,7 @@ function App() {
           onClose={() => useUiStore.getState().setPaletteOpen(false)}
         />
       )}
-      {cheatOpen && <CheatSheet onClose={() => useUiStore.getState().setCheatOpen(false)} />}
+      <ModalHost />
       <Toast />
     </ContextMenuProvider>
   );

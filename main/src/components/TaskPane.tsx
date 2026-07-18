@@ -2,7 +2,7 @@ import { cn } from '@taskscape/common-ui/cn';
 import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, type List, type Task } from '../api';
+import { type List, type Task } from '../api';
 import { registerSearchFocus } from '../lib/searchFocus';
 import { scrollTaskIntoView } from '../lib/scroll';
 import {
@@ -19,7 +19,7 @@ import { useSelectionStore } from '../stores/selectionStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useTaskStore } from '../stores/taskStore';
 import { useUiStore } from '../stores/uiStore';
-import { isViewActive, useViewStore, type PaneView } from '../stores/viewStore';
+import { isViewActive, useViewStore } from '../stores/viewStore';
 import {
   flattenVisible,
   isVisibleInPane,
@@ -242,7 +242,7 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
         {selCount > 0 ? (
           <BulkBar count={selCount} />
         ) : (
-          <StatsBar listName={list.name} done={done} total={total} pct={pct} />
+          <StatsBar done={done} total={total} pct={pct} />
         )}
       </section>
     </PaneContext.Provider>
@@ -362,19 +362,17 @@ function BulkBar({ count }: { count: number }) {
 
 /** The footer stats + a per-pane sort/filter control (D.1). */
 function StatsBar({
-  listName,
   done,
   total,
   pct,
 }: {
-  listName: string;
   done: number;
   total: number;
   pct: number;
 }) {
   return (
     <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d text-content-3l dark:text-content-3d flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
-      <ViewControl listName={listName} />
+      <ViewControl />
       <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
       <span>
         {done}/{total} done
@@ -394,16 +392,13 @@ function StatsBar({
   );
 }
 
-/** Per-pane sort + filter. Opens the standalone `overlay` filter window for this
- *  pane; lights up while the pane's view differs from the defaults (D.1). */
-function ViewControl({ listName }: { listName: string }) {
+/** Per-pane sort + filter. Opens this pane's Filter & Sort controls in the
+ *  preview panel; lights up while the pane's view differs from the defaults (D.1). */
+function ViewControl() {
   const listId = usePaneId();
   const view = useViewStore((s) => s.byPane[listId]);
   const active = view ? isViewActive(view) : false;
-  const open = () => {
-    const current: PaneView = useViewStore.getState().get(listId);
-    void api.openOverlay({ paneId: listId, paneName: listName, view: current });
-  };
+  const open = () => useUiStore.getState().setFilterPaneId(listId);
   return (
     <button
       onClick={open}

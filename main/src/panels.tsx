@@ -4,18 +4,26 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import { initReducedMotion } from './lib/reducedMotion';
 import { initTheme } from './lib/theme';
-import { ModalWindow } from './windows/ModalWindow';
-import { OverlayWindow } from './windows/OverlayWindow';
 import { SettingsWindow } from './windows/SettingsWindow';
 
-// The auxiliary panels (modal / overlay / settings) share this bundle, separate
-// from the main app's — the hash decides which surface this window is. Keeping
-// them off `index.html` means a panel never loads the whole task-manager app.
+// The Settings window is built fresh with an init script that sets
+// `window.__PANEL__` before this bundle loads (see `panel_init_script` in Rust),
+// so it knows which surface it is synchronously. Settings is the only panel
+// window left — modals and the filter panel now render in-app in the main
+// window (see components/Modal.tsx and components/preview/FilterPanel.tsx).
+interface PanelData {
+  kind: 'settings';
+}
+
+declare global {
+  interface Window {
+    __PANEL__?: PanelData;
+  }
+}
+
 function route(): React.ReactElement {
-  const hash = window.location.hash;
-  if (hash === '#settings') return <SettingsWindow />;
-  if (hash === '#overlay') return <OverlayWindow />;
-  return <ModalWindow />;
+  if (window.__PANEL__?.kind === 'settings') return <SettingsWindow />;
+  return <div className="bg-surface-2l dark:bg-surface-2d h-screen w-screen" />;
 }
 
 initTheme();

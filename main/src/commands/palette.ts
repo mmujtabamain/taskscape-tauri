@@ -50,7 +50,6 @@ export function buildCommands(): PaletteCommand[] {
     { id: 'new_project', group: 'Manage', label: 'New project', icon: 'create_new_folder', accel: accel('new_project'), run: createProject },
     { id: 'trash', group: 'Manage', label: 'Open Trash', icon: 'delete', run: () => useUiStore.getState().setTrashOpen(true) },
     { id: 'open_settings', group: 'Manage', label: 'Settings', icon: 'settings', accel: accel('open_settings'), run: () => api.openSettings() },
-    { id: 'shortcuts', group: 'Manage', label: 'Keyboard shortcuts', icon: 'keyboard', run: () => useUiStore.getState().setCheatOpen(true) },
   ];
   if (selectedTask)
     cmds.push({ id: 'delete_sel', group: 'Task', label: `Delete “${selectedTask.title}”`, icon: 'delete', run: () => void requestDeleteTask(selectedTask) });

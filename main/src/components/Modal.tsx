@@ -1,19 +1,10 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { listen } from '@tauri-apps/api/event';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../api';
 import { Icon } from '@taskscape/common-ui/Icon';
-import {
-  GLYPHS,
-  INNER,
-  OUTER,
-  useWindowFocused,
-} from '../components/windowChrome';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { setOverlay } from '../lib/overlays';
 import type { ModalButton, ModalProps, ModalResult } from '../lib/modal';
 import { suggestProjectName, suggestListName } from '../lib/nameSuggest';
-import { isMac } from '../lib/platform';
-
-const WIDTH = 400;
+import { useModalStore } from '../stores/modalStore';
 
 /** The default name the dice fills in, by pool. Empty when suggestion is off. */
 function suggestFor(kind: 'project' | 'list' | undefined): string {
@@ -34,7 +25,7 @@ const BTN_VARIANT: Record<NonNullable<ModalButton['variant']>, string> = {
 };
 
 // The tone-tinted icon badge anchors the body — a soft fill that carries the
-// dialog's intent well clear of the red close light in the title bar.
+// dialog's intent.
 const BADGE_TONE = {
   default:
     'bg-selection-1l dark:bg-selection-1d text-accent-500l dark:text-accent-500d',
@@ -42,130 +33,30 @@ const BADGE_TONE = {
     'bg-danger-100l dark:bg-danger-100d text-danger-500l dark:text-danger-500d',
 };
 
-// The global reduced-motion rule zeroes animation durations, which would make
-// the drain's animationend fire instantly — skip auto-dismiss entirely instead.
-const reducedMotion = window.matchMedia(
-  '(prefers-reduced-motion: reduce)'
-).matches;
-
-/** Title-bar window controls for the modal. Only Close is live — a dialog can't
- *  be minimized or zoomed — and Close dismisses the modal (buttonId: null)
- *  rather than destroying the shared, reused panel window. */
-function ModalControls({ onClose }: { onClose: () => void }) {
-  const focused = useWindowFocused();
-
-  if (!isMac)
-    return (
-      <button
-        onClick={onClose}
-        title="Close"
-        data-no-drag
-        className="text-content-2l dark:text-content-2d flex h-full w-11 items-center justify-center transition-colors duration-100 hover:bg-[#e81123] hover:text-white"
-      >
-        <Icon name="close" size={18} />
-      </button>
-    );
-
-  const discs = [
-    {
-      live: true,
-      ring: '#e24b41',
-      fill: '#ed6a5f',
-      glyph: '#460804',
-      label: 'Close',
-    },
-    { live: false, label: 'Minimize' },
-    { live: false, label: 'Zoom' },
-  ];
+/** Renders the one modal currently on screen, if any (see modalStore). A modal
+ *  sits above every in-window overlay — including the attachment lightbox it can
+ *  be summoned from — so it lives on the top-most z-layer. */
+export function ModalHost() {
+  const current = useModalStore((s) => s.current);
+  if (!current) return null;
   return (
-    <div className="group flex items-center gap-2 pr-3 pl-5" data-no-drag>
-      {discs.map((d) => (
-        <button
-          key={d.label}
-          onClick={d.live ? onClose : undefined}
-          title={d.label}
-          aria-disabled={!d.live}
-          className={cn('block size-3.25', !d.live && 'cursor-default')}
-        >
-          <svg
-            viewBox="0 0 85.4 85.4"
-            className="size-full"
-            clipRule="evenodd"
-            fillRule="evenodd"
-          >
-            <path
-              d={OUTER}
-              fill={d.live && focused ? d.ring : 'var(--tl-inactive-ring)'}
-            />
-            <path
-              d={INNER}
-              fill={d.live && focused ? d.fill : 'var(--tl-inactive-fill)'}
-            />
-            {d.live && focused && (
-              <g
-                fill={d.glyph}
-                className="opacity-0 transition-opacity duration-100 group-hover:opacity-100"
-              >
-                {GLYPHS.close}
-              </g>
-            )}
-          </svg>
-        </button>
-      ))}
-    </div>
+    <Modal
+      key={current.id}
+      props={current.props}
+      onResolve={(result) => useModalStore.getState().answer(current.id, result)}
+    />
   );
 }
 
-/** One reusable panel window serves every modal (it is hidden, never
- *  destroyed): fetch the pending modal on load and again on each re-present. */
-export function ModalWindow() {
-  const [current, setCurrent] = useState<{
-    id: string;
-    props: ModalProps;
-  } | null>(null);
-
-  useEffect(() => {
-    let stale = false;
-    const fetch = () =>
-      void api
-        .modalCurrent()
-        .then((cur) => {
-          if (!stale) setCurrent(cur as { id: string; props: ModalProps });
-        })
-        .catch(() => {});
-    fetch();
-    const unRefresh = listen('modal-refresh', fetch);
-    // On close the window is reused (hidden, not destroyed); dropping the content
-    // here — while it fades out — keeps the next open from flashing this modal.
-    const unClear = listen('modal-clear', () => {
-      if (!stale) setCurrent(null);
-    });
-    return () => {
-      stale = true;
-      unRefresh.then((fn) => fn());
-      unClear.then((fn) => fn());
-    };
-  }, []);
-
-  if (!current)
-    return (
-      <div className="bg-surface-2l dark:bg-surface-2d h-screen w-screen" />
-    );
-  return (
-    <ModalContent key={current.id} id={current.id} props={current.props} />
-  );
-}
-
-function ModalContent({ id, props }: { id: string; props: ModalProps }) {
-  const [presented, setPresented] = useState(false);
-  const [drainPaused, setDrainPaused] = useState(false);
-  const [drainCancelled, setDrainCancelled] = useState(false);
-
-  const contentRef = useRef<HTMLDivElement>(null);
+function Modal({
+  props,
+  onResolve,
+}: {
+  props: ModalProps;
+  onResolve: (result: ModalResult) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const resolvedRef = useRef(false);
-  const presentedRef = useRef(false);
-  const drainCancelledRef = useRef(false);
 
   const [value, setValue] = useState(() =>
     props.input
@@ -179,36 +70,27 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
   const valueRef = useRef(value);
 
   const resolve = useCallback(
-    (buttonId: string | null, timedOut = false) => {
+    (buttonId: string | null) => {
       if (resolvedRef.current) return;
       resolvedRef.current = true;
 
       const trimmed = valueRef.current.trim();
-      const value = trimmed
-        ? trimmed + (props.input?.suffix ?? "")
-        : undefined;
-
-      const result: ModalResult = { buttonId, value };
-      if (timedOut) result.timedOut = true;
-
-      void api.closeModal(id, result);
+      const value = trimmed ? trimmed + (props.input?.suffix ?? '') : undefined;
+      onResolve({ buttonId, value });
     },
-    [id, props.input?.suffix]
+    [onResolve, props.input?.suffix]
   );
 
-  const press = useCallback((btn: ModalButton, isDefault: boolean) => {
-    if (isDefault && props.input && !valueRef.current.trim()) {
-      inputRef.current?.focus();
-      return;
-    }
-    resolve(btn.id);
-  }, [props.input, resolve]);
-
-  function cancelDrain() {
-    if (drainCancelledRef.current) return;
-    drainCancelledRef.current = true;
-    setDrainCancelled(true);
-  }
+  const press = useCallback(
+    (btn: ModalButton, isDefault: boolean) => {
+      if (isDefault && props.input && !valueRef.current.trim()) {
+        inputRef.current?.focus();
+        return;
+      }
+      resolve(btn.id);
+    },
+    [props.input, resolve]
+  );
 
   function setInputValue(next: string) {
     valueRef.current = next;
@@ -223,6 +105,13 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
     requestAnimationFrame(() => el.select());
   }
 
+  // Register with the overlay-depth tracker so window-level key handlers defer
+  // to the modal (e.g. Escape dismisses the modal, not the task selection).
+  useEffect(() => {
+    setOverlay(true);
+    return () => setOverlay(false);
+  }, []);
+
   useEffect(() => {
     if (!props.input) return;
     const el = inputRef.current;
@@ -230,21 +119,8 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
     if (valueRef.current) el?.select();
   }, [props]);
 
-  // Measure after fonts settle (variable fonts shift metrics), then size,
-  // center and reveal the hidden window exactly once (StrictMode-safe).
-  useEffect(() => {
-    if (presentedRef.current) return;
-    presentedRef.current = true;
-    void document.fonts.ready.then(() => {
-      const height = (contentRef.current?.scrollHeight ?? 200) + 2; // + root hairline border
-      void api.presentWindow(WIDTH, height);
-      setPresented(true);
-    });
-  }, []);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      cancelDrain();
       if (e.key === 'Escape') {
         e.preventDefault();
         resolve(null);
@@ -262,43 +138,25 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
 
   return (
     <div
-      data-tauri-drag-region
-      className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d relative h-screen w-screen overflow-hidden border"
-      onPointerEnter={() => setDrainPaused(true)}
-      onPointerLeave={() => setDrainPaused(false)}
+      className="z-tooltip fixed inset-0 flex items-center justify-center bg-black/30"
+      onMouseDown={() => resolve(null)}
     >
-      <style>
-        {'@keyframes modal-in { from { opacity: 0; transform: scale(0.97); } }'}
-      </style>
       <div
-        ref={contentRef}
-        data-tauri-drag-region
-        className="w-full"
-        style={
-          presented
-            ? { animation: 'modal-in 180ms cubic-bezier(0.2, 0, 0, 1) both' }
-            : { opacity: 0 }
-        }
+        onMouseDown={(e) => e.stopPropagation()}
+        className="rounded-control border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d shadow-lift w-[min(400px,92vw)] overflow-hidden border"
       >
-        <div
-          data-tauri-drag-region
-          className="relative flex h-11 shrink-0 items-stretch"
-        >
-          {isMac && <ModalControls onClose={() => resolve(null)} />}
-
-          <div
-            data-tauri-drag-region
-            className={cn('flex min-w-0 flex-1 items-center', isMac ? 'pr-4' : 'pr-2 pl-4')}
+        <div className="relative flex h-11 shrink-0 items-center pr-2 pl-4">
+          <h1 className="font-display text-content-1l dark:text-content-1d min-w-0 flex-1 truncate text-[14px] leading-none font-semibold">
+            {props.title}
+          </h1>
+          <button
+            type="button"
+            onClick={() => resolve(null)}
+            title="Close"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-7 w-7 shrink-0 place-items-center"
           >
-            <h1
-              data-tauri-drag-region
-              className="font-display text-content-1l dark:text-content-1d truncate text-[14px] leading-none font-semibold"
-            >
-              {props.title}
-            </h1>
-          </div>
-
-          {!isMac && <ModalControls onClose={() => resolve(null)} />}
+            <Icon name="close" size={16} />
+          </button>
         </div>
 
         {(props.message || props.input) && (
@@ -368,7 +226,6 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                               );
                             }}
                             onFocus={(e) => {
-                              cancelDrain();
                               if (props.input?.initialValue)
                                 e.currentTarget.select();
                             }}
@@ -389,7 +246,6 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
                         placeholder={props.input.placeholder}
                         onChange={(e) => setInputValue(e.target.value)}
                         onFocus={(e) => {
-                          cancelDrain();
                           if (props.input?.initialValue)
                             e.currentTarget.select();
                         }}
@@ -431,23 +287,6 @@ function ModalContent({ id, props }: { id: string; props: ModalProps }) {
           ))}
         </div>
       </div>
-
-      {props.timeoutMs != null && !reducedMotion && (
-        <div
-          className="bg-accent-500l dark:bg-accent-500d pointer-events-none absolute inset-x-6 bottom-0 h-0.5 origin-left transition-opacity duration-200"
-          style={{
-            animation: presented
-              ? `drain ${props.timeoutMs}ms linear forwards`
-              : 'none',
-            animationPlayState:
-              drainPaused || drainCancelled ? 'paused' : 'running',
-            opacity: drainCancelled ? 0 : drainPaused ? 0.25 : 0.45,
-          }}
-          onAnimationEnd={() => {
-            if (!drainCancelledRef.current) resolve(null, true);
-          }}
-        />
-      )}
     </div>
   );
 }
