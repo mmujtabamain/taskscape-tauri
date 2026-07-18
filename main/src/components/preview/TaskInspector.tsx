@@ -1,6 +1,6 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { RichTextEditor, type RichTextHandle } from '@taskscape/common-ui/RichTextEditor';
+import { RichTextEditor, type RichTextHandle } from './RichTextEditorLazy';
 import { useEffect, useRef, useState } from 'react';
 import { api, type Note, type Task } from '../../api';
 import { confirmModal } from '../../lib/modal';

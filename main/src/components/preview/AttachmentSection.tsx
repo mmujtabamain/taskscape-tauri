@@ -5,7 +5,7 @@ import {
   splitFileName,
 } from '@taskscape/common-ui/fileKind';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { ATTACHMENT_MIME } from '@taskscape/common-ui/RichTextEditor';
+import { ATTACHMENT_MIME } from '@taskscape/common-ui/attachmentMime';
 import { Spinner } from '@taskscape/common-ui/Spinner';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useEffect, useState } from 'react';

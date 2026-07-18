@@ -1,5 +1,4 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { Spinner } from '@taskscape/common-ui/Spinner';
 import { useEffect, useMemo, useState } from 'react';
 import { createList } from './commands/lists';
 import { buildCommands } from './commands/palette';
@@ -19,13 +18,10 @@ import { initialLoad, startBootstrap } from './stores/bootstrap';
 import { useLayoutStore } from './stores/layoutStore';
 import { useListStore } from './stores/listStore';
 import { useProjectStore } from './stores/projectStore';
-import { useTaskStore } from './stores/taskStore';
 import { useUiStore } from './stores/uiStore';
 
 function App() {
   const activeProjectId = useProjectStore((s) => s.activeId);
-  const projectsLoaded = useProjectStore((s) => s.loaded);
-  const tasksLoaded = useTaskStore((s) => s.loaded);
   const lists = useListStore((s) => s.lists);
   const activeListId = useLayoutStore((s) => s.activeListId);
   const splitListId = useLayoutStore((s) => s.splitListId);
@@ -36,7 +32,6 @@ function App() {
   const filterOpen = useUiStore((s) => s.filterOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
 
-  const ready = projectsLoaded && tasksLoaded;
   const listsInProject = useMemo(
     () => lists.filter((l) => l.project_id === activeProjectId),
     [lists, activeProjectId]
@@ -125,12 +120,6 @@ function App() {
             </>
           )}
         </div>
-
-        {!ready && (
-          <div className="z-overlay bg-surface-1l dark:bg-surface-1d absolute inset-0 grid place-items-center">
-            <Spinner size={26} label="Loading…" />
-          </div>
-        )}
       </div>
 
       {paletteOpen && (

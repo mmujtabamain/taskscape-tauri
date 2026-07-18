@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "python3 ../scripts/subset-icons.py tray",
     "dev": "vite",
+    "prebuild": "python3 ../scripts/subset-icons.py tray",
     "build": "tsc && vite build",
     "lint": "eslint .",
     "format": "prettier --write src",

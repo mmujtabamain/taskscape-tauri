@@ -6,3 +6,9 @@ dist/
 # Throwaway dev database built from migrations for entity codegen (dev loop).
 /dev.db
 /dev.db-*
+
+# Icon-subsetting venv + generated per-app subset fonts (built by
+# scripts/subset-icons.py via each app's predev/prebuild hook).
+/scripts/.venv/
+/main/src/assets/fonts/material-symbols-subset.woff2
+/tray/src/assets/fonts/material-symbols-subset.woff2

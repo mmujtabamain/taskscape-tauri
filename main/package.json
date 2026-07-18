@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "python3 ../scripts/subset-icons.py main",
     "dev": "vite",
+    "prebuild": "python3 ../scripts/subset-icons.py main",
     "build": "tsc && vite build",
     "check:z": "node scripts/check-z-layers.mjs",
     "typecheck": "tsc && node scripts/check-z-layers.mjs",

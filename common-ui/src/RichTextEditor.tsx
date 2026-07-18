@@ -15,9 +15,9 @@ import { fileKindFor } from './fileKind';
 import { Icon } from './Icon';
 import { sanitizeNoteHtml } from './sanitizeHtml';
 import type { Attachment } from './types';
+import { ATTACHMENT_MIME } from './attachmentMime';
 
-/** Drag payload used to drop an attachment into a note as a mention chip. */
-export const ATTACHMENT_MIME = 'application/x-attachment';
+export { ATTACHMENT_MIME };
 
 export interface RichTextHandle {
   getHtml: () => string;
@@ -61,6 +61,8 @@ interface Props {
    *  to keep the default inset-field look. */
   wrapperClassName?: string;
 }
+
+export type RichTextEditorProps = Props;
 
 // Bare domains are auto-linked only for these TLDs so filenames typed into a note
 // (notes.md, app.py, report.pdf) are never mistaken for links. Explicit links go

@@ -13,17 +13,35 @@ use tauri::{
     WebviewWindowBuilder, WindowEvent,
 };
 use taskscape_common::{
-    hotkeys, server, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT, TRAY_PORT,
+    hotkeys, server, settings, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT,
+    TRAY_PORT,
 };
+use tokio::sync::OnceCell;
 
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
+/// The shared store, opened lazily. `run` warms it in the background at startup
+/// so the window can paint before the (async) DB open finishes; commands await
+/// this same cell. Whichever caller reaches it first runs `Store::open`, the
+/// rest await that one open — so the DB is opened exactly once.
+type StoreCell = Arc<OnceCell<Arc<Store>>>;
+
+/// Resolve the store, opening it on first access. Cheap on every call after the
+/// first (a clone of the cached `Arc`).
+async fn store_of(cell: &StoreCell) -> Result<Arc<Store>, String> {
+    cell.get_or_try_init(|| async { Store::open().await.map(Arc::new) })
+        .await
+        .cloned()
+        .map_err(err)
+}
+
 /// Whether the main window should paint dark: the saved `theme` preference wins
-/// ("light"/"dark"), otherwise follow the current system appearance.
-async fn resolve_dark(store: &Store, window: &tauri::WebviewWindow) -> bool {
-    match store.get_setting("theme").await.ok().flatten().as_deref() {
+/// ("light"/"dark"), otherwise follow the current system appearance. Reads the
+/// file-backed setting directly (no DB), so it runs before the store is open.
+fn resolve_dark(window: &tauri::WebviewWindow) -> bool {
+    match settings::get("theme").as_deref() {
         Some("dark") => true,
         Some("light") => false,
         _ => window
@@ -67,87 +85,100 @@ fn launch_embedded_tray() {
 }
 
 #[tauri::command]
-async fn list_projects(store: State<'_, Arc<Store>>) -> Result<Vec<Project>, String> {
+async fn list_projects(store: State<'_, StoreCell>) -> Result<Vec<Project>, String> {
+    let store = store_of(&store).await?;
     store.list_projects().await.map_err(err)
 }
 
 #[tauri::command]
-async fn create_project(store: State<'_, Arc<Store>>, name: String) -> Result<Project, String> {
+async fn create_project(store: State<'_, StoreCell>, name: String) -> Result<Project, String> {
+    let store = store_of(&store).await?;
     store.create_project(&name).await.map_err(err)
 }
 
 #[tauri::command]
 async fn rename_project(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     id: String,
     name: String,
 ) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.rename_project(&id, &name).await.map_err(err)
 }
 
 #[tauri::command]
-async fn delete_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+async fn delete_project(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.delete_project(&id).await.map_err(err)
 }
 
 /// The default project (created on demand). Used to seed a first project when
 /// the database has none yet.
 #[tauri::command]
-async fn default_project(store: State<'_, Arc<Store>>) -> Result<Project, String> {
+async fn default_project(store: State<'_, StoreCell>) -> Result<Project, String> {
+    let store = store_of(&store).await?;
     store.default_project().await.map_err(err)
 }
 
 #[tauri::command]
-async fn list_lists(store: State<'_, Arc<Store>>) -> Result<Vec<List>, String> {
+async fn list_lists(store: State<'_, StoreCell>) -> Result<Vec<List>, String> {
+    let store = store_of(&store).await?;
     store.list_lists().await.map_err(err)
 }
 
 #[tauri::command]
 async fn create_list(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     project_id: String,
     name: String,
 ) -> Result<List, String> {
+    let store = store_of(&store).await?;
     store.create_list(&project_id, &name).await.map_err(err)
 }
 
 #[tauri::command]
-async fn rename_list(store: State<'_, Arc<Store>>, id: String, name: String) -> Result<(), String> {
+async fn rename_list(store: State<'_, StoreCell>, id: String, name: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.rename_list(&id, &name).await.map_err(err)
 }
 
 #[tauri::command]
-async fn delete_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+async fn delete_list(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.delete_list(&id).await.map_err(err)
 }
 
 #[tauri::command]
 async fn reorder_list(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     id: String,
     sort_order: f64,
 ) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.reorder_list(&id, sort_order).await.map_err(err)
 }
 
 #[tauri::command]
-async fn list_tasks(store: State<'_, Arc<Store>>, list_id: String) -> Result<Vec<Task>, String> {
+async fn list_tasks(store: State<'_, StoreCell>, list_id: String) -> Result<Vec<Task>, String> {
+    let store = store_of(&store).await?;
     store.list_tasks(&list_id).await.map_err(err)
 }
 
 #[tauri::command]
-async fn all_tasks(store: State<'_, Arc<Store>>) -> Result<Vec<Task>, String> {
+async fn all_tasks(store: State<'_, StoreCell>) -> Result<Vec<Task>, String> {
+    let store = store_of(&store).await?;
     store.all_tasks().await.map_err(err)
 }
 
 #[tauri::command]
 async fn create_task(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     list_id: String,
     title: String,
     notes: Option<String>,
     parent_id: Option<String>,
 ) -> Result<Task, String> {
+    let store = store_of(&store).await?;
     store
         .create_task(&list_id, &title, notes.as_deref(), parent_id.as_deref())
         .await
@@ -156,12 +187,13 @@ async fn create_task(
 
 #[tauri::command]
 async fn update_task(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     id: String,
     title: Option<String>,
     notes: Option<String>,
     done: Option<bool>,
 ) -> Result<Task, String> {
+    let store = store_of(&store).await?;
     store
         .update_task(&id, title.as_deref(), notes.as_deref(), done)
         .await
@@ -171,18 +203,20 @@ async fn update_task(
 /// Soft-delete a task (move it, with its subtree, to the Trash). Returns every
 /// id that was stamped, so the caller can undo the exact set.
 #[tauri::command]
-async fn delete_task(store: State<'_, Arc<Store>>, id: String) -> Result<Vec<String>, String> {
+async fn delete_task(store: State<'_, StoreCell>, id: String) -> Result<Vec<String>, String> {
+    let store = store_of(&store).await?;
     store.soft_delete_tasks(&[id]).await.map_err(err)
 }
 
 #[tauri::command]
 async fn move_task(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     id: String,
     parent_id: Option<String>,
     list_id: Option<String>,
     sort_order: Option<f64>,
 ) -> Result<Task, String> {
+    let store = store_of(&store).await?;
     store
         .move_task(&id, parent_id.as_deref(), list_id.as_deref(), sort_order)
         .await
@@ -191,10 +225,11 @@ async fn move_task(
 
 #[tauri::command]
 async fn reorder_task(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     id: String,
     sort_order: f64,
 ) -> Result<Task, String> {
+    let store = store_of(&store).await?;
     store.reorder_task(&id, sort_order).await.map_err(err)
 }
 
@@ -202,41 +237,47 @@ async fn reorder_task(
 /// pass the forest roots of the selection. Returns every stamped id so the
 /// delete is undoable/restorable as an exact set.
 #[tauri::command]
-async fn delete_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<Vec<String>, String> {
+async fn delete_tasks(store: State<'_, StoreCell>, ids: Vec<String>) -> Result<Vec<String>, String> {
+    let store = store_of(&store).await?;
     store.soft_delete_tasks(&ids).await.map_err(err)
 }
 
 /// Restore soft-deleted tasks (undo a delete / restore from Trash).
 #[tauri::command]
-async fn restore_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<(), String> {
+async fn restore_tasks(store: State<'_, StoreCell>, ids: Vec<String>) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.restore_tasks(&ids).await.map_err(err)
 }
 
 /// Permanently remove tasks from the Trash.
 #[tauri::command]
-async fn purge_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<(), String> {
+async fn purge_tasks(store: State<'_, StoreCell>, ids: Vec<String>) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.purge_tasks(&ids).await.map_err(err)
 }
 
 /// Everything currently in the Trash, most-recently-deleted first.
 #[tauri::command]
-async fn list_trashed(store: State<'_, Arc<Store>>) -> Result<Vec<Task>, String> {
+async fn list_trashed(store: State<'_, StoreCell>) -> Result<Vec<Task>, String> {
+    let store = store_of(&store).await?;
     store.list_trashed().await.map_err(err)
 }
 
 /// Permanently empty the Trash.
 #[tauri::command]
-async fn empty_trash(store: State<'_, Arc<Store>>) -> Result<(), String> {
+async fn empty_trash(store: State<'_, StoreCell>) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.empty_trash().await.map_err(err)
 }
 
 /// Set the done flag on several tasks at once (bulk mark done / not done).
 #[tauri::command]
 async fn set_tasks_done(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     ids: Vec<String>,
     done: bool,
 ) -> Result<(), String> {
+    let store = store_of(&store).await?;
     for id in &ids {
         store
             .update_task(id, None, None, Some(done))
@@ -307,7 +348,8 @@ fn render_markdown<'a>(
 
 /// Build a Markdown checklist for the given task ids (Select mode's copy action).
 #[tauri::command]
-async fn copy_tasks(store: State<'_, Arc<Store>>, ids: Vec<String>) -> Result<String, String> {
+async fn copy_tasks(store: State<'_, StoreCell>, ids: Vec<String>) -> Result<String, String> {
+    let store = store_of(&store).await?;
     let tasks = store.all_tasks().await.map_err(err)?;
     let selected: HashSet<&str> = ids.iter().map(String::as_str).collect();
     let (roots, children) = group_by_parent(&tasks);
@@ -378,10 +420,11 @@ fn to_export_task<'a>(node: &'a Task, children: &HashMap<&'a str, Vec<&'a Task>>
 /// `path` as JSON.
 #[tauri::command]
 async fn export_list(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     list_id: String,
     path: String,
 ) -> Result<(), String> {
+    let store = store_of(&store).await?;
     let list = store
         .list_lists()
         .await
@@ -436,11 +479,12 @@ async fn import_task(
 /// the document's embedded list name when provided (non-blank).
 #[tauri::command]
 async fn import_list(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     project_id: String,
     path: String,
     name: Option<String>,
 ) -> Result<List, String> {
+    let store = store_of(&store).await?;
     let raw = std::fs::read_to_string(&path).map_err(err)?;
     let export: ListExport = serde_json::from_str(&raw).map_err(err)?;
     let list_name = name
@@ -454,16 +498,18 @@ async fn import_list(
 }
 
 #[tauri::command]
-async fn list_notes(store: State<'_, Arc<Store>>, task_id: String) -> Result<Vec<Note>, String> {
+async fn list_notes(store: State<'_, StoreCell>, task_id: String) -> Result<Vec<Note>, String> {
+    let store = store_of(&store).await?;
     store.list_notes(&task_id).await.map_err(err)
 }
 
 #[tauri::command]
 async fn create_note(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     task_id: String,
     content: String,
 ) -> Result<Note, String> {
+    let store = store_of(&store).await?;
     store.create_note(&task_id, &content).await.map_err(err)
 }
 
@@ -479,25 +525,28 @@ async fn update_note(
 }
 
 #[tauri::command]
-async fn delete_note(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+async fn delete_note(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.delete_note(&id).await.map_err(err)
 }
 
 #[tauri::command]
 async fn list_attachments(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     task_id: String,
 ) -> Result<Vec<Attachment>, String> {
+    let store = store_of(&store).await?;
     store.list_attachments(&task_id).await.map_err(err)
 }
 
 #[tauri::command]
 async fn add_reference(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     task_id: String,
     name: String,
     location: String,
 ) -> Result<Attachment, String> {
+    let store = store_of(&store).await?;
     taskscape_common::attachments::attach_reference(&store, &task_id, &name, &location)
         .await
         .map_err(err)
@@ -505,27 +554,30 @@ async fn add_reference(
 
 #[tauri::command]
 async fn add_copy(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     task_id: String,
     source_path: String,
     name: Option<String>,
 ) -> Result<Attachment, String> {
+    let store = store_of(&store).await?;
     taskscape_common::attachments::attach_copy(&store, &task_id, &source_path, name.as_deref())
         .await
         .map_err(err)
 }
 
 #[tauri::command]
-async fn delete_attachment(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+async fn delete_attachment(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.delete_attachment(&id).await.map_err(err)
 }
 
 #[tauri::command]
 async fn rename_attachment(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     id: String,
     name: String,
 ) -> Result<Attachment, String> {
+    let store = store_of(&store).await?;
     taskscape_common::attachments::rename_attachment(&store, &id, &name)
         .await
         .map_err(err)
@@ -551,9 +603,10 @@ async fn capture_screenshot() -> Result<Option<String>, String> {
 /// Returns `None` when a region capture is cancelled.
 #[tauri::command]
 async fn attach_screenshot(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     task_id: String,
 ) -> Result<Option<Attachment>, String> {
+    let store = store_of(&store).await?;
     // `screencapture` is a blocking shell-out — keep it off the async runtime.
     let Some(path) = tauri::async_runtime::spawn_blocking(taskscape_common::screenshot::capture)
         .await
@@ -575,13 +628,15 @@ async fn attach_screenshot(
 
 /// Remember which list the user last had open, so the tray captures land there.
 #[tauri::command]
-async fn set_active_list(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+async fn set_active_list(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.set_setting("last_active_list", &id).await.map_err(err)
 }
 
 /// Remember which project the user last had open, so we can restore it on launch.
 #[tauri::command]
-async fn set_active_project(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+async fn set_active_project(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store
         .set_setting("last_active_project", &id)
         .await
@@ -591,26 +646,29 @@ async fn set_active_project(store: State<'_, Arc<Store>>, id: String) -> Result<
 /// Read a persisted setting (e.g. `last_active_project`).
 #[tauri::command]
 async fn get_setting(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     key: String,
 ) -> Result<Option<String>, String> {
+    let store = store_of(&store).await?;
     store.get_setting(&key).await.map_err(err)
 }
 
 #[tauri::command]
 async fn set_setting(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     key: String,
     value: String,
 ) -> Result<(), String> {
+    let store = store_of(&store).await?;
     store.set_setting(&key, &value).await.map_err(err)
 }
 
 /// The hotkey catalog with effective (user-customized) combos.
 #[tauri::command]
 async fn list_hotkeys(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
 ) -> Result<Vec<hotkeys::ResolvedBinding>, String> {
+    let store = store_of(&store).await?;
     hotkeys::resolve(&store).await.map_err(err)
 }
 
@@ -618,16 +676,18 @@ async fn list_hotkeys(
 /// the shortcuts editor shows inline.
 #[tauri::command]
 async fn set_hotkey(
-    store: State<'_, Arc<Store>>,
+    store: State<'_, StoreCell>,
     id: String,
     accel: String,
 ) -> Result<(), String> {
+    let store = store_of(&store).await?;
     hotkeys::set_binding(&store, &id, &accel).await.map_err(err)
 }
 
 /// Restore one binding to its default combo.
 #[tauri::command]
-async fn reset_hotkey(store: State<'_, Arc<Store>>, id: String) -> Result<(), String> {
+async fn reset_hotkey(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
+    let store = store_of(&store).await?;
     hotkeys::reset_binding(&store, &id).await.map_err(err)
 }
 
@@ -801,10 +861,9 @@ fn is_low_power_mode() -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let store = Arc::new(
-        tauri::async_runtime::block_on(Store::open()).expect("failed to open taskscape store"),
-    );
-    let server_store = store.clone();
+    // Opened lazily (see `StoreCell`) so the window can paint before the async DB
+    // open finishes — `setup` warms it in the background and commands await it.
+    let store_cell: StoreCell = Arc::new(OnceCell::new());
 
     // Ordered note-write queue: autosave enqueues `update_note` edits here and a
     // worker (spawned in `setup`) applies them in order. Bounded so a runaway
@@ -848,7 +907,7 @@ pub fn run() {
             }
             _ => {}
         })
-        .manage(store)
+        .manage(store_cell.clone())
         .manage(NoteQueue(note_tx))
         .setup(move |app| {
             #[cfg(target_os = "macos")]
@@ -862,15 +921,16 @@ pub fn run() {
             // the native rounded corners, shadow, and resize behavior.
             if let Some(window) = app.get_webview_window("main") {
                 panels::hide_traffic_lights(&window);
-                // Paint the native background to match the theme so no white
-                // frame flashes on launch before the webview has painted...
-                let dark = tauri::async_runtime::block_on(resolve_dark(&server_store, &window));
+                // Paint the native background to match the theme so the window
+                // shows instantly as a themed pane (the theme is a file-backed
+                // setting, so this needs no DB and doesn't wait on the store)...
+                let dark = resolve_dark(&window);
                 panels::set_window_background(&window, dark);
                 // ...and make the webview itself transparent while it loads, so
-                // its default white doesn't cover that themed background.
+                // its default white doesn't cover that themed background. The
+                // frontend paints an instant boot spinner over it (index.html)
+                // until its first data load lands.
                 panels::disable_webview_white_background(&window);
-                // The window starts hidden (tauri.conf `visible: false`) and is
-                // shown by `reveal_main` once its webview has loaded.
             }
 
             // Safety net: if the frontend never calls `reveal_main` (a webview that
@@ -933,8 +993,18 @@ pub fn run() {
                     }),
                 )
                 .with_state(handle);
-            let router = server::data_router(server_store.clone()).merge(app_routes);
+            // Opening the store here also warms the shared cell, so it's ready
+            // by the time the frontend fires its first command.
+            let server_cell = store_cell.clone();
             tauri::async_runtime::spawn(async move {
+                let store = match store_of(&server_cell).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("[taskscape-main] HTTP server: store open failed: {e}");
+                        return;
+                    }
+                };
+                let router = server::data_router(store).merge(app_routes);
                 if let Err(e) = server::serve(MAIN_PORT, router).await {
                     eprintln!("[taskscape-main] HTTP server error: {e}");
                 }
@@ -943,11 +1013,18 @@ pub fn run() {
             // Drain the note-write queue: apply each autosave edit in arrival
             // order. An update whose note was meanwhile deleted just errors
             // harmlessly (logged), then we move on to the next.
-            let queue_store = server_store.clone();
+            let queue_cell = store_cell.clone();
             let mut note_rx = note_rx;
             tauri::async_runtime::spawn(async move {
+                let store = match store_of(&queue_cell).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("[taskscape-main] note worker: store open failed: {e}");
+                        return;
+                    }
+                };
                 while let Some((id, content)) = note_rx.recv().await {
-                    if let Err(e) = queue_store.update_note(&id, &content).await {
+                    if let Err(e) = store.update_note(&id, &content).await {
                         eprintln!("[taskscape-main] queued note update failed ({id}): {e}");
                     }
                 }

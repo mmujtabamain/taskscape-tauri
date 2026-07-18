@@ -1,4 +1,4 @@
-import 'material-symbols/outlined.css';
+import './material-symbols.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';

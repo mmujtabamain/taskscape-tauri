@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "material-symbols/outlined.css";
+import "./material-symbols.css";
 import "./index.css";
 import { initTheme } from "./theme";
 

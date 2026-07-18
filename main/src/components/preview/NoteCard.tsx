@@ -1,8 +1,5 @@
 import { Icon } from '@taskscape/common-ui/Icon';
-import {
-  RichTextEditor,
-  type RichTextHandle,
-} from '@taskscape/common-ui/RichTextEditor';
+import { RichTextEditor, type RichTextHandle } from './RichTextEditorLazy';
 import { useEffect, useRef } from 'react';
 import type { Attachment, Note } from '../../api';
 import { AUTOSAVE_MS, requestNoteLink } from './noteEditing';
