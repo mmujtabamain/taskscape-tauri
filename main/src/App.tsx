@@ -33,7 +33,7 @@ function App() {
   const previewW = useLayoutStore((s) => s.previewW);
   const splitRatio = useLayoutStore((s) => s.splitRatio);
   const trashOpen = useUiStore((s) => s.trashOpen);
-  const filterPaneId = useUiStore((s) => s.filterPaneId);
+  const filterOpen = useUiStore((s) => s.filterOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
 
   const ready = projectsLoaded && tasksLoaded;
@@ -99,7 +99,7 @@ function App() {
             </div>
           )}
 
-          {(previewOpen || trashOpen || filterPaneId) && (
+          {(previewOpen || trashOpen || filterOpen) && (
             <>
               <Resizer
                 onResize={(x, rect) =>
@@ -114,10 +114,9 @@ function App() {
               >
                 {trashOpen ? (
                   <TrashPane onClose={() => useUiStore.getState().setTrashOpen(false)} />
-                ) : filterPaneId ? (
+                ) : filterOpen ? (
                   <FilterPanel
-                    paneId={filterPaneId}
-                    onClose={() => useUiStore.getState().setFilterPaneId(null)}
+                    onClose={() => useUiStore.getState().setFilterOpen(false)}
                   />
                 ) : (
                   <PreviewPanel />

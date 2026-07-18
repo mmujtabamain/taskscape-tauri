@@ -268,8 +268,8 @@ export function useAppKeyboard(): void {
           useUiStore.getState().setTrashOpen(false);
           return;
         }
-        if (useUiStore.getState().filterPaneId) {
-          useUiStore.getState().setFilterPaneId(null);
+        if (useUiStore.getState().filterOpen) {
+          useUiStore.getState().setFilterOpen(false);
           return;
         }
         if (focusedListId && paneSel(focusedListId).ids.size > 0)

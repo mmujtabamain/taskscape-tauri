@@ -31,10 +31,10 @@ interface UiState {
   /** Shell overlays. */
   paletteOpen: boolean;
   trashOpen: boolean;
-  /** The pane (list id) whose Filter & Sort controls are open in the preview
-   *  panel, or null when the inspector shows. Mutually exclusive with the Trash
-   *  view (opening one closes the other). */
-  filterPaneId: string | null;
+  /** Whether the Filter & Sort controls are open in the preview panel. The
+   *  panel targets whichever pane(s) are visible (layout store), not the pane
+   *  it was opened from. Mutually exclusive with the Trash view. */
+  filterOpen: boolean;
   /** A drafted new task shown in the preview with no DB row until it gets
    *  content — the list it will land in (at most one draft at a time). */
   draftListId: string | null;
@@ -50,7 +50,7 @@ interface UiState {
   endDrag: () => void;
   setPaletteOpen: (open: boolean) => void;
   setTrashOpen: (open: boolean) => void;
-  setFilterPaneId: (id: string | null) => void;
+  setFilterOpen: (open: boolean) => void;
   setDraftListId: (id: string | null) => void;
 }
 
@@ -67,7 +67,7 @@ export const useUiStore = create<UiState>((set) => ({
   dropTarget: null,
   paletteOpen: false,
   trashOpen: false,
-  filterPaneId: null,
+  filterOpen: false,
   draftListId: null,
 
   setComposeFor: (id) => set({ composeFor: id }),
@@ -80,7 +80,7 @@ export const useUiStore = create<UiState>((set) => ({
   endDrag: () => set({ draggingId: null, dropTarget: null }),
   setPaletteOpen: (open) => set({ paletteOpen: open }),
   // Trash and the filter panel share the preview slot — opening one closes the other.
-  setTrashOpen: (open) => set(open ? { trashOpen: true, filterPaneId: null } : { trashOpen: false }),
-  setFilterPaneId: (id) => set(id ? { filterPaneId: id, trashOpen: false } : { filterPaneId: null }),
+  setTrashOpen: (open) => set(open ? { trashOpen: true, filterOpen: false } : { trashOpen: false }),
+  setFilterOpen: (open) => set(open ? { filterOpen: true, trashOpen: false } : { filterOpen: false }),
   setDraftListId: (id) => set({ draftListId: id }),
 }));

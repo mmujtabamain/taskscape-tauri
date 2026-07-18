@@ -12,9 +12,10 @@ import { useSettingsStore } from './settingsStore';
 import { useTaskStore } from './taskStore';
 import {
   useViewStore,
-  type CreatedRange,
+  type PaneView,
   type SortDir,
   type SortMode,
+  type TriState,
 } from './viewStore';
 
 /** The active search match set for a pane (matches + ancestors), or null when
@@ -44,23 +45,34 @@ const refineCache = new Map<string, Set<string>>();
 const hasNotesOf = (t: Task): boolean =>
   (t.note_items?.length ?? 0) > 0 || !!t.notes?.trim();
 
-function createdCutoff(range: CreatedRange): number | null {
-  if (range === 'any') return null;
+const triPass = (want: TriState, has: boolean): boolean =>
+  want === 'any' || (want === 'has') === has;
+
+function dateCutoff(v: PaneView): number | null {
+  if (v.dateRange === 'any') return null;
   const DAY = 86_400_000;
-  const now = Date.now();
-  if (range === 'today') return now - DAY;
-  if (range === 'week') return now - 7 * DAY;
-  return now - 30 * DAY; // month
+  const days =
+    v.dateRange === 'day'
+      ? 1
+      : v.dateRange === 'week'
+        ? 7
+        : v.dateRange === 'month'
+          ? 30
+          : Math.max(1, v.customDays);
+  return Date.now() - days * DAY;
 }
 
-/** The set of tasks a pane's content/created filters admit — a task passes if it
- *  matches every enabled toggle, OR any descendant does (so ancestors stay to
- *  keep the tree reachable). Returns null when no refine filter is on. Memoized
- *  on (tasks identity, pane's refine signature). */
+/** The set of tasks a pane's content/date filters admit — a task passes if it
+ *  matches every non-'any' predicate, OR any descendant does (so ancestors stay
+ *  to keep the tree reachable). Returns null when no refine filter is on.
+ *  Memoized on (tasks identity, pane's refine signature). */
 export function refineSet(paneId: string): Set<string> | null {
   const v = useViewStore.getState().get(paneId);
   const on =
-    v.hasNotes || v.hasAttachments || v.hasSubtasks || v.created !== 'any';
+    v.notes !== 'any' ||
+    v.attachments !== 'any' ||
+    v.subtasks !== 'any' ||
+    v.dateRange !== 'any';
   if (!on) return null;
 
   const { tasks, childrenByParent, rootsByList } = useTaskStore.getState();
@@ -68,16 +80,21 @@ export function refineSet(paneId: string): Set<string> | null {
     refineCache.clear();
     refineCacheTasks = tasks;
   }
-  const key = `${paneId}|${v.hasNotes}|${v.hasAttachments}|${v.hasSubtasks}|${v.created}`;
+  const key = `${paneId}|${v.notes}|${v.attachments}|${v.subtasks}|${v.dateField}|${v.dateRange}|${v.customDays}`;
   const cached = refineCache.get(key);
   if (cached) return cached;
 
-  const cutoff = createdCutoff(v.created);
+  const cutoff = dateCutoff(v);
   const selfPass = (t: Task): boolean => {
-    if (v.hasNotes && !hasNotesOf(t)) return false;
-    if (v.hasAttachments && t.attachments.length === 0) return false;
-    if (v.hasSubtasks && (childrenByParent[t.id]?.length ?? 0) === 0) return false;
-    if (cutoff != null && t.created_at < cutoff) return false;
+    if (!triPass(v.notes, hasNotesOf(t))) return false;
+    if (!triPass(v.attachments, t.attachments.length > 0)) return false;
+    if (!triPass(v.subtasks, (childrenByParent[t.id]?.length ?? 0) > 0))
+      return false;
+    if (
+      cutoff != null &&
+      (v.dateField === 'updated' ? t.updated_at : t.created_at) < cutoff
+    )
+      return false;
     return true;
   };
   const set = new Set<string>();
@@ -94,7 +111,7 @@ export function refineSet(paneId: string): Set<string> | null {
 }
 
 /** Does this task show in this pane? Combines the pane's search set, its
- *  content/created refine filters, the active/completed filter, and the global
+ *  content/date refine filters, the active/completed filter, and the global
  *  show-completed setting. */
 export function isVisibleInPane(task: Task, paneId: string): boolean {
   const search = paneSearchSet(paneId);
@@ -117,6 +134,8 @@ function comparator(sort: SortMode, dir: SortDir): (a: Task, b: Task) => number 
     switch (sort) {
       case 'created':
         return (a: Task, b: Task) => a.created_at - b.created_at;
+      case 'updated':
+        return (a: Task, b: Task) => a.updated_at - b.updated_at;
       case 'alpha':
         return (a: Task, b: Task) => a.title.localeCompare(b.title);
       case 'done-last':

@@ -392,16 +392,20 @@ function StatsBar({
   );
 }
 
-/** Per-pane sort + filter. Opens this pane's Filter & Sort controls in the
- *  preview panel; lights up while the pane's view differs from the defaults (D.1). */
+/** Per-pane sort + filter. Toggles the Filter & Sort controls in the preview
+ *  panel (they follow the visible pane(s)); lights up while the pane's view
+ *  differs from the defaults (D.1). */
 function ViewControl() {
   const listId = usePaneId();
   const view = useViewStore((s) => s.byPane[listId]);
   const active = view ? isViewActive(view) : false;
-  const open = () => useUiStore.getState().setFilterPaneId(listId);
+  const toggle = () => {
+    const ui = useUiStore.getState();
+    ui.setFilterOpen(!ui.filterOpen);
+  };
   return (
     <button
-      onClick={open}
+      onClick={toggle}
       title="Sort & filter"
       className={cn(
         'rounded-field flex h-5.5 items-center gap-1 px-1.5 text-[11px] font-semibold tracking-normal normal-case transition-colors',
