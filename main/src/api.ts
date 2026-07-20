@@ -157,6 +157,9 @@ export const api = {
   presentWindow: (width: number, height: number) =>
     invoke<void>('present_window', { width, height }),
   openSettings: () => invoke<void>('open_settings'),
+  /** Fade the main webview in once the first frame has painted (the window is
+   *  already on screen with a native boot box). Idempotent. */
+  revealMain: () => invoke<void>('reveal_main'),
   /** Drop the native boot box once the boot overlay is dismissed. */
   bootDone: () => invoke<void>('boot_done'),
 

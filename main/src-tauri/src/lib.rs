@@ -2,6 +2,7 @@ mod panels;
 mod power;
 
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use axum::{extract::State as AxumState, http::StatusCode, routing::post, Router};
@@ -44,12 +45,11 @@ const WINDOW_BG_LIGHT: tauri::window::Color = tauri::window::Color(244, 244, 246
 const WINDOW_BG_DARK: tauri::window::Color = tauri::window::Color(22, 23, 25, 255);
 
 /// Repaint the main window's native background for the resolved theme. The
-/// window is created with the light `backgroundColor` from `tauri.conf.json` —
-/// the config value is what stops the webview ever drawing its own white
-/// background (wry disables `drawsBackground` at webview *creation* when a
-/// background color is configured, so there is no first-paint race) — and this
-/// swaps the native color in `setup`, before the event loop presents a frame,
-/// then again on live theme changes.
+/// window is created hidden with the light `backgroundColor` from
+/// `tauri.conf.json`; this swaps the native color in `setup` — before the
+/// window is shown — and again on live theme changes, so the window's first
+/// frame is already themed and a later resize never exposes a stale
+/// white/wrong-mode edge.
 fn paint_window_background(window: &tauri::WebviewWindow, dark: bool) {
     let color = if dark { WINDOW_BG_DARK } else { WINDOW_BG_LIGHT };
     let _ = window.set_background_color(Some(color));
@@ -68,6 +68,11 @@ fn resolve_dark(window: &tauri::WebviewWindow) -> bool {
             .unwrap_or(false),
     }
 }
+
+/// Set once the main webview has been faded in (by `reveal_main` or the startup
+/// fallback), so the two paths never double-reveal it. The window itself is
+/// shown early in `setup`; only the webview's fade-in is gated here.
+static WEBVIEW_REVEALED: AtomicBool = AtomicBool::new(false);
 
 /// Sender into the note-write queue. Autosave streams `update_note` calls as the
 /// user types; enqueuing them (instead of writing inline) lets a single worker
@@ -835,6 +840,24 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Fade the main webview in. The window itself is already on screen (shown in
+/// `setup` with the native boot box over a themed background); the WKWebView
+/// beneath it has been held transparent (`alphaValue = 0`) so none of WebKit's
+/// startup is visible. The frontend calls this once its first real frame — the
+/// boot overlay in `index.html` — has been presented, and this animates the
+/// webview to opaque. Idempotent (and raced against the startup fallback) via
+/// [`WEBVIEW_REVEALED`], so the fade runs exactly once.
+#[tauri::command]
+fn reveal_main(app: AppHandle) -> Result<(), String> {
+    if WEBVIEW_REVEALED.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        panels::reveal_webview(&window);
+    }
+    Ok(())
+}
+
 /// Drop the native boot-box layer once the frontend dismisses its boot overlay
 /// (the opaque page has covered it since first paint, so this only frees it).
 #[tauri::command]
@@ -928,21 +951,41 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 panels::hide_traffic_lights(&window);
                 // Swap the config's light `backgroundColor` for the resolved
-                // theme before the event loop presents the first frame (the
-                // theme is a file-backed setting, so this needs no DB and
-                // doesn't wait on the store). The webview never draws its own
-                // white background — the config color disabled that at webview
-                // creation — so this themed surface is all that shows until the
-                // page paints its own (identically themed) background.
+                // theme (a file-backed setting, so no DB wait) while nothing is
+                // on screen yet, so the window's very first frame is themed.
                 let dark = resolve_dark(&window);
                 paint_window_background(&window, dark);
-                // The boot indicator's empty box, drawn natively behind the
-                // not-yet-painted webview so it's visible from the window's
-                // first frame. The page's identical #boot box covers it
-                // seamlessly; `boot_done` removes it once the boot overlay is
-                // dismissed.
+                // The boot indicator's empty box, drawn natively so it's on
+                // screen the instant the window appears — behind the (still
+                // invisible) webview. `boot_done` removes it once the boot
+                // overlay is dismissed.
                 panels::show_boot_box(&window, dark);
+                // Show the window NOW — themed surface + native boot box — with
+                // the WKWebView held transparent (`alphaValue = 0`) beneath it.
+                // The user sees native boot UI immediately; `reveal_main` fades
+                // the webview in on first paint, so none of WebKit's startup
+                // (white default, unstyled frames, theme flip) is ever seen.
+                // The hide-then-show ordering is handled inside the call.
+                panels::hide_webview_and_reveal_window(&window);
             }
+
+            // Safety net: if the frontend never calls `reveal_main` (a webview
+            // that failed to load), fade the webview in anyway after a grace
+            // period, so the app isn't stuck showing only the boot box. The
+            // window is already visible (shown above); `show`/`set_focus` here
+            // just cover the case where `setup`'s callback never ran. Whichever
+            // path fires first wins via `WEBVIEW_REVEALED`.
+            let fallback = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(4));
+                if !WEBVIEW_REVEALED.swap(true, Ordering::SeqCst) {
+                    if let Some(window) = fallback.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                        panels::reveal_webview(&window);
+                    }
+                }
+            });
 
             // Extra route so the tray process can ask this window to reload live.
             let handle = app.handle().clone();
@@ -1108,6 +1151,7 @@ pub fn run() {
             reset_hotkey,
             present_window,
             open_settings,
+            reveal_main,
             boot_done,
             set_window_theme,
             is_low_power_mode,
