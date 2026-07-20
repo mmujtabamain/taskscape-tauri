@@ -43,8 +43,7 @@ function App() {
   // up until that load lands (or fails), then cross-fades to the real content.
   useEffect(() => {
     const cleanup = startBootstrap();
-    // void initialLoad().finally(dismissBoot);
-    void initialLoad().finally(() => setTimeout(dismissBoot, 5000));
+    void initialLoad().finally(dismissBoot);
     return cleanup;
   }, []);
 

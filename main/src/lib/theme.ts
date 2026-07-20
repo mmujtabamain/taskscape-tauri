@@ -12,6 +12,13 @@ function apply() {
   applyDark(dark);
   document.documentElement.style.colorScheme =
     pref === 'system' ? 'light dark' : pref;
+  // Cache the preference for index.html's pre-paint theme script, so the next
+  // launch resolves a forced theme before its first frame.
+  try {
+    localStorage.setItem('theme', pref);
+  } catch {
+    // Private-mode/storage failures only cost the pre-paint hint.
+  }
   // Keep the native window background matched (main window only; the command
   // no-ops for panels), so a resize never flashes a stale-theme edge.
   api.setWindowTheme(dark).catch(() => {});

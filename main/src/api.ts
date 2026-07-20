@@ -157,8 +157,6 @@ export const api = {
   presentWindow: (width: number, height: number) =>
     invoke<void>('present_window', { width, height }),
   openSettings: () => invoke<void>('open_settings'),
-  /** Reveal the main window once its webview has loaded. Idempotent. */
-  revealMain: () => invoke<void>('reveal_main'),
   /** Drop the native boot box once the boot overlay is dismissed. */
   bootDone: () => invoke<void>('boot_done'),
 

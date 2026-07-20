@@ -2,19 +2,34 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Resolve the theme before the first paint. theme.ts caches the saved
+         preference in localStorage; reading it here (falling back to the system
+         appearance) sets `.dark` synchronously, so a forced theme that differs
+         from the system never paints the wrong-mode background for the frames
+         until the async settings read lands. theme.ts reconciles afterwards. -->
+    <script>
+      try {
+        var t = localStorage.getItem('theme');
+        var dark =
+          t === 'dark' ||
+          (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      } catch (e) {}
+    </script>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Taskscape</title>
     <style>
       /* Paint the themed page background on the very first frame — before the
          app's CSS/JS load — so the always-visible window never flashes white
-         while the webview boots. In the lowest cascade layer so index.css's
-         own `.dark`-driven background wins the moment it loads (which also
-         corrects an explicit theme override that differs from the system).
-         The --boot-* vars are pre-CSS stand-ins for the design tokens the
-         #boot indicator uses; once tokens.css loads, the real theme-swapping
-         aliases (--surface-1 / --edge-3 / --content-3) take over via the
-         var() fallback chain below. */
+         while the webview boots. Keyed off `.dark` (set by the inline script
+         above), matching how tokens.css swaps themes. In the lowest cascade
+         layer so index.css's own background wins the moment it loads. The
+         --boot-* vars are pre-CSS stand-ins for the design tokens the #boot
+         indicator uses; once tokens.css loads, the real theme-swapping aliases
+         (--surface-1 / --edge-3 / --content-3) take over via the var()
+         fallback chain below. */
       @layer app-boot {
         :root {
           --boot-bg: oklch(0.968 0.002 255);
@@ -22,12 +37,10 @@
           --boot-ink: oklch(0.62 0.013 264);
           background-color: var(--boot-bg);
         }
-        @media (prefers-color-scheme: dark) {
-          :root {
-            --boot-bg: oklch(0.205 0.004 260);
-            --boot-edge: oklch(0.98 0.01 260 / 0.24);
-            --boot-ink: oklch(0.57 0.011 262);
-          }
+        :root.dark {
+          --boot-bg: oklch(0.205 0.004 260);
+          --boot-edge: oklch(0.98 0.01 260 / 0.24);
+          --boot-ink: oklch(0.57 0.011 262);
         }
       }
 
