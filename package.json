@@ -4,8 +4,7 @@
   "version": "0.1.0",
   "workspaces": [
     "common-ui",
-    "main",
-    "tray"
+    "main"
   ],
   "scripts": {
     "dev": "scripts/run-dev.sh",

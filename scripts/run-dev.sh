@@ -37,6 +37,7 @@ if [ ! -d "$ROOT_DIR/node_modules" ]; then
   )
 fi
 
+# The main app is still a Tauri (webview) app.
 run_app() {
   local dir="$1"
   log "[$dir] starting tauri dev…"
@@ -46,10 +47,19 @@ run_app() {
   )
 }
 
+# The tray is now a standalone Slint (Rust) binary — just `cargo run`.
+run_tray() {
+  log "[tray] starting cargo run…"
+  (
+    cd "$ROOT_DIR/tray"
+    exec cargo run
+  )
+}
+
 # Kill both apps (and their child processes) on Ctrl-C.
 trap 'trap - INT TERM EXIT; kill 0 2>/dev/null || true' INT TERM EXIT
 
 run_app main &
-run_app tray &
+run_tray &
 
 wait

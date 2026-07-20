@@ -70,14 +70,13 @@ SRC_FONT = ROOT / "node_modules" / "material-symbols" / "material-symbols-outlin
 
 # Each app's subset covers its own source plus the shared UI library (whose
 # components — the editor toolbar, file-kind icons — it also renders).
+# Only the main app has a webview frontend that needs a woff2 icon subset. The
+# tray is now a standalone Slint app; its icon glyphs are baked into a TTF subset
+# committed at tray/assets/MaterialSymbolsSubset.ttf (see scripts/gen-slint-icons.py).
 APPS = {
     "main": {
         "scan": ["main/src", "common-ui/src"],
         "out": "main/src/assets/fonts/material-symbols-subset.woff2",
-    },
-    "tray": {
-        "scan": ["tray/src", "common-ui/src"],
-        "out": "tray/src/assets/fonts/material-symbols-subset.woff2",
     },
 }
 

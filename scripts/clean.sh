@@ -24,11 +24,13 @@ run() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Rust crates (each app has its own target/; they share the ../../common crate).
-RUST_CRATES=(common main/src-tauri tray/src-tauri)
+# Rust crates (each app has its own target/; they share the common crate). The
+# tray is now a standalone Slint binary at tray/ (was tray/src-tauri under Tauri).
+RUST_CRATES=(common main/src-tauri tray)
 
-# Vite build output + dev caches live per workspace (common-ui is source-only).
-VITE_DIRS=(main/dist tray/dist main/node_modules/.vite tray/node_modules/.vite)
+# Vite build output + dev caches live per workspace (common-ui is source-only; the
+# tray no longer has a JS frontend).
+VITE_DIRS=(main/dist main/node_modules/.vite)
 
 step "Cleaning Rust workspaces"
 for crate in "${RUST_CRATES[@]}"; do

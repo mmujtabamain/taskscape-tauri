@@ -1,0 +1,334 @@
+// Embed the app's fonts (families: "Outfit", "Montserrat") and the subset icon
+// font (family: "MaterialSymbols") at compile time.
+import "../assets/Outfit.ttf";
+import "../assets/Montserrat.ttf";
+import "../assets/MaterialSymbolsSubset.ttf";
+
+// The app's design tokens (see common-ui/styles/tokens.css), converted from oklch
+// to sRGB. `dark` is set once at launch (and on every reveal) from the resolved
+// theme. Carried over verbatim from the reverted Slint modal work (d8fd962).
+export global Palette {
+    in property <bool> dark: false;
+
+    out property <brush> surface-0: dark ? #0f1012 : #ebecee;
+    out property <brush> surface-1: dark ? #161719 : #f3f4f6;
+    out property <brush> surface-2: dark ? #1e1f22 : #fdfdfe;
+    out property <brush> surface-3: dark ? #292b2e : #ffffff;
+
+    out property <brush> content-1: dark ? #e9ebee : #21242a;
+    out property <brush> content-2: dark ? #a8abb0 : #545860;
+    out property <brush> content-3: dark ? #74787e : #82868e;
+
+    out property <brush> edge-2: dark ? #f5f9ff1c : #2d333d24;
+    out property <brush> edge-3: dark ? #f5f9ff3d : #2d333d4c;
+
+    out property <brush> accent: dark ? #3a9bfd : #007df3;
+    out property <brush> accent-hover: dark ? #53abff : #006ce7;
+    out property <brush> on-accent: #fafcff;
+    out property <brush> selection: dark ? #3a9bfd29 : #007df31a;
+
+    out property <brush> danger: dark ? #f75d59 : #cc2827;
+    out property <brush> danger-hover: dark ? #ff6f69 : #bb0916;
+    out property <brush> danger-soft: dark ? #f75d5926 : #cc28271a;
+
+    out property <brush> wash: dark ? #f5f9ff14 : #2d333d17;
+}
+
+// Material Symbols glyphs used in the capture bar. Codepoints are the PUA points
+// from the embedded subset (see scripts / MaterialSymbolsSubset.ttf).
+export global Glyphs {
+    out property <string> font: "MaterialSymbols";
+    out property <string> delete-sweep: "\u{e16c}";
+    out property <string> open-in-new: "\u{e89e}";
+    out property <string> screenshot-monitor: "\u{ec08}";
+    out property <string> error: "\u{f8b6}";
+}
+
+// A ghost pill button used in the title row (Clear) and footer (Screenshot).
+component GhostButton inherits Rectangle {
+    in property <string> glyph;
+    in property <string> label;
+    in property <string> hint;             // trailing kbd hint (optional)
+    in property <length> glyph-size: 15px;
+    in property <bool> filled: false;
+    in property <brush> tint: Palette.content-2;
+    in property <brush> tint-hover: Palette.content-1;
+    in property <bool> enabled: true;
+    callback clicked;
+
+    height: 26px;
+    border-radius: 6px;
+    background: ta.has-hover && root.enabled ? Palette.surface-1 : transparent;
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 6px;
+        alignment: center;
+        if root.glyph != "": Text {
+            text: root.glyph;
+            font-family: Glyphs.font;
+            font-size: root.glyph-size;
+            color: ta.has-hover && root.enabled ? root.tint-hover : root.tint;
+            vertical-alignment: center;
+        }
+        if root.label != "": Text {
+            text: root.label;
+            font-size: 12px;
+            color: ta.has-hover && root.enabled ? root.tint-hover : root.tint;
+            vertical-alignment: center;
+        }
+        if root.hint != "": Text {
+            text: root.hint;
+            font-size: 11px;
+            color: Palette.content-3;
+            vertical-alignment: center;
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A single-line / multi-line editable field with a placeholder overlay. The input
+// and placeholder fill the field and share a vertical alignment (centered for a
+// single line, top for multi-line) so they sit exactly on top of one another.
+component Field inherits Rectangle {
+    in property <string> placeholder;
+    in property <bool> multiline: false;
+    in property <length> font-size: 14px;
+    in-out property <string> text <=> ti.text;
+    property <TextVerticalAlignment> v-align: root.multiline
+        ? TextVerticalAlignment.top
+        : TextVerticalAlignment.center;
+    callback accepted;
+    callback focus-changed(bool);
+
+    public function focus-input() {
+        ti.focus();
+    }
+
+    Text {
+        width: 100%;
+        height: 100%;
+        visible: ti.text == "";
+        vertical-alignment: root.v-align;
+        horizontal-alignment: left;
+        text: root.placeholder;
+        font-size: root.font-size;
+        color: Palette.content-3;
+    }
+
+    ti := TextInput {
+        width: 100%;
+        height: 100%;
+        vertical-alignment: root.v-align;
+        color: Palette.content-1;
+        font-size: root.font-size;
+        single-line: !root.multiline;
+        wrap: root.multiline ? word-wrap : no-wrap;
+        selection-background-color: Palette.selection;
+        selection-foreground-color: Palette.content-1;
+        accepted => {
+            root.accepted();
+        }
+        changed has-focus => {
+            root.focus-changed(self.has-focus);
+        }
+    }
+}
+
+export component MiniBar inherits Window {
+    // ── display state (Rust → UI) ────────────────────────────────────────────
+    in property <string> clear-hint;           // e.g. "⌘⇧⌫"  (footer/clear kbd)
+    in property <string> screenshot-hint;      // e.g. "⌘⇧↩"
+    in property <string> target-project;
+    in property <string> target-list;
+    in property <bool> has-target: false;
+    in property <bool> capturing: false;
+    in property <int> shot-count: 0;
+    in property <string> capture-error;        // "" when none
+
+    // ── draft (two-way) ──────────────────────────────────────────────────────
+    in-out property <string> title-text <=> title-field.text;
+    // Not aliased to the notes Field: it lives inside a conditional block (only
+    // built while open), so it can't be referenced from here — the block binds
+    // `text <=> root.notes-text` itself and focuses on `init`.
+    in-out property <string> notes-text;
+    in-out property <bool> notes-open: false;
+    // Whether the notes editor holds focus — read by Rust so a global ⌘Return
+    // submits from the notes editor but dismisses from the title.
+    in-out property <bool> notes-focused: false;
+
+    // ── actions (UI → Rust) ──────────────────────────────────────────────────
+    callback submit();
+    callback clear-draft();
+    callback open-main();
+    callback add-screenshot();
+
+    // Focus the title field (called from Rust on reveal). The notes field grabs
+    // focus itself via `init` when the section is opened.
+    public function focus-title() {
+        title-field.focus-input();
+    }
+
+    property <bool> has-draft: root.title-text != "" || root.notes-text != ""
+        || root.notes-open || root.shot-count > 0;
+    property <bool> has-error: root.capture-error != "";
+
+    title: "";
+    no-frame: true;
+    width: 480px;
+    default-font-family: "Montserrat";
+    background: Palette.surface-2;
+
+    VerticalLayout {
+        // ── Title row ────────────────────────────────────────────────────────
+        Rectangle {
+            height: 40px;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 8px;
+                spacing: 6px;
+                title-field := Field {
+                    horizontal-stretch: 1;
+                    placeholder: "Capture a task ...";
+                    accepted => {
+                        root.submit();
+                    }
+                }
+
+                if root.has-draft: VerticalLayout {
+                    alignment: center;
+                    GhostButton {
+                        glyph: Glyphs.delete-sweep;
+                        glyph-size: 16px;
+                        label: "Clear";
+                        hint: root.clear-hint;
+                        clicked => {
+                            root.clear-draft();
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Palette.edge-2;
+        }
+
+        // ── Notes section ────────────────────────────────────────────────────
+        if !root.notes-open: Rectangle {
+            height: 34px;
+            HorizontalLayout {
+                padding-left: 12px;
+                alignment: start;
+                Text {
+                    text: "Press Tab to add a note";
+                    font-size: 12px;
+                    color: Palette.content-3;
+                    vertical-alignment: center;
+                }
+            }
+
+            TouchArea {
+                mouse-cursor: text;
+                clicked => {
+                    root.notes-open = true;
+                }
+            }
+        }
+        if root.notes-open: Rectangle {
+            min-height: 64px;
+            max-height: 160px;
+            VerticalLayout {
+                padding: 12px;
+                Field {
+                    vertical-stretch: 1;
+                    multiline: true;
+                    font-size: 13px;
+                    placeholder: "Notes ...";
+                    text <=> root.notes-text;
+                    init => {
+                        self.focus-input();
+                    }
+                    focus-changed(focused) => {
+                        root.notes-focused = focused;
+                        // Emptying + blurring the editor collapses it back to the hint.
+                        if !focused && root.notes-text == "" {
+                            root.notes-open = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Palette.edge-2;
+        }
+
+        // ── Footer ───────────────────────────────────────────────────────────
+        Rectangle {
+            height: 38px;
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                spacing: 4px;
+                // Target: opens the main window.
+                VerticalLayout {
+                    alignment: center;
+                    GhostButton {
+                        glyph: Glyphs.open-in-new;
+                        glyph-size: 14px;
+                        label: root.has-target
+                            ? (root.target-project != ""
+                            ? root.target-project + " / " + root.target-list
+                            : root.target-list)
+                            : "Taskscape";
+                        clicked => {
+                            root.open-main();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                // Screenshot: spinner / count / error states.
+                VerticalLayout {
+                    alignment: center;
+                    GhostButton {
+                        glyph: root.capturing ? "" : (root.has-error ? Glyphs.error : Glyphs.screenshot-monitor);
+                        label: root.capturing
+                            ? "Capturing …"
+                            : root.has-error
+                            ? "Capture failed"
+                            : root.shot-count == 0
+                            ? "Screenshot"
+                            : root.shot-count == 1
+                            ? "1 shot"
+                            : "\{root.shot-count} shots";
+                        hint: root.capturing || root.has-error ? "" : root.screenshot-hint;
+                        tint: root.has-error
+                            ? Palette.danger
+                            : (root.shot-count > 0 && !root.capturing ? Palette.accent : Palette.content-2);
+                        tint-hover: root.has-error
+                            ? Palette.danger
+                            : (root.shot-count > 0 && !root.capturing ? Palette.accent : Palette.content-1);
+                        enabled: !root.capturing;
+                        clicked => {
+                            root.add-screenshot();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

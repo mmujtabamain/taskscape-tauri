@@ -45,13 +45,36 @@ find_app() {
 }
 
 build_app main
-build_app tray
-
 MAIN_APP="$(find_app main)"
-TRAY_APP="$(find_app tray)"
 
-if [ -z "$MAIN_APP" ] || [ -z "$TRAY_APP" ]; then
-  echo "error: could not locate built .app bundles" >&2
+# The tray is now a standalone Slint (Rust) binary — there's no Tauri bundler for
+# it, so build it with cargo and hand-assemble a minimal LSUIElement .app bundle.
+echo "==> Building tray (cargo release)"
+(cd "$ROOT/tray" && cargo build --release)
+TRAY_BIN="$ROOT/tray/target/release/taskscape-tray"
+TRAY_APP="$DIST/Taskscape Tray.app"
+rm -rf "$TRAY_APP"
+mkdir -p "$TRAY_APP/Contents/MacOS" "$TRAY_APP/Contents/Resources"
+cp "$TRAY_BIN" "$TRAY_APP/Contents/MacOS/taskscape-tray"
+cp "$ROOT/tray/icons/icon.icns" "$TRAY_APP/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+cat > "$TRAY_APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key><string>taskscape-tray</string>
+  <key>CFBundleIdentifier</key><string>com.taskscape.tray</string>
+  <key>CFBundleName</key><string>Taskscape Tray</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>LSUIElement</key><true/>
+  <key>LSMinimumSystemVersion</key><string>10.15</string>
+</dict>
+</plist>
+PLIST
+
+if [ -z "$MAIN_APP" ] || [ ! -x "$TRAY_APP/Contents/MacOS/taskscape-tray" ]; then
+  echo "error: could not locate built app bundles" >&2
   exit 1
 fi
 
