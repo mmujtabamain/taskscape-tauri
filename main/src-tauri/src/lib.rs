@@ -836,6 +836,16 @@ fn reveal_main(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Drop the native boot-box layer once the frontend dismisses its boot overlay
+/// (the opaque page has covered it since first paint, so this only frees it).
+#[tauri::command]
+fn boot_done(window: tauri::WebviewWindow) -> Result<(), String> {
+    let w = window.clone();
+    window
+        .run_on_main_thread(move || panels::remove_boot_box(&w))
+        .map_err(err)
+}
+
 /// Keep the main window's native background in sync with the live theme — a
 /// system light/dark flip or a manual override from Settings — so a later
 /// resize never reveals a stale white/wrong-mode edge. Called from the frontend
@@ -928,9 +938,14 @@ pub fn run() {
                 panels::set_window_background(&window, dark);
                 // ...and make the webview itself transparent while it loads, so
                 // its default white doesn't cover that themed background. The
-                // frontend paints an instant boot spinner over it (index.html)
-                // until its first data load lands.
+                // page also paints a themed background on its first frame via
+                // critical CSS in index.html, so nothing flashes white.
                 panels::disable_webview_white_background(&window);
+                // The boot indicator's empty box, drawn natively behind the
+                // still-transparent webview so it's visible before the page
+                // paints. The page's identical #boot box covers it seamlessly;
+                // `boot_done` removes it once the boot overlay is dismissed.
+                panels::show_boot_box(&window, dark);
             }
 
             // Safety net: if the frontend never calls `reveal_main` (a webview that
@@ -1112,6 +1127,7 @@ pub fn run() {
             present_window,
             open_settings,
             reveal_main,
+            boot_done,
             set_window_theme,
             is_low_power_mode,
         ])

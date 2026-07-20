@@ -159,6 +159,8 @@ export const api = {
   openSettings: () => invoke<void>('open_settings'),
   /** Reveal the main window once its webview has loaded. Idempotent. */
   revealMain: () => invoke<void>('reveal_main'),
+  /** Drop the native boot box once the boot overlay is dismissed. */
+  bootDone: () => invoke<void>('boot_done'),
 
   setWindowTheme: (dark: boolean) => invoke<void>('set_window_theme', { dark }),
   /** Whether macOS is in Low Power Mode right now (always false off macOS). */

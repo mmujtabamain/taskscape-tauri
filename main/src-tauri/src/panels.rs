@@ -101,6 +101,142 @@ pub fn disable_webview_white_background(window: &tauri::WebviewWindow) {
     let _ = window;
 }
 
+/// The boot indicator's empty checkbox, drawn natively so it's on screen from
+/// the window's first frame — before the webview paints anything. Geometry and
+/// color mirror `.boot-check` / `.boot-box` in `index.html` exactly (28×28,
+/// radius 7, 1.5pt stroke in `--edge-3`, centered and lifted 4% of the window
+/// height), so the handoff to the HTML box is invisible: the opaque page simply
+/// paints over it. Removed later via the `boot_done` command.
+#[cfg(target_os = "macos")]
+const BOOT_BOX_SIZE: f64 = 28.0;
+#[cfg(target_os = "macos")]
+const BOOT_BOX_RADIUS: f64 = 7.0;
+#[cfg(target_os = "macos")]
+const BOOT_BOX_STROKE: f64 = 1.5;
+/// `--edge-3` as sRGB + alpha (light / dark).
+#[cfg(target_os = "macos")]
+const BOOT_EDGE_LIGHT: (f64, f64, f64, f64) = (0.176, 0.201, 0.240, 0.30);
+#[cfg(target_os = "macos")]
+const BOOT_EDGE_DARK: (f64, f64, f64, f64) = (0.959, 0.975, 1.0, 0.24);
+#[cfg(target_os = "macos")]
+const BOOT_BOX_ID: &std::ffi::CStr = c"taskscape-boot-box";
+
+/// Add the native boot box beneath the (transparent-while-loading) webview. An
+/// `NSBox` rather than a bare CALayer because it takes its border as an
+/// `NSColor` and needs no Core Graphics types. Must run on the main thread.
+/// No-op off macOS.
+pub fn show_boot_box(window: &tauri::WebviewWindow, dark: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::{msg_send, runtime::AnyObject};
+        use objc2_core_foundation::{CGPoint, CGRect, CGSize};
+
+        let (r, g, b, a) = if dark { BOOT_EDGE_DARK } else { BOOT_EDGE_LIGHT };
+        let Ok(ns_window) = window.ns_window() else {
+            return;
+        };
+        let ns_window = ns_window as *mut AnyObject;
+        unsafe {
+            let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+            if content_view.is_null() {
+                return;
+            }
+            let bounds: CGRect = msg_send![content_view, bounds];
+            // Mirror the HTML boot indicator's centered position. AppKit's coordinate
+            // system is bottom-left, so centering is simply half the remaining space.
+            let frame = CGRect {
+                origin: CGPoint {
+                    x: (bounds.size.width - BOOT_BOX_SIZE) / 2.0,
+                    y: (bounds.size.height - BOOT_BOX_SIZE) / 2.0,
+                },
+                size: CGSize {
+                    width: BOOT_BOX_SIZE,
+                    height: BOOT_BOX_SIZE,
+                },
+            };
+            let boot_box: *mut AnyObject = msg_send![objc2::class!(NSBox), alloc];
+            let boot_box: *mut AnyObject = msg_send![boot_box, initWithFrame: frame];
+            // NSBoxCustom / NSNoTitle: a plain bordered rounded rect.
+            let _: () = msg_send![boot_box, setBoxType: 4usize];
+            let _: () = msg_send![boot_box, setTitlePosition: 0usize];
+            let _: () = msg_send![boot_box, setBorderWidth: BOOT_BOX_STROKE];
+            let _: () = msg_send![boot_box, setCornerRadius: BOOT_BOX_RADIUS];
+            let border: *mut AnyObject = msg_send![
+                objc2::class!(NSColor),
+                colorWithSRGBRed: r,
+                green: g,
+                blue: b,
+                alpha: a,
+            ];
+            let _: () = msg_send![boot_box, setBorderColor: border];
+            let clear: *mut AnyObject = msg_send![objc2::class!(NSColor), clearColor];
+            let _: () = msg_send![boot_box, setFillColor: clear];
+            // All four margins flexible, so it stays centered through an early
+            // live resize.
+            let _: () = msg_send![boot_box, setAutoresizingMask: 45usize];
+            let id: *mut AnyObject = msg_send![
+                objc2::class!(NSString),
+                stringWithUTF8String: BOOT_BOX_ID.as_ptr()
+            ];
+            let _: () = msg_send![boot_box, setIdentifier: id];
+            // NSWindowBelow (-1): behind the webview, over the window background.
+            let _: () = msg_send![
+                content_view,
+                addSubview: boot_box,
+                positioned: -1isize,
+                relativeTo: std::ptr::null_mut::<AnyObject>(),
+            ];
+            let _: () = msg_send![boot_box, release];
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (window, dark);
+}
+
+/// Remove the native boot box (found by its identifier). The opaque page has
+/// covered it since first paint, so this is hygiene, not a visible change.
+/// Must run on the main thread. No-op off macOS.
+pub fn remove_boot_box(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::{msg_send, runtime::AnyObject, runtime::Bool};
+
+        let Ok(ns_window) = window.ns_window() else {
+            return;
+        };
+        let ns_window = ns_window as *mut AnyObject;
+        unsafe {
+            let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+            if content_view.is_null() {
+                return;
+            }
+            let subviews: *mut AnyObject = msg_send![content_view, subviews];
+            if subviews.is_null() {
+                return;
+            }
+            let target: *mut AnyObject = msg_send![
+                objc2::class!(NSString),
+                stringWithUTF8String: BOOT_BOX_ID.as_ptr()
+            ];
+            let count: usize = msg_send![subviews, count];
+            for i in 0..count {
+                let view: *mut AnyObject = msg_send![subviews, objectAtIndex: i];
+                let id: *mut AnyObject = msg_send![view, identifier];
+                if id.is_null() {
+                    continue;
+                }
+                let matches: Bool = msg_send![id, isEqualToString: target];
+                if matches.as_bool() {
+                    let _: () = msg_send![view, removeFromSuperview];
+                    return;
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
+}
+
 /// Recompute the window shadow. A frameless window shown right after
 /// [`round_corners`] still carries the shadow of its original square frame;
 /// invalidating after the reveal makes it hug the rounded mask.

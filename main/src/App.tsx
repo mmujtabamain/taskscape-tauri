@@ -1,6 +1,5 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { useEffect, useMemo, useState } from 'react';
-import { createList } from './commands/lists';
 import { buildCommands } from './commands/palette';
 import { CommandPalette } from './components/CommandPalette';
 import { ContextMenuProvider } from './components/ContextMenu';
@@ -14,6 +13,7 @@ import { TrashPane } from './components/TrashPane';
 import { useAppKeyboard } from './hooks/useAppKeyboard';
 import { useMenuEvents } from './hooks/useMenuEvents';
 import { useTrayRouting } from './hooks/useTrayRouting';
+import { dismissBoot } from './lib/boot';
 import { initialLoad, startBootstrap } from './stores/bootstrap';
 import { useLayoutStore } from './stores/layoutStore';
 import { useListStore } from './stores/listStore';
@@ -39,10 +39,12 @@ function App() {
   const activeList = listsInProject.find((l) => l.id === activeListId) ?? null;
   const splitList = listsInProject.find((l) => l.id === splitListId) ?? null;
 
-  // One bootstrap wires events + does the first load.
+  // One bootstrap wires events + does the first load. The boot overlay stays
+  // up until that load lands (or fails), then cross-fades to the real content.
   useEffect(() => {
     const cleanup = startBootstrap();
-    void initialLoad();
+    // void initialLoad().finally(dismissBoot);
+    void initialLoad().finally(() => setTimeout(dismissBoot, 5000));
     return cleanup;
   }, []);
 
@@ -85,12 +87,6 @@ function App() {
               <p className="font-display text-content-2l dark:text-content-2d text-[17px] font-medium">
                 No lists yet
               </p>
-              <button
-                onClick={() => void createList()}
-                className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent hover:bg-accent-600l dark:hover:bg-accent-600d active:bg-accent-700l dark:active:bg-accent-700d px-4 py-2 text-[13px] font-semibold tracking-[0.01em] transition-colors"
-              >
-                Create your first list
-              </button>
             </div>
           )}
 
