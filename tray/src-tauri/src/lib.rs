@@ -33,10 +33,25 @@ fn main_focused() -> &'static AtomicBool {
     FOCUSED.get_or_init(|| AtomicBool::new(false))
 }
 
-/// Fire-and-forget POST to the main app (it's frontmost, so it acts on itself).
-fn route_to_main(path: &'static str) {
+/// POST to the main app (it's frontmost, so it acts on itself), falling back to
+/// a local mini-bar action if it isn't actually reachable. `main_focused` is only
+/// a cache of main's last-reported focus; it goes stale when main is closed while
+/// frontmost (it exits before `/main-blurred` lands — or a crash/force-quit never
+/// sends it), which would otherwise wedge the hotkey routing every press to a dead
+/// port. On a failed POST we clear the stale flag and run `fallback` on the main
+/// thread (window ops must), so the combo still works with main gone.
+fn route_to_main_or(app: &AppHandle, path: &'static str, fallback: fn(&AppHandle)) {
+    let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let _ = server::client::post_json(MAIN_PORT, path, &serde_json::json!({})).await;
+        if server::client::post_json(MAIN_PORT, path, &serde_json::json!({}))
+            .await
+            .is_ok()
+        {
+            return;
+        }
+        main_focused().store(false, Ordering::Release);
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || fallback(&handle));
     });
 }
 
@@ -117,13 +132,13 @@ pub fn run() {
                                 let _ = w.emit("capture-enter", ());
                             }
                         } else if main_focused().load(Ordering::Acquire) {
-                            route_to_main("/new-task");
+                            route_to_main_or(app, "/new-task", toggle_mini);
                         } else {
                             toggle_mini(app);
                         }
                     } else if Some(*shortcut) == screenshot {
                         if main_focused().load(Ordering::Acquire) {
-                            route_to_main("/attach-screenshot");
+                            route_to_main_or(app, "/attach-screenshot", capture_and_show);
                         } else {
                             capture_and_show(app);
                         }
