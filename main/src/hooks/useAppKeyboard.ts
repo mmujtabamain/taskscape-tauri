@@ -13,7 +13,7 @@ import {
   startNewTask,
 } from '../commands/tasks';
 import { focusOtherPane, splitTargetId } from '../commands/view';
-import { paneSelectAll } from '../lib/paneSelection';
+import { paneSelectAll, paneToggleSelect } from '../lib/paneSelection';
 import { overlayOpen } from '../lib/overlays';
 import { scrollTaskIntoView } from '../lib/scroll';
 import { focusSearch } from '../lib/searchFocus';
@@ -247,17 +247,24 @@ export function useAppKeyboard(): void {
           const prev = sibs[sibs.findIndex((s) => s.id === t.id) - 1];
           if (prev) void actDropOnRow(t.id, prev, 'nest');
         }
-      } else if (e.key === ' ') {
-        // Space toggles the whole selection when one is live (flip to all-done, or
-        // all-undone when they already are), else the single previewed task.
-        const selIds = focusedListId ? [...paneSel(focusedListId).ids] : [];
-        if (selIds.length > 0) {
+      } else if (e.key === ' ' || e.code === 'Space') {
+        // Space mirrors the checkbox's two roles: by default it toggles the active
+        // row's membership in the pane selection ("select"); with Option held it
+        // marks done — the whole selection when one is live, else the active task.
+        // (⌥Space can arrive as a non-breaking space, hence the e.code fallback.)
+        if (e.altKey) {
+          const selIds = focusedListId ? [...paneSel(focusedListId).ids] : [];
+          if (selIds.length > 0) {
+            e.preventDefault();
+            const allDone = selIds.every((id) => taskById[id]?.done);
+            void actSetTasksDone(selIds, !allDone);
+          } else if (selectedTask) {
+            e.preventDefault();
+            void actToggleDone(selectedTask);
+          }
+        } else if (selectedTask && focusedListId) {
           e.preventDefault();
-          const allDone = selIds.every((id) => taskById[id]?.done);
-          void actSetTasksDone(selIds, !allDone);
-        } else if (selectedTask) {
-          e.preventDefault();
-          void actToggleDone(selectedTask);
+          paneToggleSelect(focusedListId, selectedTask.id);
         }
       } else if ((e.key === 'F2' || e.key === 'Enter') && selectedTask) {
         e.preventDefault();

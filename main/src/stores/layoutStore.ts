@@ -27,6 +27,9 @@ interface LayoutState {
   setPaneFocus: (id: string) => void;
   /** After a project switch: show `firstListId` on the left, clear the split. */
   resetForProject: (firstListId: string | null) => void;
+  /** Keep both panes on lists that still exist (e.g. after a deletion), falling
+   *  back to `fallbackId` for the active pane. */
+  reconcileLists: (valid: Set<string>, fallbackId: string | null) => void;
 
   setPreviewOpen: (open: boolean) => void;
   togglePreview: () => void;
@@ -123,6 +126,18 @@ export const useLayoutStore = create<LayoutState>((set, get) => {
     resetForProject: (firstListId) => {
       localStorage.removeItem('ui.split');
       set({ activeListId: firstListId, splitListId: null, paneFocus: firstListId });
+      persistFocus();
+    },
+
+    reconcileLists: (valid, fallbackId) => {
+      const keep = (id: string | null) => (id && valid.has(id) ? id : null);
+      set((s) => {
+        const activeListId = keep(s.activeListId) ?? fallbackId;
+        const splitListId =
+          keep(s.splitListId) && s.splitListId !== activeListId ? s.splitListId : null;
+        return { activeListId, splitListId, paneFocus: keep(s.paneFocus) ?? activeListId };
+      });
+      if (!get().splitListId) localStorage.removeItem('ui.split');
       persistFocus();
     },
 

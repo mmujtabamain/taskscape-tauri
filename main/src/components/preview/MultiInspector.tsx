@@ -1,5 +1,6 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import { useState } from 'react';
 import type { Task } from '../../api';
 import {
   bulkCopy,
@@ -30,6 +31,14 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
   const listNameById = (id: string) => lists.find((l) => l.id === id)?.name ?? null;
 
   const done = tasks.filter((t) => t.done).length;
+
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    if (!focusedListId) return;
+    bulkCopy(focusedListId);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
+  };
 
   const openOne = (id: string) => {
     if (focusedListId)
@@ -93,12 +102,9 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
             <Icon name="arrow_forward" size={15} weight={300} />
             Move
           </button>
-          <button
-            className={act}
-            onClick={() => focusedListId && bulkCopy(focusedListId)}
-          >
-            <Icon name="content_copy" size={15} weight={300} />
-            Copy
+          <button className={act} onClick={copy}>
+            <Icon name={copied ? 'check' : 'content_copy'} size={15} weight={300} />
+            {copied ? 'Copied' : 'Copy'}
           </button>
           <button
             className={cn(act, 'col-span-2 hover:text-danger-500l dark:hover:text-danger-500d')}

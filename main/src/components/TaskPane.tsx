@@ -99,6 +99,57 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
     return () => registerSearchFocus(list.id, null);
   }, [list.id]);
 
+  // Auto-scroll the pane while a task drag hovers near its top/bottom edge, so a
+  // drag can reach rows outside the current viewport. A rAF loop keeps scrolling
+  // even when the pointer is held still in the edge zone (dragover stops firing).
+  // The listener is capture-phase on window because rows stopPropagation their
+  // own dragover, which would otherwise hide it from a bubble-phase handler.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const EDGE = 56;
+    const MAX = 16;
+    let raf = 0;
+    let speed = 0;
+    const tick = () => {
+      el.scrollTop += speed;
+      raf = speed !== 0 ? requestAnimationFrame(tick) : 0;
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!useUiStore.getState().draggingId) return;
+      const r = el.getBoundingClientRect();
+      const inside =
+        e.clientX >= r.left &&
+        e.clientX <= r.right &&
+        e.clientY >= r.top &&
+        e.clientY <= r.bottom;
+      const topGap = e.clientY - r.top;
+      const botGap = r.bottom - e.clientY;
+      speed = !inside
+        ? 0
+        : topGap < EDGE
+          ? -Math.ceil(((EDGE - topGap) / EDGE) * MAX)
+          : botGap < EDGE
+            ? Math.ceil(((EDGE - botGap) / EDGE) * MAX)
+            : 0;
+      if (speed !== 0 && raf === 0) raf = requestAnimationFrame(tick);
+    };
+    const stop = () => {
+      speed = 0;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    };
+    window.addEventListener('dragover', onDragOver, true);
+    window.addEventListener('drop', stop, true);
+    window.addEventListener('dragend', stop, true);
+    return () => {
+      window.removeEventListener('dragover', onDragOver, true);
+      window.removeEventListener('drop', stop, true);
+      window.removeEventListener('dragend', stop, true);
+      stop();
+    };
+  }, []);
+
   // Direct match count for the badge (memo-cheap; recomputed per keystroke).
   const matchCount = searching
     ? directMatches(query, paneSearch!.scope, paneSearch!.fields, list.id, activeProjectId).size
@@ -187,6 +238,12 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
         <div
           ref={scrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          onClick={(e) => {
+            // A click on blank pane space (not a row) drops the selection + preview.
+            if ((e.target as HTMLElement).closest('[data-task-id]')) return;
+            useSelectionStore.getState().clear(list.id);
+            useSelectionStore.getState().focus(null);
+          }}
           onDragOver={(e) => {
             if (e.dataTransfer.types.includes('application/x-task')) {
               e.preventDefault();

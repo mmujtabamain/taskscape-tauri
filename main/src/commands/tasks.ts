@@ -141,11 +141,16 @@ export function bulkCopy(listId: string): void {
 /** "+" / ⌘N: open an empty draft in the preview — no DB row yet. It becomes a
  *  real task only once it gets content (see `runDraftAction`). */
 export function startNewTask(listId: string): void {
+  const ui = useUiStore.getState();
   useLayoutStore.getState().setPaneFocus(listId);
   useSelectionStore.getState().clear(listId);
   useSelectionStore.getState().focus(null);
+  // The draft lives in the preview slot; close anything else parked there (Trash
+  // or the Filter view) so it isn't created hidden behind them.
+  ui.setTrashOpen(false);
+  ui.setFilterOpen(false);
   useLayoutStore.getState().setPreviewOpen(true);
-  useUiStore.getState().setDraftListId(listId);
+  ui.setDraftListId(listId);
 }
 
 // The busy guard swallows the DraftInspector's unmount blur (an extra 'commit'

@@ -69,6 +69,14 @@ export async function deleteList(list: List): Promise<void> {
   });
   if (!ok) return;
   await useListStore.getState().remove(list.id);
+  // Deleting the active/split list leaves the panes pointing at a list that no
+  // longer exists; fall back to a sibling so the view never lands on "No lists yet".
+  const inProject = useListStore
+    .getState()
+    .listsInProject(useProjectStore.getState().activeId);
+  useLayoutStore
+    .getState()
+    .reconcileLists(new Set(inProject.map((l) => l.id)), inProject[0]?.id ?? null);
 }
 
 /** Move focus to the next/previous tab in the active project. */

@@ -25,6 +25,14 @@ export function DraftInspector() {
   useEffect(() => {
     ref.current?.focus();
   }, []);
+  // Grow the field to fit the wrapped title (matches the task inspector), so a
+  // long title expands over multiple lines instead of clipping to one.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
   const noBlur = (e: React.MouseEvent) => e.preventDefault();
   const startBtn =
     'rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-2l dark:text-content-2d hover:border-content-3l dark:hover:border-content-3d hover:text-content-1l dark:hover:text-content-1d flex h-10 flex-1 items-center justify-center gap-1.5 border border-dashed text-[13px] font-semibold transition-colors';
