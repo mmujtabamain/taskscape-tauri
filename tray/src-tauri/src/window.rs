@@ -21,9 +21,13 @@ const PARK: (i32, i32) = (-10_000, -10_000);
 fn show_mini(app: &AppHandle, window: &tauri::WebviewWindow) {
     // Move to the cursor first, THEN reveal. Because the window rests off-screen
     // while hidden, there is no old on-screen frame to flash.
-    if let Some(pos) = cursor_anchor(app, window) {
-        let _ = window.set_position(pos);
-    }
+    let anchor = match cursor_anchor(app, window) {
+        Some((pos, anchor)) => {
+            let _ = window.set_position(pos);
+            anchor
+        }
+        None => VAnchor::Top,
+    };
     // Re-assert the Space-joining behavior right before showing: it must be in
     // effect at the moment we reveal/focus, or macOS shows the window on the
     // desktop Space instead of the active full-screen one.
@@ -37,7 +41,9 @@ fn show_mini(app: &AppHandle, window: &tauri::WebviewWindow) {
     // ...then pin it onto the current (possibly full-screen) Space.
     #[cfg(target_os = "macos")]
     order_front_regardless(window);
-    let _ = window.emit("mini-shown", ());
+    // Tell the webview which window edge to anchor the card to for this reveal
+    // (and, by arriving, that it's safe to paint the card again — see `dismiss`).
+    let _ = window.emit("mini-shown", anchor.as_str());
 }
 
 /// Reveal the mini bar from a background thread's `run_on_main_thread` callback
@@ -71,16 +77,42 @@ pub fn hide_mini(window: tauri::WebviewWindow) -> Result<(), String> {
 /// only submitting a capture or an explicit clear (⌘⇧⌫ / the Clear button)
 /// resets the form.
 pub fn dismiss(window: &tauri::WebviewWindow) {
+    // Hide the card too, so the next reveal can't flash it at this summon's
+    // anchor for a frame before Rust reports the new one (see `show_mini`).
+    let _ = window.emit("mini-hidden", ());
     let _ = window.hide();
     let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
+}
+
+/// Which edge of the (taller-than-the-card) window the card is pinned to for a
+/// given reveal. `Top` lets it grow downward into the empty space below; `Bottom`
+/// pins it to the window's bottom so it grows upward into the space above —
+/// chosen so the card lands at the cursor whether it was summoned near the top or
+/// the bottom of the screen.
+#[derive(Clone, Copy)]
+enum VAnchor {
+    Top,
+    Bottom,
+}
+
+impl VAnchor {
+    fn as_str(self) -> &'static str {
+        match self {
+            VAnchor::Top => "top",
+            VAnchor::Bottom => "bottom",
+        }
+    }
 }
 
 /// Where the mini bar is anchored when summoned: just up-and-left of the cursor
 /// so the title field lands under it. If placing it there would push the bar
 /// past the right or bottom edge of the monitor the cursor is on, it flips to
-/// the opposite side of the cursor; a final clamp to the monitor's work area
-/// guarantees the whole frame stays on screen wherever the cursor is.
-fn cursor_anchor(app: &AppHandle, window: &tauri::WebviewWindow) -> Option<PhysicalPosition<i32>> {
+/// the opposite side of the cursor; a final clamp keeps the whole frame on the
+/// display (it may overlap the Dock, but its top stays below the menu bar).
+fn cursor_anchor(
+    app: &AppHandle,
+    window: &tauri::WebviewWindow,
+) -> Option<(PhysicalPosition<i32>, VAnchor)> {
     // Physical offset from the cursor to the bar's top-left in the default
     // (down-and-right) placement.
     const OFF_X: f64 = 24.0;
@@ -90,35 +122,46 @@ fn cursor_anchor(app: &AppHandle, window: &tauri::WebviewWindow) -> Option<Physi
     let size = window.outer_size().ok()?;
     let (w, h) = (size.width as f64, size.height as f64);
 
-    // The usable area (menu bar / dock excluded) of the monitor under the cursor.
     let monitor = window
         .monitor_from_point(cursor.x, cursor.y)
         .ok()
         .flatten()
         .or_else(|| window.primary_monitor().ok().flatten())?;
+    // The bar is a pop-up-menu-level panel, so it may draw over the Dock like a
+    // context menu — but never over the menu bar. So its left / right / bottom
+    // edges clamp to the full display, while its top clamps to the work area
+    // (which starts below the menu bar). This also lets it overlap a Dock parked
+    // on the left or right, not just the bottom.
+    let full_pos = monitor.position();
+    let full_size = monitor.size();
     let area = monitor.work_area();
-    let left = area.position.x as f64;
+    let left = full_pos.x as f64;
     let top = area.position.y as f64;
-    let right = left + area.size.width as f64;
-    let bottom = top + area.size.height as f64;
+    let right = full_pos.x as f64 + full_size.width as f64;
+    let bottom = full_pos.y as f64 + full_size.height as f64;
 
     // Default down-and-right of the cursor; flip to the other side when that
-    // side would spill off the right / bottom edge.
+    // side would spill off the right / bottom edge. A vertical flip means the
+    // cursor is near the bottom, so the card anchors to the window's bottom and
+    // grows upward instead of downward.
     let mut x = cursor.x - OFF_X;
     if x + w > right {
         x = cursor.x + OFF_X - w;
     }
     let mut y = cursor.y - OFF_Y;
+    let mut anchor = VAnchor::Top;
     if y + h > bottom {
         y = cursor.y + OFF_Y - h;
+        anchor = VAnchor::Bottom;
     }
 
-    // Whatever the flip chose, never let the frame leave the work area (covers
+    // Whatever the flip chose, never let the frame leave the display — the top
+    // clamps below the menu bar, the other edges to the physical bounds (covers
     // the top/left edges and monitors smaller than the bar).
     x = x.clamp(left, (right - w).max(left));
     y = y.clamp(top, (bottom - h).max(top));
 
-    Some(PhysicalPosition::new(x as i32, y as i32))
+    Some((PhysicalPosition::new(x as i32, y as i32), anchor))
 }
 
 /// Open the main window, then dismiss the bar *after* main is up so there's no

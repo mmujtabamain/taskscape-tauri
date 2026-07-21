@@ -50,6 +50,28 @@ body,
   overflow: hidden;
 }
 
+/* The window is deliberately taller than the collapsed card so the notes have
+   room to expand. `#root` fills the window and pins the card to one edge: the
+   top by default (notes grow downward), or the bottom when Rust reports the bar
+   was summoned near the screen's bottom edge (`.anchor-bottom`, notes grow
+   upward). Either way the card lands at the cursor rather than floating above it. */
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  /* Painted only once Rust reports this reveal's anchor (`.bar-ready`), so a
+     reveal never shows the card at the previous summon's anchor for a frame.
+     The backing is transparent, so a hidden card shows nothing. */
+  opacity: 0;
+}
+:root.anchor-bottom #root {
+  justify-content: flex-end;
+}
+:root.bar-ready #root {
+  opacity: 1;
+}
+
 /* Toggled from App.tsx while the user is typing to hide the mouse pointer (it
    opens right over the title field). Removed on the next mouse move. The
    `:root.cursor-hidden` compound out-specifies the input's UA text cursor and

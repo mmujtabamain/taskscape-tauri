@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
+import { applyAnchor, hideCard } from '../anchor';
 import { api } from '../api';
 import { refreshTheme } from '../theme';
 import type { CaptureDraft } from './useCaptureDraft';
@@ -13,12 +14,17 @@ export function useCaptureBarEvents(draft: CaptureDraft, onReveal: () => void): 
   const { pending, captured, cancelled, error } = draft.screenshotEvents;
   useEffect(() => {
     const subs = [
-      // Summoned: refresh the target/hotkeys/theme (via onReveal) and refocus.
-      listen('mini-shown', () => {
+      // Summoned: pin the card to the window edge Rust chose for this reveal
+      // (which also reveals it), refresh the target/hotkeys/theme (via onReveal)
+      // and refocus.
+      listen<string>('mini-shown', (e) => {
+        applyAnchor(e.payload);
         onReveal();
         void refreshTheme();
         focusDraft();
       }),
+      // Dismissed: hide the card so the next reveal can re-anchor it flash-free.
+      listen('mini-hidden', () => hideCard()),
       // ⌘Enter while the bar is open (global; can't reach the webview, so Rust
       // forwards it): submit when the notes editor is focused, else dismiss.
       listen('capture-enter', () => {
