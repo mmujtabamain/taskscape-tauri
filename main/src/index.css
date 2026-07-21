@@ -41,8 +41,19 @@
    cascade layer) always override them — an unlayered element rule would beat
    every utility regardless of specificity. */
 @layer base {
-  /* Desktop-app feel: no rubber-band flash, no stray text selection or I-beams
-     outside editable fields. */
+  /* Desktop-app feel: no rubber-band flash, and NOTHING is selectable by
+     default — no stray text selection or I-beams. WKWebView (this app's engine)
+     honours only the -webkit- prefixed property, so every `user-select` rule
+     here is doubled; without the prefix the lock silently does nothing and text
+     stays selectable everywhere (double-click-drag from any label).
+
+     The only text that may be selected — audited, and enforced solely by the
+     rules below:
+       1. editable controls — input / textarea / the contenteditable rich-text
+          editor — which need selection to function;
+       2. read-only text explicitly wrapped in <SelectableText> (.selectable-text).
+          Today that's just the attachment text/code preview.
+     Anything not covered by these two rules is locked, on purpose. */
   html,
   body {
     overscroll-behavior: none;
@@ -51,13 +62,16 @@
     font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none;
     user-select: none;
     cursor: default;
   }
 
   input,
   textarea,
-  [contenteditable] {
+  [contenteditable],
+  .selectable-text {
+    -webkit-user-select: text;
     user-select: text;
     cursor: text;
   }

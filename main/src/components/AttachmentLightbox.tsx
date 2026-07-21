@@ -8,6 +8,7 @@ import {
   previewKindFor,
   splitFileName,
 } from '@taskscape/common-ui/fileKind';
+import { SelectableText } from './SelectableText';
 import { propagateAttachmentRename } from '../lib/mentions';
 import { confirmModal, promptName } from '../lib/modal';
 import { setOverlay } from '../lib/overlays';
@@ -271,9 +272,12 @@ export function AttachmentLightbox({
         if (text === null)
           return <div className="text-[13px] text-white/60">Loading…</div>;
         return (
-          <pre className="rounded-control bg-surface-2l dark:bg-surface-2d text-content-2l dark:text-content-2d max-h-full w-full max-w-3xl overflow-auto p-5 text-[12.5px] leading-5 select-text">
+          <SelectableText
+            as="pre"
+            className="rounded-control bg-surface-2l dark:bg-surface-2d text-content-2l dark:text-content-2d max-h-full w-full max-w-3xl overflow-auto p-5 text-[12.5px] leading-5"
+          >
             {text}
-          </pre>
+          </SelectableText>
         );
       default:
         return card('No inline preview');
