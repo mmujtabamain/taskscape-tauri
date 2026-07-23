@@ -23,6 +23,44 @@ import { SectionHeader } from './SectionHeader';
 const refresh = () => void useTaskStore.getState().load();
 const selectTask = (id: string) => useSelectionStore.getState().focus(id);
 
+const SUBTASK_INDENT = 18;
+
+/** One row of the subtask tree, recursing into its own children so the inspector
+ *  mirrors the full nesting shown in the list pane. Indent grows per depth; the
+ *  hover bleed (`-mx-1.5`) stays intact by only overriding padding-left. */
+function SubtaskRow({ task, depth }: { task: Task; depth: number }) {
+  const children = useTaskStore((s) => s.childrenByParent[task.id]) ?? [];
+  return (
+    <>
+      <div
+        className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d -mx-1.5 flex h-8 items-center gap-2.5 pr-1.5"
+        style={{ paddingLeft: 6 + depth * SUBTASK_INDENT }}
+      >
+        <DoneCheckbox
+          done={task.done}
+          size={14}
+          onToggle={() => void actToggleDone(task)}
+        />
+        <button
+          onClick={() => selectTask(task.id)}
+          title={task.title}
+          className={cn(
+            'min-w-0 flex-1 truncate text-left text-[13.5px]',
+            task.done
+              ? 'text-content-3l dark:text-content-3d line-through'
+              : 'text-content-1l dark:text-content-1d'
+          )}
+        >
+          {task.title}
+        </button>
+      </div>
+      {children.map((child) => (
+        <SubtaskRow key={child.id} task={child} depth={depth + 1} />
+      ))}
+    </>
+  );
+}
+
 /** The single-task inspector. Reads the task's list/project/children from the
  *  stores, manages in-place title editing and note autosave locally, and hosts
  *  the shared attachment lightbox. Keyed by task.id in the router, so it remounts
@@ -382,28 +420,7 @@ export function TaskInspector({ task }: { task: Task }) {
             />
             <div className="-mb-2">
               {children.map((child) => (
-                <div
-                  key={child.id}
-                  className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d -mx-1.5 flex h-8 items-center gap-2.5 px-1.5"
-                >
-                  <DoneCheckbox
-                    done={child.done}
-                    size={14}
-                    onToggle={() => void actToggleDone(child)}
-                  />
-                  <button
-                    onClick={() => selectTask(child.id)}
-                    title={child.title}
-                    className={cn(
-                      'min-w-0 flex-1 truncate text-left text-[13.5px]',
-                      child.done
-                        ? 'text-content-3l dark:text-content-3d line-through'
-                        : 'text-content-1l dark:text-content-1d'
-                    )}
-                  >
-                    {child.title}
-                  </button>
-                </div>
+                <SubtaskRow key={child.id} task={child} depth={0} />
               ))}
             </div>
           </div>

@@ -2,6 +2,17 @@ import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { memo, useEffect, useRef, type ReactNode } from 'react';
 import {
+  beginTitleEdit,
+  bulkDelete,
+  bulkMove,
+  bulkSetDone,
+  copyToClipboard,
+  createSubtask,
+  requestDeleteTask,
+  selectionRootsOf,
+} from '../commands/tasks';
+import { paneRowClick, paneToggleSelect } from '../lib/paneSelection';
+import {
   dropOnRow as actDropOnRow,
   dropSetOnRow as actDropSetOnRow,
   move as actMove,
@@ -24,18 +35,6 @@ import { useTaskStore } from '../stores/taskStore';
 import { useUiStore } from '../stores/uiStore';
 import { useViewStore } from '../stores/viewStore';
 import { isVisibleInPane, orderForPane } from '../stores/visibility';
-import {
-  beginTitleEdit,
-  bulkDelete,
-  bulkMove,
-  bulkSetDone,
-  copyToClipboard,
-  createSubtask,
-  requestDeleteTask,
-  selectionRootsOf,
-} from '../commands/tasks';
-import { paneRowClick, paneToggleSelect } from '../lib/paneSelection';
-import { absoluteDateTime, relativeTime } from '../time';
 import { useContextMenu, type MenuItem } from './contextMenuContext';
 import { usePaneId } from './paneContext';
 
@@ -128,8 +127,17 @@ export const TaskRow = memo(function TaskRow({
 }) {
   const menu = useContextMenu();
   const composing = useUiStore((s) => s.composeFor === taskId);
-  const { listId, task, children, expanded, picked, selected, dragging, drop, query } =
-    useRowState(taskId);
+  const {
+    listId,
+    task,
+    children,
+    expanded,
+    picked,
+    selected,
+    dragging,
+    drop,
+    query,
+  } = useRowState(taskId);
 
   if (!task) return null;
 
@@ -145,17 +153,34 @@ export const TaskRow = memo(function TaskRow({
     const n = selectedIds.size;
     const bulk = n >= 2 && selectedIds.has(task.id);
     if (bulk) useSelectionStore.getState().focus(task.id);
-    else paneRowClick(listId, task.id, { metaKey: false, ctrlKey: false, shiftKey: false });
+    else
+      paneRowClick(listId, task.id, {
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+      });
 
     const otherLists = useListStore
       .getState()
       .listsInProject(useProjectStore.getState().activeId);
-    const moveSubmenu = otherLists.map((l) => ({ id: `move:${l.id}`, label: l.name }));
+    const moveSubmenu = otherLists.map((l) => ({
+      id: `move:${l.id}`,
+      label: l.name,
+    }));
     const items: MenuItem[] = bulk
       ? [
           { id: 'copy', label: `Copy ${n} tasks`, icon: 'content_copy' },
-          { id: 'done', label: `Mark ${n} done`, icon: 'task_alt', dividerAbove: true },
-          { id: 'undone', label: `Mark ${n} not done`, icon: 'radio_button_unchecked' },
+          {
+            id: 'done',
+            label: `Mark ${n} done`,
+            icon: 'task_alt',
+            dividerAbove: true,
+          },
+          {
+            id: 'undone',
+            label: `Mark ${n} not done`,
+            icon: 'radio_button_unchecked',
+          },
           {
             id: 'move',
             label: 'Move to list',
@@ -163,11 +188,22 @@ export const TaskRow = memo(function TaskRow({
             disabled: otherLists.length === 0,
             submenu: moveSubmenu,
           },
-          { id: 'delete', label: `Delete ${n} tasks…`, icon: 'delete', danger: true, dividerAbove: true },
+          {
+            id: 'delete',
+            label: `Delete ${n} tasks…`,
+            icon: 'delete',
+            danger: true,
+            dividerAbove: true,
+          },
         ]
       : [
           { id: 'copy', label: 'Copy', icon: 'content_copy' },
-          { id: 'subtask', label: 'Add subtask', icon: 'subdirectory_arrow_right', dividerAbove: true },
+          {
+            id: 'subtask',
+            label: 'Add subtask',
+            icon: 'subdirectory_arrow_right',
+            dividerAbove: true,
+          },
           { id: 'rename', label: 'Rename', icon: 'edit' },
           {
             id: 'move',
@@ -177,16 +213,29 @@ export const TaskRow = memo(function TaskRow({
             submenu: moveSubmenu,
           },
           ...(task.parent_id
-            ? [{ id: 'promote', label: 'Promote to top level', icon: 'north_west' }]
+            ? [
+                {
+                  id: 'promote',
+                  label: 'Promote to top level',
+                  icon: 'north_west',
+                },
+              ]
             : []),
-          { id: 'delete', label: 'Delete task…', icon: 'delete', danger: true, dividerAbove: true },
+          {
+            id: 'delete',
+            label: 'Delete task…',
+            icon: 'delete',
+            danger: true,
+            dividerAbove: true,
+          },
         ];
     menu.open({
       x,
       y,
       items,
       onPick: (id) => {
-        if (id === 'copy') void copyToClipboard(bulk ? [...selectedIds] : [task.id]);
+        if (id === 'copy')
+          void copyToClipboard(bulk ? [...selectedIds] : [task.id]);
         if (id === 'done') bulkSetDone(listId, true);
         if (id === 'undone') bulkSetDone(listId, false);
         if (id === 'subtask') useUiStore.getState().setComposeFor(task.id);
@@ -241,7 +290,9 @@ export const TaskRow = memo(function TaskRow({
         }}
         onDragLeave={(e) => {
           if (
-            !(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node) &&
+            !(e.currentTarget as HTMLElement).contains(
+              e.relatedTarget as Node
+            ) &&
             drop
           )
             useUiStore.getState().setDropTarget(null);
@@ -313,33 +364,7 @@ export const TaskRow = memo(function TaskRow({
           </span>
         )}
 
-        {/* Disclosure chevron, left of the checkbox in the gutter. */}
-        <span className="grid w-5 shrink-0 place-items-center">
-          {children.length > 0 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                useLayoutStore.getState().toggleCollapsed(task.id);
-              }}
-              onDoubleClick={(e) => e.stopPropagation()}
-              className={cn(
-                'rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 place-items-center',
-                expanded ? 'opacity-0 group-hover/row:opacity-100' : 'opacity-100'
-              )}
-              title={expanded ? 'Collapse' : 'Expand'}
-            >
-              <Icon
-                name="chevron_right"
-                size={16}
-                weight={300}
-                className={cn(
-                  'transition-transform duration-100',
-                  expanded && 'rotate-90'
-                )}
-              />
-            </button>
-          )}
-        </span>
+        <div className="w-5" />
 
         <span className="grid w-6 shrink-0 place-items-center">
           <Check
@@ -355,11 +380,13 @@ export const TaskRow = memo(function TaskRow({
             className={cn(
               'truncate text-[14px] leading-4.75 font-medium',
               task.done
-                ? 'strike strike-on text-content-3l dark:text-content-3d'
+                ? 'text-content-3l dark:text-content-3d'
                 : 'text-content-1l dark:text-content-1d'
             )}
           >
-            {highlight(task.title, query)}
+            <span className={cn('strike', task.done && 'strike-on')}>
+              {highlight(task.title, query)}
+            </span>
           </div>
           {task.notes && (
             <div
@@ -375,56 +402,64 @@ export const TaskRow = memo(function TaskRow({
           )}
         </div>
 
-        <div
-          className={cn(
-            'ml-2.5 flex shrink-0 items-center gap-2.5',
-            task.done && 'opacity-55'
-          )}
-        >
-          {!expanded && children.length > 0 && (
-            <span className="text-content-3l dark:text-content-3d text-[11px] font-semibold tabular-nums">
-              ({children.length})
+        <div className={'ml-2.5 flex shrink-0 items-center gap-2'}>
+          {/* Disclosure chevron, left of the checkbox in the gutter. */}
+          {children.length > 0 && (
+            <span className="grid w-5 shrink-0 place-items-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  useLayoutStore.getState().toggleCollapsed(task.id);
+                }}
+                onDoubleClick={(e) => e.stopPropagation()}
+                className={cn(
+                  'rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 place-items-center',
+                  expanded
+                    ? 'opacity-0 group-hover/row:opacity-100'
+                    : 'opacity-100'
+                )}
+                title={expanded ? 'Collapse' : 'Expand'}
+              >
+                <Icon
+                  name="chevron_left"
+                  size={16}
+                  weight={300}
+                  className={cn(
+                    'transition-transform duration-100',
+                    expanded && '-rotate-90'
+                  )}
+                />
+              </button>
             </span>
           )}
-          {expanded && children.length > 0 && (
+          {children.length > 0 && (
             <span
-              className="text-content-3l dark:text-content-3d text-[11px] font-semibold tracking-[0.02em] tabular-nums"
+              className="rounded-field border-edge-2l dark:border-edge-2d bg-surface-3d text-content-3l dark:text-content-3d flex h-5 items-center gap-0.5 border px-1 text-[11px] font-semibold"
               title={`${doneChildren} of ${children.length} subtasks done`}
             >
-              {doneChildren}/{children.length}
+              <span>{doneChildren}</span>
+              <span>/</span>
+              <span>{children.length}</span>
             </span>
           )}
           {task.attachments.length > 0 && (
-            <span className="rounded-field border-edge-2l dark:border-edge-2d text-content-3l dark:text-content-3d flex h-5 items-center gap-1 border px-1.5 text-[11px] font-semibold tabular-nums">
-              <Icon name="attach_file" size={13} weight={300} />
-              {task.attachments.length}
+            <span className="rounded-field border-edge-2l dark:border-edge-2d bg-surface-3d text-content-3l dark:text-content-3d flex h-5 items-center gap-0.5 border px-0.5 text-[11px] font-semibold">
+              <Icon name="attach_file" size={13} weight={500} />
+              <span className="pr-0.5">{task.attachments.length}</span>
             </span>
           )}
-          <span
-            className="text-content-3l dark:text-content-3d text-[11.5px] tracking-[0.02em] tabular-nums"
-            title={`Created ${absoluteDateTime(task.created_at)}`}
-          >
-            {relativeTime(task.created_at)}
-          </span>
           <button
             onClick={(e) => {
               e.stopPropagation();
-              useUiStore.getState().setComposeFor(task.id);
-            }}
-            onDoubleClick={(e) => e.stopPropagation()}
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 group-hover/row:opacity-100"
-            title="Add subtask"
-          >
-            <Icon name="add" size={17} weight={300} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              const r = (
+                e.currentTarget as HTMLElement
+              ).getBoundingClientRect();
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 group-hover/row:opacity-100"
+            className={cn(
+              'rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center'
+            )}
             title="More"
           >
             <Icon name="more_horiz" size={17} weight={300} />
@@ -498,14 +533,19 @@ function Check({
       onDoubleClick={(e) => e.stopPropagation()}
     >
       {/* Selection indicator */}
-      {!doneMode && picked && <span className="bg-content-1d size-2 rounded-full" />}
+      {!doneMode && picked && (
+        <span className="bg-content-1d size-2 rounded-full" />
+      )}
 
       {/* Done fill */}
       {doneMode && (
         <>
           {done && <div className="size-full"></div>}
           {/* Animated check */}
-          <svg viewBox="0 0 12 12" className="absolute inset-0 m-auto h-3.5 w-3.5">
+          <svg
+            viewBox="0 0 12 12"
+            className="absolute inset-0 m-auto h-3.5 w-3.5"
+          >
             <path
               d="M2.5 6.5 L5 8.8 L9.5 3.6"
               fill="none"
@@ -517,9 +557,7 @@ function Check({
               strokeDashoffset={done ? 0 : 12}
               opacity={done ? 1 : undefined}
               className={
-                !done
-                  ? 'opacity-0 group-hover/check:opacity-30'
-                  : undefined
+                !done ? 'opacity-0 group-hover/check:opacity-30' : undefined
               }
               style={{
                 transition: done
