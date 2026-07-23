@@ -220,7 +220,7 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
           <button
             onClick={() => startNewTask(list.id)}
             title="New task"
-            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
           >
             <Icon name="add" size={18} weight={400} />
           </button>
@@ -369,7 +369,7 @@ function BulkBar({ count }: { count: number }) {
     });
   };
   const btn =
-    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d flex h-6 items-center gap-1 px-1.5 text-[12px] font-semibold normal-case tracking-normal transition-colors disabled:pointer-events-none disabled:opacity-40';
+    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d flex h-6 items-center gap-1 px-1.5 text-[12px] font-semibold normal-case tracking-normal disabled:pointer-events-none disabled:opacity-40';
   return (
     <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d flex h-9 shrink-0 items-center gap-1 border-t px-3">
       <span className="text-content-1l dark:text-content-1d mr-1 pl-1 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
@@ -465,7 +465,7 @@ function ViewControl() {
       onClick={toggle}
       title="Sort & filter"
       className={cn(
-        'rounded-field flex h-5.5 items-center gap-1 px-1.5 text-[11px] font-semibold tracking-normal normal-case transition-colors',
+        'rounded-field flex h-5.5 items-center gap-1 px-1.5 text-[11px] font-semibold tracking-normal normal-case',
         active
           ? 'text-accent-500l dark:text-accent-500d'
           : 'text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d'

@@ -95,14 +95,14 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
             <button
               onClick={() => useTrashStore.getState().restore([t.id])}
               title="Restore"
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-7 w-7 shrink-0 place-items-center opacity-0 transition-opacity group-hover/trash:opacity-100"
+              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-7 w-7 shrink-0 place-items-center opacity-0 group-hover/trash:opacity-100"
             >
               <Icon name="restore" size={16} />
             </button>
             <button
               onClick={() => useTrashStore.getState().purge([t.id])}
               title="Delete permanently"
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-7 w-7 shrink-0 place-items-center opacity-0 transition-opacity group-hover/trash:opacity-100"
+              className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-7 w-7 shrink-0 place-items-center opacity-0 group-hover/trash:opacity-100"
             >
               <Icon name="delete_forever" size={16} />
             </button>

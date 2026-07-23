@@ -163,7 +163,7 @@ function Resizer({
     >
       <span
         className={cn(
-          'absolute inset-y-0 left-0 w-px transition-colors',
+          'absolute inset-y-0 left-0 w-px',
           active
             ? 'bg-edge-3l dark:bg-edge-3d'
             : 'hover:bg-edge-2l dark:hover:bg-edge-2d bg-transparent'

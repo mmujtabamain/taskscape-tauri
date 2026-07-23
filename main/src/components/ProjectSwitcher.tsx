@@ -40,7 +40,7 @@ export function ProjectSwitcher() {
     <div ref={rootRef} className="relative flex items-center" data-no-drag>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="rounded-control bg-surface-0l dark:bg-surface-0d hover:bg-wash-2l dark:hover:bg-wash-2d flex h-8 items-center gap-1.5 py-1.5 pr-2.5 pl-3.5 transition-colors"
+        className="rounded-control bg-surface-0l dark:bg-surface-0d hover:bg-wash-2l dark:hover:bg-wash-2d flex h-8 items-center gap-1.5 py-1.5 pr-2.5 pl-3.5"
         title="Switch project"
       >
         <span className="font-display text-content-1l dark:text-content-1d max-w-44 truncate text-[14px] font-semibold">
@@ -77,7 +77,7 @@ export function ProjectSwitcher() {
                   setOpen(false);
                   void renameProject(p);
                 }}
-                className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 transition-opacity group-hover:opacity-100"
+                className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 group-hover:opacity-100"
                 title="Rename project"
               >
                 <Icon name="edit" size={16} weight={500} />
@@ -88,7 +88,7 @@ export function ProjectSwitcher() {
                   setOpen(false);
                   void deleteProject(p);
                 }}
-                className="rounded-field text-content-3l dark:text-content-3d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 place-items-center opacity-0 transition-opacity group-hover:opacity-100"
+                className="rounded-field text-content-3l dark:text-content-3d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 place-items-center opacity-0 group-hover:opacity-100"
                 title="Delete project"
               >
                 <Icon name="delete" size={16} weight={500} />

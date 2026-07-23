@@ -155,7 +155,7 @@ export function ListTabs() {
                 }
               }}
               className={cn(
-                'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-2 border-b border-transparent pr-2 pl-4 transition-colors',
+                'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-2 border-b border-transparent pr-2 pl-4',
                 focused && 'bg-surface-2l dark:bg-surface-2d',
                 dropOver === list.id && 'bg-selection-1l dark:bg-selection-1d',
                 draggingTab === list.id && 'opacity-40'
@@ -206,7 +206,7 @@ export function ListTabs() {
                     e.stopPropagation();
                     void deleteList(list);
                   }}
-                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center"
                   title="Delete list"
                 >
                   <Icon name="close" size={15} weight={500} />
@@ -258,7 +258,7 @@ export function ListTabs() {
       )}
       <button
         onClick={() => void createList()}
-        className="text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d my-auto ml-2 grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors"
+        className="text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d my-auto ml-2 grid h-7 w-7 shrink-0 place-items-center rounded-md"
         title="New list"
       >
         <Icon name="add" size={18} weight={300} />

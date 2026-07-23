@@ -55,7 +55,7 @@ function Segmented<T extends string>({
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
-          className={`rounded-field h-7 flex-1 text-[12px] font-medium transition duration-150 ${
+          className={`rounded-field h-7 flex-1 text-[12px] font-medium ${
             value === o.value
               ? 'border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d border'
               : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
@@ -234,7 +234,7 @@ export function SettingsWindow() {
             type="button"
             aria-label="Close settings"
             onClick={() => void getCurrentWindow().close()}
-            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d ml-auto flex h-6 w-6 items-center justify-center transition duration-150"
+            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d ml-auto flex h-6 w-6 items-center justify-center"
           >
             <Icon name="close" size={18} />
           </button>
@@ -247,7 +247,7 @@ export function SettingsWindow() {
                 key={p.id}
                 type="button"
                 onClick={() => setPane(p.id)}
-                className={`rounded-field flex h-8 w-full items-center gap-2 px-2.5 text-[13px] font-medium transition duration-150 ${
+                className={`rounded-field flex h-8 w-full items-center gap-2 px-2.5 text-[13px] font-medium ${
                   pane === p.id
                     ? 'bg-wash-2l dark:bg-wash-2d text-content-1l dark:text-content-1d'
                     : 'text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d'

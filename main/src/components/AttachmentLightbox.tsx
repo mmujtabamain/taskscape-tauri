@@ -41,7 +41,7 @@ function BarButton({
       onClick={onClick}
       title={title}
       className={cn(
-        'rounded-control grid h-8 w-8 shrink-0 place-items-center text-white/70 transition-colors',
+        'rounded-control grid h-8 w-8 shrink-0 place-items-center text-white/70',
         danger
           ? 'hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white'
           : 'hover:bg-white/15 hover:text-white'
@@ -209,7 +209,7 @@ export function AttachmentLightbox({
       </div>
       <button
         onClick={() => api.openAttachment(attachment)}
-        className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent hover:bg-accent-600l dark:hover:bg-accent-600d mt-1 flex h-9 items-center gap-1.5 px-4 text-[13px] font-semibold transition-colors"
+        className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent hover:bg-accent-600l dark:hover:bg-accent-600d mt-1 flex h-9 items-center gap-1.5 px-4 text-[13px] font-semibold"
       >
         <Icon name="open_in_new" size={15} />
         Open externally
@@ -343,7 +343,7 @@ export function AttachmentLightbox({
                 step(-1);
               }}
               title="Previous"
-              className="absolute left-4 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+              className="absolute left-4 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
             >
               <Icon name="chevron_left" size={26} weight={300} />
             </button>
@@ -353,7 +353,7 @@ export function AttachmentLightbox({
                 step(1);
               }}
               title="Next"
-              className="absolute right-4 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+              className="absolute right-4 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
             >
               <Icon name="chevron_right" size={26} weight={300} />
             </button>

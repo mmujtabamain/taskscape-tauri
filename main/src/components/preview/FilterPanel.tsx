@@ -164,7 +164,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
                   disabled={view.sort === 'manual'}
                   title={dir === 'asc' ? 'Ascending' : 'Descending'}
                   className={cn(
-                    'grid h-6.5 w-7 place-items-center rounded-[5px] transition-colors disabled:pointer-events-none disabled:opacity-40',
+                    'grid h-6.5 w-7 place-items-center rounded-[5px] disabled:pointer-events-none disabled:opacity-40',
                     view.dir === dir && view.sort !== 'manual'
                       ? 'bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift'
                       : 'text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d'
@@ -280,14 +280,14 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
         <button
           onClick={resetAll}
           disabled={!anyActive}
-          className="rounded-control text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d flex h-8 items-center gap-1 px-2.5 text-[12.5px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40"
+          className="rounded-control text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d flex h-8 items-center gap-1 px-2.5 text-[12.5px] font-semibold disabled:pointer-events-none disabled:opacity-40"
         >
           <Icon name="restart_alt" size={15} />
           Reset
         </button>
         <button
           onClick={onClose}
-          className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift hover:bg-accent-600l dark:hover:bg-accent-600d ml-auto flex h-8 items-center px-4 text-[12.5px] font-semibold transition-colors"
+          className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift hover:bg-accent-600l dark:hover:bg-accent-600d ml-auto flex h-8 items-center px-4 text-[12.5px] font-semibold"
         >
           Done
         </button>
@@ -355,7 +355,7 @@ function Segmented<T extends string>({
             key={o.id}
             onClick={() => onChange(o.id)}
             className={cn(
-              'truncate rounded-[5px] font-medium transition-colors',
+              'truncate rounded-[5px] font-medium',
               size === 'md' ? 'h-6.5 px-2 text-[12px]' : 'h-5.5 px-1 text-[11px]',
               on
                 ? 'bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift'
@@ -393,7 +393,7 @@ function MenuButton({
     <button
       onClick={open}
       className={cn(
-        'bg-surface-0l dark:bg-surface-0d rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-7.5 items-center gap-2 px-2.5 transition-colors',
+        'bg-surface-0l dark:bg-surface-0d rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-7.5 items-center gap-2 px-2.5',
         className
       )}
     >
@@ -464,7 +464,7 @@ function DaysStepper({
 }) {
   const clamp = (n: number) => Math.min(365, Math.max(1, Math.round(n) || 1));
   const btn =
-    'bg-surface-0l dark:bg-surface-0d rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6.5 w-6.5 shrink-0 place-items-center transition-colors';
+    'bg-surface-0l dark:bg-surface-0d rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6.5 w-6.5 shrink-0 place-items-center';
   return (
     <div className="flex items-center gap-1.5 pl-0.5">
       <span className="text-content-2l dark:text-content-2d min-w-0 flex-1 truncate text-[12.5px] font-medium">

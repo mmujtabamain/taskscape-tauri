@@ -73,7 +73,7 @@ function MacControls() {
               <g
                 fill={l.glyphColor}
                 transform="translate(42.7 42.7) scale(1.12) translate(-42.7 -42.7)"
-                className="opacity-0 transition-opacity duration-100 group-hover:opacity-100"
+                className="opacity-0 group-hover:opacity-100"
               >
                 {GLYPHS[l.glyph]}
               </g>
@@ -100,7 +100,7 @@ function WinControls() {
   }, [win]);
 
   const base =
-    'flex h-full w-[46px] items-center justify-center text-content-2l dark:text-content-2d transition-colors duration-100';
+    'flex h-full w-[46px] items-center justify-center text-content-2l dark:text-content-2d';
   return (
     <div className="flex h-full items-stretch" data-no-drag>
       <button

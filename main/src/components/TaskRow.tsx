@@ -284,7 +284,7 @@ export const TaskRow = memo(function TaskRow({
           openMenu(e.clientX, e.clientY);
         }}
         className={cn(
-          'group/row relative flex min-h-10 items-center pr-3 transition-colors duration-75',
+          'group/row relative flex min-h-10 items-center pr-3',
           selected
             ? 'bg-selection-1l dark:bg-selection-1d'
             : 'hover:bg-wash-1l dark:hover:bg-wash-1d',
@@ -323,7 +323,7 @@ export const TaskRow = memo(function TaskRow({
               }}
               onDoubleClick={(e) => e.stopPropagation()}
               className={cn(
-                'rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 place-items-center transition-opacity',
+                'rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 place-items-center',
                 expanded ? 'opacity-0 group-hover/row:opacity-100' : 'opacity-100'
               )}
               title={expanded ? 'Collapse' : 'Expand'}
@@ -412,7 +412,7 @@ export const TaskRow = memo(function TaskRow({
               useUiStore.getState().setComposeFor(task.id);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 transition-opacity duration-100 group-hover/row:opacity-100"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 group-hover/row:opacity-100"
             title="Add subtask"
           >
             <Icon name="add" size={17} weight={300} />
@@ -424,7 +424,7 @@ export const TaskRow = memo(function TaskRow({
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 transition-opacity duration-100 group-hover/row:opacity-100"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 group-hover/row:opacity-100"
             title="More"
           >
             <Icon name="more_horiz" size={17} weight={300} />
@@ -518,7 +518,7 @@ function Check({
               opacity={done ? 1 : undefined}
               className={
                 !done
-                  ? 'opacity-0 transition-opacity duration-100 group-hover/check:opacity-30'
+                  ? 'opacity-0 group-hover/check:opacity-30'
                   : undefined
               }
               style={{

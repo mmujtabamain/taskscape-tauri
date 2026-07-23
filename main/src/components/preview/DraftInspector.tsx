@@ -35,7 +35,7 @@ export function DraftInspector() {
   }, [title]);
   const noBlur = (e: React.MouseEvent) => e.preventDefault();
   const startBtn =
-    'rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-2l dark:text-content-2d hover:border-content-3l dark:hover:border-content-3d hover:text-content-1l dark:hover:text-content-1d flex h-10 flex-1 items-center justify-center gap-1.5 border border-dashed text-[13px] font-semibold transition-colors';
+    'rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-2l dark:text-content-2d hover:border-content-3l dark:hover:border-content-3d hover:text-content-1l dark:hover:text-content-1d flex h-10 flex-1 items-center justify-center gap-1.5 border border-dashed text-[13px] font-semibold';
 
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
@@ -76,7 +76,7 @@ export function DraftInspector() {
             onMouseDown={noBlur}
             onClick={() => void runDraftAction('', 'cancel')}
             title="Discard draft"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
           >
             <Icon name="last_page" size={16} />
           </button>

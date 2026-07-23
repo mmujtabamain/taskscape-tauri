@@ -65,7 +65,7 @@ export function NoteCard({
       <button
         onClick={onDelete}
         title="Delete note"
-        className="z-raised border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-3l dark:text-content-3d shadow-lift hover:text-danger-500l dark:hover:text-danger-500d absolute -top-2 -right-2 grid h-6 w-6 place-items-center rounded-full border opacity-0 transition-opacity group-hover/note:opacity-100"
+        className="z-raised border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-3l dark:text-content-3d shadow-lift hover:text-danger-500l dark:hover:text-danger-500d absolute -top-2 -right-2 grid h-6 w-6 place-items-center rounded-full border opacity-0 group-hover/note:opacity-100"
       >
         <Icon name="close" size={14} weight={400} />
       </button>

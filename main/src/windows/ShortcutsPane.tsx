@@ -116,7 +116,7 @@ export function ShortcutsPane() {
                         aria-label={`Reset ${b.label} to default`}
                         title="Reset to default"
                         onClick={() => void reset(b.id)}
-                        className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d flex h-6 w-6 items-center justify-center opacity-0 transition duration-150 group-hover:opacity-100"
+                        className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d flex h-6 w-6 items-center justify-center opacity-0 group-hover:opacity-100"
                       >
                         <Icon name="restart_alt" size={15} />
                       </button>
@@ -124,7 +124,7 @@ export function ShortcutsPane() {
                     <button
                       type="button"
                       onClick={() => beginRecording(b.id)}
-                      className={`rounded-field inline-flex h-6 min-w-14 items-center justify-center border px-2 font-sans text-[11px] tabular-nums transition duration-150 ${
+                      className={`rounded-field inline-flex h-6 min-w-14 items-center justify-center border px-2 font-sans text-[11px] tabular-nums ${
                         recording === b.id
                           ? 'border-accent-500l dark:border-accent-500d text-accent-500l dark:text-accent-500d bg-surface-0l dark:bg-surface-0d'
                           : 'border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d text-content-2l dark:text-content-2d hover:border-edge-3l dark:hover:border-edge-3d hover:text-content-1l dark:hover:text-content-1d'

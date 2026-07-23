@@ -121,7 +121,7 @@ function BarButton({
       disabled={disabled}
       title={title}
       className={cn(
-        'rounded-control hover:bg-wash-1l dark:hover:bg-wash-1d grid h-8 w-8 place-items-center transition-colors disabled:pointer-events-none disabled:opacity-35',
+        'rounded-control hover:bg-wash-1l dark:hover:bg-wash-1d grid h-8 w-8 place-items-center disabled:pointer-events-none disabled:opacity-35',
         active
           ? 'text-content-1l dark:text-content-1d'
           : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'

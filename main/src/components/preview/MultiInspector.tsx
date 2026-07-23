@@ -57,7 +57,7 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
   };
 
   const act =
-    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-8 items-center justify-center gap-1.5 text-[12.5px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40';
+    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-8 items-center justify-center gap-1.5 text-[12.5px] font-semibold disabled:pointer-events-none disabled:opacity-40';
 
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
@@ -77,7 +77,7 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
           <button
             onClick={() => focusedListId && useSelectionStore.getState().clear(focusedListId)}
             title="Clear selection"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
           >
             <Icon name="close" size={16} />
           </button>
@@ -150,7 +150,7 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
               <button
                 onClick={() => openOne(t.id)}
                 title="Open"
-                className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center opacity-0 transition-opacity group-hover/sel:opacity-100"
+                className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center opacity-0 group-hover/sel:opacity-100"
               >
                 <Icon name="open_in_full" size={13} />
               </button>

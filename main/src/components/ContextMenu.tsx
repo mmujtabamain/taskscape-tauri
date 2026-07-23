@@ -117,7 +117,7 @@ function MenuPanel({
               if (!item.submenu) onPick(item.id);
             }}
             className={cn(
-              'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] transition-colors disabled:pointer-events-none disabled:opacity-40',
+              'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] disabled:pointer-events-none disabled:opacity-40',
               item.danger
                 ? 'text-danger-500l dark:text-danger-500d hover:bg-danger-100l dark:hover:bg-danger-100d'
                 : 'text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d'

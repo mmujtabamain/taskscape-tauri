@@ -17,8 +17,8 @@ export function DoneCheckbox({
       onClick={onToggle}
       title={done ? 'Mark not done' : 'Mark done'}
       className={cn(
-        'rounded-field grid shrink-0 place-items-center border-[1.5px] transition-colors',
-        size === 18 ? 'h-5 w-5' : 'h-[18px] w-[18px]',
+        'rounded-field grid shrink-0 place-items-center border-[1.5px]',
+        size === 18 ? 'h-5 w-5' : 'h-4.5 w-4.5',
         done
           ? 'bg-done-lamp-1l dark:bg-done-lamp-1d text-on-accent border-transparent'
           : 'border-edge-3l dark:border-edge-3d hover:border-content-3l dark:hover:border-content-3d'

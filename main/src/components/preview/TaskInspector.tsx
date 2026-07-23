@@ -202,7 +202,7 @@ export function TaskInspector({ task }: { task: Task }) {
   };
 
   const headBtn =
-    'rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center transition-colors';
+    'rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center';
 
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
@@ -296,7 +296,7 @@ export function TaskInspector({ task }: { task: Task }) {
             <button
               onClick={() => void requestDeleteTask(task)}
               title="Delete task"
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center transition-colors"
+              className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center"
             >
               <Icon name="delete" size={15} />
             </button>
@@ -317,7 +317,7 @@ export function TaskInspector({ task }: { task: Task }) {
                   <button
                     onClick={() => setAddingNote(true)}
                     title="Add note"
-                    className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
+                    className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
                   >
                     <Icon name="add" size={14} />
                     Note
@@ -361,7 +361,7 @@ export function TaskInspector({ task }: { task: Task }) {
             ) : notes.length === 0 ? (
               <button
                 onClick={() => setAddingNote(true)}
-                className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-3l dark:text-content-3d hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d flex h-24 w-full items-center justify-center gap-1.5 border border-dashed font-semibold transition-colors"
+                className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-3l dark:text-content-3d hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d flex h-24 w-full items-center justify-center gap-1.5 border border-dashed font-semibold"
               >
                 <Icon name="add" size={16} />
                 Add note

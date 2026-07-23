@@ -14,7 +14,7 @@ function suggestFor(kind: 'project' | 'list' | undefined): string {
 }
 
 const BTN =
-  'inline-flex h-8 items-center justify-center rounded-control px-4 text-[12.5px] font-semibold tracking-[0.01em] transition duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-1l dark:focus-visible:ring-focus-1d';
+  'inline-flex h-8 items-center justify-center rounded-control px-4 text-[12.5px] font-semibold tracking-[0.01em] transition-transform duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-1l dark:focus-visible:ring-focus-1d';
 const BTN_VARIANT: Record<NonNullable<ModalButton['variant']>, string> = {
   ghost:
     'border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d hover:border-edge-3l dark:hover:border-edge-3d hover:bg-surface-2l dark:hover:bg-surface-2d',
@@ -262,7 +262,7 @@ function Modal({
                         aria-label="Suggest another name"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={rollSuggestion}
-                        className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center transition duration-150"
+                        className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center"
                       >
                         <Icon name="casino" size={16} />
                       </button>

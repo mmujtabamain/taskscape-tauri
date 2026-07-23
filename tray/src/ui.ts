@@ -6,6 +6,6 @@ export const inputClasses =
   'dark:text-content-1d dark:placeholder:text-content-3d';
 
 export const ghostButtonBase =
-  'flex shrink-0 items-center gap-1.5 rounded-control px-2 py-1 text-xs transition ' +
+  'flex shrink-0 items-center gap-1.5 rounded-control px-2 py-1 text-xs ' +
   'hover:bg-surface-1l dark:hover:bg-surface-1d ' +
   'disabled:cursor-default disabled:hover:bg-transparent';

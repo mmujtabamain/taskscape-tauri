@@ -35,7 +35,7 @@ export function Footer({
       <button
         onClick={() => api.openMain()}
         tabIndex={-1}
-        className="text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d flex min-w-0 items-center gap-1.5 text-xs transition-colors"
+        className="text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d flex min-w-0 items-center gap-1.5 text-xs"
         title="Open the main Taskscape window"
       >
         <Icon name="open_in_new" size={14} />

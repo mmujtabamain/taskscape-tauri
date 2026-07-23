@@ -161,21 +161,21 @@ export function AttachmentSection({
               onClick={addScreenshot}
               disabled={capturing}
               title={capturing ? 'Capturing …' : 'Capture the full screen and attach it'}
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold disabled:cursor-default disabled:hover:bg-transparent"
             >
               {capturing ? <Spinner size={12} /> : <Icon name="screenshot_monitor" size={14} />}
               {capturing ? 'Capturing …' : 'Shot'}
             </button>
             <button
               onClick={addLink}
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
+              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
             >
               <Icon name="add_link" size={14} />
               Link
             </button>
             <button
               onClick={addFile}
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold transition-colors"
+              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
             >
               <Icon name="note_add" size={14} />
               File
@@ -199,7 +199,7 @@ export function AttachmentSection({
                     e.dataTransfer.setData(ATTACHMENT_MIME, a.name);
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
-                  className="group rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d hover:border-edge-3l dark:hover:border-edge-3d relative block aspect-square w-full overflow-hidden border transition-colors"
+                  className="group rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d hover:border-edge-3l dark:hover:border-edge-3d relative block aspect-square w-full overflow-hidden border"
                 >
                   {thumb ? (
                     <img
@@ -217,7 +217,7 @@ export function AttachmentSection({
                       />
                     </span>
                   )}
-                  <span className="bg-surface-3l dark:bg-surface-3d text-content-2l dark:text-content-2d absolute top-1 right-1 grid h-5 w-5 place-items-center rounded-full opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="bg-surface-3l dark:bg-surface-3d text-content-2l dark:text-content-2d absolute top-1 right-1 grid h-5 w-5 place-items-center rounded-full opacity-0 group-hover:opacity-100">
                     <Icon name="open_in_full" size={14} />
                   </span>
                 </button>
@@ -233,7 +233,7 @@ export function AttachmentSection({
           <button
             onClick={addFile}
             title="Copy a file into this task"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold transition-colors"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold"
           >
             <Icon name="note_add" size={18} />
             Copy a file
@@ -242,7 +242,7 @@ export function AttachmentSection({
           <button
             onClick={addLink}
             title="Link a file or URL without copying"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold transition-colors"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold"
           >
             <Icon name="add_link" size={18} />
             Add a link
