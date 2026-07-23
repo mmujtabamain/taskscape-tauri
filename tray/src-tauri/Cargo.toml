@@ -30,3 +30,13 @@ taskscape-common = { path = "../../common" }
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 
+[profile.dev]
+incremental = false
+
+# Strip debug info from dependencies to shrink target/; keep it for our own crates.
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.package.taskscape-common]
+debug = true
+

@@ -24,7 +24,8 @@ run() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Rust crates (each app has its own target/; they share the ../../common crate).
+# Rust crates. Both apps + common share one target/ (see .cargo/config.toml),
+# so each cargo clean targets the same dir — idempotent.
 RUST_CRATES=(common main/src-tauri tray/src-tauri)
 
 # Vite build output + dev caches live per workspace (common-ui is source-only).

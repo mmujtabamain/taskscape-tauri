@@ -1,0 +1,14 @@
+# Shared Cargo target directory for both apps (main/ and tray/).
+#
+# Both apps are separate workspaces that share taskscape-common and nearly all
+# dependencies. Pointing them at one target dir lets Cargo reuse compiled deps
+# instead of building a private copy per app, cutting disk use substantially.
+#
+# Relative to this file's directory (the repo root), so cargo run from any
+# subdir (main/src-tauri, tray/src-tauri) resolves to <repo>/target.
+#
+# Trade-off: Cargo takes an exclusive lock per target dir, so `npm run dev`
+# (which builds both apps at once) serializes the two builds instead of running
+# them in parallel.
+[build]
+target-dir = "target"

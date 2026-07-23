@@ -38,10 +38,13 @@ build_app() {
 }
 
 find_app() {
-  # Newest .app bundle produced by `tauri build` for the given app dir. Sorting
-  # by mtime avoids grabbing a stale bundle left over from an earlier build under
-  # a different productName.
-  ls -dt "$ROOT/$1/src-tauri/target/release/bundle/macos/"*.app 2>/dev/null | head -1
+  # The .app bundle produced by `tauri build` for the given app dir. Both apps
+  # build into one shared target dir (see .cargo/config.toml), so bundles are
+  # disambiguated by productName rather than by directory.
+  local name
+  name="$(node -p "require('$ROOT/$1/src-tauri/tauri.conf.json').productName")"
+  local app="$ROOT/target/release/bundle/macos/$name.app"
+  [ -d "$app" ] && printf '%s\n' "$app"
 }
 
 build_app main
