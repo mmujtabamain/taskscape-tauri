@@ -6,24 +6,6 @@
 @import '../../common-ui/styles/tokens.css';
 @import '../../common-ui/styles/note-rt.css';
 
-@font-face {
-  font-family: 'Montserrat';
-  src: url('./assets/fonts/Montserrat-VariableFont_wght.ttf')
-    format('truetype-variations');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Outfit';
-  src: url('./assets/fonts/Outfit-VariableFont_wght.ttf')
-    format('truetype-variations');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* The `@custom-variant dark`, the theme-swapping alias `.dark` overrides, and
    `--icon-wght` are shared with the tray, so they live in tokens.css. Only the
    traffic-light disc colors are specific to this app. */
@@ -59,7 +41,7 @@
     overscroll-behavior: none;
     background-color: var(--surface-1);
     color: var(--content-1);
-    font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+    font-family: system-ui, sans-serif;
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
     -webkit-user-select: none;

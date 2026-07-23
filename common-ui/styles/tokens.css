@@ -120,8 +120,8 @@
    (`bg-surface-1l`) and dark (`bg-surface-1d`) utilities exist and resolve to the
    fixed values above. */
 @theme inline {
-  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Outfit', 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-display: ui-sans-serif, system-ui, sans-serif;
 
   --color-surface-0l: var(--surface-0l);
   --color-surface-0d: var(--surface-0d);
