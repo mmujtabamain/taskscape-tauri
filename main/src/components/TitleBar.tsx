@@ -5,7 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { api } from '../api';
 import { splitTargetId } from '../commands/view';
 import { isMac } from '../lib/platform';
-import { useLowPowerMode } from '../lib/reducedMotion';
+import { useLowPowerMode, useReducedMotion } from '../lib/reducedMotion';
 import { useHotkeyStore } from '../stores/hotkeyStore';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useListStore } from '../stores/listStore';
@@ -16,7 +16,8 @@ import { WindowControls } from './WindowControls';
 /** The window chrome: project switcher, list tabs, and the view controls. A thin
  *  layout shell — each child self-sources its own state from the stores. */
 export function TitleBar() {
-  const reducedMotion = useLowPowerMode();
+  const reducedMotion = useReducedMotion();
+  const lowPower = useLowPowerMode();
   const splitListId = useLayoutStore((s) => s.splitListId);
   const previewOpen = useLayoutStore((s) => s.previewOpen);
   const hotkeys = useHotkeyStore((s) => s.map);
@@ -63,7 +64,11 @@ export function TitleBar() {
       <div className="gap-space-4 pr-space-6 pl-space-6 flex items-center">
         {reducedMotion && (
           <div
-            title="Reduced motion active on Low Power Mode"
+            title={
+              lowPower
+                ? 'Reduced motion active on Low Power Mode'
+                : 'Reduced motion is on (Settings > General)'
+            }
             className="text-content-3l dark:text-content-3d grid h-8 w-8 shrink-0 place-items-center"
           >
             <Icon name="motion_photos_off" size={19} weight={300} />

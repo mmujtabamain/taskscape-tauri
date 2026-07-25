@@ -1,254 +1,347 @@
-import { Icon } from '@taskscape/common-ui/Icon';
+import { cn } from '@taskscape/common-ui/cn';
 import {
+  Badge,
+  EmptyState,
   IconButton,
+  InputWell,
   Label,
-  SectionHeader,
-  Segmented,
-  Toggle,
+  MenuItem,
+  SettingRow,
+  SettingsGroup,
+  TextInput,
 } from '@taskscape/common-ui/components';
-import { emit } from '@tauri-apps/api/event';
+import { Icon } from '@taskscape/common-ui/Icon';
+import { getVersion } from '@tauri-apps/api/app';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useRef, useState } from 'react';
-import { api } from '../api';
-import { setTheme, type ThemePref } from '../lib/theme';
-import { ShortcutsPane } from './ShortcutsPane';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
+import { api, type DataPaths } from '../api';
+import { useLowPowerMode } from '../lib/reducedMotion';
+import { countRows, filterGroups, PANES } from './settings/panes';
+import { SettingsTitleBar } from './settings/SettingsTitleBar';
+import { useSettings } from './settings/settings';
+import type { GroupSpec, SettingsCtx } from './settings/types';
+import { useHotkeyEditor } from './settings/useHotkeyEditor';
 
+// Mirrors both the inner size and the minimum size `build_panel` gives this
+// window in main/src-tauri/src/lib.rs — keep the two in step.
 const WIDTH = 640;
 const HEIGHT = 520;
 
-const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-];
-
-type ScreenshotMode = 'fullscreen' | 'region';
-
-const SCREENSHOT_OPTIONS: { value: ScreenshotMode; label: string }[] = [
-  { value: 'fullscreen', label: 'Full Screen' },
-  { value: 'region', label: 'Region' },
-];
-
-const PANES = [
-  { id: 'general', label: 'General', icon: 'tune' },
-  { id: 'shortcuts', label: 'Shortcuts', icon: 'keyboard' },
-] as const;
-type PaneId = (typeof PANES)[number]['id'];
-
-function SectionLabel({ children }: { children: string }) {
-  return <SectionHeader label={children} className="mb-0" />;
-}
-
-function GeneralPane({
-  theme,
-  onTheme,
-  showCompleted,
-  onToggleCompleted,
-  screenshotMode,
-  onScreenshotMode,
-}: {
-  theme: ThemePref;
-  onTheme: (next: ThemePref) => void;
-  showCompleted: boolean;
-  onToggleCompleted: () => void;
-  screenshotMode: ScreenshotMode;
-  onScreenshotMode: (next: ScreenshotMode) => void;
-}) {
+function renderGroup(group: GroupSpec, ctx: SettingsCtx, prefix?: string) {
   return (
-    <div className="space-y-5">
-      <section className="space-y-3">
-        <SectionLabel>Appearance</SectionLabel>
-        <Segmented
-          variant="surfaceThumb"
-          items={THEME_OPTIONS}
-          value={theme}
-          onChange={onTheme}
+    <SettingsGroup
+      key={`${prefix ?? ''}${group.id}`}
+      label={prefix ? `${prefix} · ${group.label}` : group.label}
+      hint={group.hint}
+      onDiscard={group.changed ? group.onDiscard : undefined}
+    >
+      {group.rows.map((row) => (
+        <SettingRow
+          key={row.id}
+          title={row.title}
+          description={row.description}
+          layout={row.layout}
+          control={row.control(ctx)}
+          footnote={row.footnote?.(ctx)}
         />
-      </section>
-
-      <section className="space-y-3">
-        <SectionLabel>Screenshots</SectionLabel>
-        <div className="space-y-1.5">
-          <Segmented
-            variant="surfaceThumb"
-            items={SCREENSHOT_OPTIONS}
-            value={screenshotMode}
-            onChange={onScreenshotMode}
-          />
-          <Label as="p" tone="muted" className="text-[11px]">
-            {screenshotMode === 'region'
-              ? 'Drag to select an area, or press Space to grab a window. Esc cancels.'
-              : 'Capture the entire screen instantly.'}
-          </Label>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <SectionLabel>Tasks</SectionLabel>
-        <div className="flex items-center justify-between">
-          <Label tone="primary" className="text-[13px]">
-            Show completed tasks
-          </Label>
-          <Toggle
-            checked={showCompleted}
-            onChange={onToggleCompleted}
-            title="Show completed tasks"
-          />
-        </div>
-      </section>
-    </div>
+      ))}
+    </SettingsGroup>
   );
 }
 
 export function SettingsWindow() {
-  const [pane, setPane] = useState<PaneId>('general');
-  const [theme, setThemeChoice] = useState<ThemePref>('system');
-  const [showCompleted, setShowCompleted] = useState(true);
-  const [screenshotMode, setScreenshotMode] =
-    useState<ScreenshotMode>('fullscreen');
-  const [loaded, setLoaded] = useState(false);
+  const settings = useSettings();
+  const hotkeys = useHotkeyEditor();
+
+  const [paneId, setPaneId] = useState(PANES[0].id);
+  const [query, setQuery] = useState('');
+  // Set when a pane is picked *while searching* and that pane had matches: the
+  // query survives, narrowed to it. Any edit to the query goes back to all panes.
+  const [scoped, setScoped] = useState(false);
+  const [version, setVersion] = useState<string | null>(null);
+  const [paths, setPaths] = useState<DataPaths | null>(null);
   const [presented, setPresented] = useState(false);
 
   const presentedRef = useRef(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const lowPower = useLowPowerMode();
+  const [systemPrefers, setSystemPrefers] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setSystemPrefers(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     let stale = false;
-    void (async () => {
-      const [t, sc, sm] = await Promise.all([
-        api.getSetting('theme').catch(() => null),
-        api.getSetting('show_completed').catch(() => null),
-        api.getSetting('screenshot_mode').catch(() => null),
-      ]);
-      if (stale) return;
-      if (t === 'system' || t === 'light' || t === 'dark') setThemeChoice(t);
-      setShowCompleted(sc !== '0');
-      if (sm === 'region') setScreenshotMode('region');
-      setLoaded(true);
-    })();
+    void getVersion()
+      .then((v) => {
+        if (!stale) setVersion(v);
+      })
+      .catch(() => {
+        // Leaves the About row showing a dash rather than a wrong number.
+      });
+    void api
+      .dataPaths()
+      .then((p) => {
+        if (!stale) setPaths(p);
+      })
+      .catch(() => {});
     return () => {
       stale = true;
     };
   }, []);
 
-  // Size, center and fade the window in once settings have loaded (StrictMode-safe,
-  // after fonts settle). The window is built fresh on open, so this runs once per
-  // window. Fixed size; panes scroll.
+  // Size, center and fade the window in once the preferences have loaded
+  // (StrictMode-safe, after fonts settle). The window is built fresh on open, so
+  // this runs once per window. Fixed size; the pane scrolls.
   useEffect(() => {
-    if (!loaded || presentedRef.current) return;
+    if (!settings.loaded || presentedRef.current) return;
     presentedRef.current = true;
     void document.fonts.ready.then(() => {
       void api.presentWindow(WIDTH, HEIGHT);
       setPresented(true);
     });
-  }, [loaded]);
+  }, [settings.loaded]);
 
+  // Escape backs out one level — first the search, then the window. A recording
+  // hotkey swallows both (useHotkeyEditor listens in the capture phase).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') void getCurrentWindow().close();
+      if (e.key === 'Escape') {
+        if (query) clearSearch();
+        else void getCurrentWindow().close();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        searchRef.current?.select();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [query]);
 
-  function chooseTheme(next: ThemePref) {
-    setThemeChoice(next);
-    void setTheme(next);
+  const activePane = PANES.find((p) => p.id === paneId) ?? PANES[0];
+  const searching = query.trim().length > 0;
+
+  const ctx: SettingsCtx = {
+    values: settings.values,
+    set: settings.set,
+    changedSince: settings.changedSince,
+    discard: settings.discard,
+    resetAll: () => {
+      settings.resetAll();
+      hotkeys.resetAll();
+    },
+    hotkeys,
+    version,
+    paths,
+    motion: { lowPower, systemPrefers },
+  };
+
+  // Searching spans every pane, so the answer is never hidden behind the pane you
+  // didn't think to open.
+  const results = searching
+    ? PANES.map((pane) => ({
+        pane,
+        groups: filterGroups(pane.groups(ctx), query),
+      })).filter((r) => r.groups.length > 0)
+    : [];
+
+  const matchesIn = (id: string) =>
+    results.find((r) => r.pane.id === id)?.groups ?? [];
+
+  function clearSearch() {
+    setQuery('');
+    setScoped(false);
   }
 
-  function chooseScreenshotMode(next: ScreenshotMode) {
-    setScreenshotMode(next);
-    void api.setSetting('screenshot_mode', next);
+  function search(next: string) {
+    setQuery(next);
+    setScoped(false);
   }
 
-  function toggleCompleted() {
-    const next = !showCompleted;
-    setShowCompleted(next);
-    const value = next ? '1' : '0';
-    void api
-      .setSetting('show_completed', value)
-      .then(() => emit('settings-changed', { key: 'show_completed', value }));
+  // Picking a pane that has hits keeps the query and narrows to that pane; only a
+  // pane with nothing to show for it drops the search.
+  function selectPane(id: string) {
+    setPaneId(id);
+    if (matchesIn(id).length > 0) setScoped(true);
+    else clearSearch();
+    scrollRef.current?.scrollTo({ top: 0 });
   }
+
+  function onNavKeys(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    const at = PANES.findIndex((p) => p.id === activePane.id);
+    const next = PANES[(at + step + PANES.length) % PANES.length];
+    selectPane(next.id);
+    navRef.current
+      ?.querySelector<HTMLElement>(`#settings-tab-${next.id}`)
+      ?.focus();
+  }
+
+  const dirtySession = settings.changed || hotkeys.changed;
+  const scopedGroups = searching && scoped ? matchesIn(activePane.id) : [];
 
   return (
-    <div className="bg-surface-1l dark:bg-surface-1d flex h-screen w-screen flex-col overflow-hidden">
-      <style>
-        {
-          '@keyframes settings-in { from { opacity: 0; transform: scale(0.97); } }'
-        }
-      </style>
+    <div className="bg-surface-1l dark:bg-surface-1d h-screen w-screen overflow-hidden">
       <div
-        className="flex h-full flex-col"
-        style={
-          presented
-            ? { animation: 'settings-in 180ms cubic-bezier(0.2, 0, 0, 1) both' }
-            : { opacity: 0 }
-        }
+        className={cn(
+          'flex h-full flex-col',
+          presented ? 'animate-scale-in' : 'opacity-0'
+        )}
       >
-        <header
-          data-tauri-drag-region
-          className="border-edge-2l dark:border-edge-2d flex h-11 shrink-0 items-center border-b px-4"
-        >
-          <Label
-            as="h1"
-            data-tauri-drag-region
-            tone="primary"
-            weight="semibold"
-            className="font-display text-[15px]"
-          >
-            Settings
-          </Label>
-          <IconButton
-            icon="close"
-            iconSize={18}
-            variant="ghostStrong"
-            aria-label="Close settings"
-            onClick={() => void getCurrentWindow().close()}
-            className="ml-auto"
-          />
-        </header>
+        <SettingsTitleBar
+          trailing={
+            dirtySession && (
+              <IconButton
+                icon="undo"
+                size="xl"
+                radius="control"
+                iconSize={19}
+                iconWeight={300}
+                variant="ghostStrong"
+                title="Discard every change made since this window opened"
+                aria-label="Discard changes"
+                onClick={() => {
+                  settings.discardAll();
+                  hotkeys.discardAll();
+                }}
+              />
+            )
+          }
+        />
 
         <div className="flex min-h-0 flex-1">
-          <nav className="border-edge-1l dark:border-edge-1d w-40 shrink-0 space-y-0.5 border-r px-2 py-3">
-            {PANES.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setPane(p.id)}
-                className={`rounded-field flex h-8 w-full items-center gap-2 px-2.5 text-[13px] font-medium ${
-                  pane === p.id
-                    ? 'bg-wash-2l dark:bg-wash-2d text-content-1l dark:text-content-1d'
-                    : 'text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d'
-                }`}
-              >
-                <Icon name={p.icon} size={16} />
-                {p.label}
-              </button>
-            ))}
+          <nav className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d gap-space-6 p-space-5 flex w-44 shrink-0 flex-col border-r">
+            <InputWell
+              className="h-7"
+              leading={<Icon name="search" size={14} />}
+              trailing={
+                query && (
+                  <IconButton
+                    icon="close"
+                    size="sm"
+                    iconSize={14}
+                    variant="plain"
+                    title="Clear search"
+                    aria-label="Clear search"
+                    onClick={clearSearch}
+                  />
+                )
+              }
+            >
+              <TextInput
+                bare
+                ref={searchRef}
+                value={query}
+                onChange={(e) => search(e.target.value)}
+                placeholder="Search"
+                aria-label="Search settings"
+                className="text-[12px]"
+              />
+            </InputWell>
+
+            <div
+              ref={navRef}
+              role="tablist"
+              aria-orientation="vertical"
+              aria-label="Settings sections"
+              onKeyDown={onNavKeys}
+              className="gap-space-1 flex flex-col"
+            >
+              {PANES.map((pane) => {
+                const matches = searching ? countRows(matchesIn(pane.id)) : 0;
+                const selected = pane.id === activePane.id;
+                return (
+                  <MenuItem
+                    key={pane.id}
+                    id={`settings-tab-${pane.id}`}
+                    role="tab"
+                    rounded
+                    active={selected && (!searching || scoped)}
+                    aria-selected={selected}
+                    aria-controls={
+                      selected ? `settings-panel-${pane.id}` : undefined
+                    }
+                    tabIndex={selected ? 0 : -1}
+                    leading={<Icon name={pane.icon} size={16} />}
+                    trailing={
+                      matches > 0 && (
+                        <Badge tone="recessed" size="sm">
+                          {matches}
+                        </Badge>
+                      )
+                    }
+                    className={cn(searching && matches === 0 && 'opacity-40')}
+                    onClick={() => selectPane(pane.id)}
+                  >
+                    {pane.label}
+                  </MenuItem>
+                );
+              })}
+            </div>
           </nav>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {pane === 'general' ? (
-              <GeneralPane
-                theme={theme}
-                onTheme={chooseTheme}
-                showCompleted={showCompleted}
-                onToggleCompleted={toggleCompleted}
-                screenshotMode={screenshotMode}
-                onScreenshotMode={chooseScreenshotMode}
-              />
-            ) : (
-              <ShortcutsPane />
-            )}
+          <div
+            ref={scrollRef}
+            role="tabpanel"
+            id={`settings-panel-${activePane.id}`}
+            aria-labelledby={`settings-tab-${activePane.id}`}
+            className="bg-surface-2l dark:bg-surface-2d px-space-8 py-space-7 min-h-0 flex-1 overflow-y-auto"
+          >
+            <div
+              key={
+                searching
+                  ? scoped
+                    ? `scoped-${activePane.id}`
+                    : 'search'
+                  : activePane.id
+              }
+              className="animate-panel-in gap-space-8 flex min-h-full flex-col"
+            >
+              {!searching ? (
+                <>
+                  {activePane.intro && (
+                    <Label as="p" tone="muted" className="text-[12px]">
+                      {activePane.intro}
+                    </Label>
+                  )}
+                  {activePane
+                    .groups(ctx)
+                    .map((group) => renderGroup(group, ctx))}
+                </>
+              ) : scoped ? (
+                scopedGroups.map((group) => renderGroup(group, ctx))
+              ) : results.length > 0 ? (
+                results.flatMap((r) =>
+                  r.groups.map((group) => renderGroup(group, ctx, r.pane.label))
+                )
+              ) : (
+                <EmptyState
+                  icon="search"
+                  title="No settings match"
+                  subtitle={`Nothing here for “${query.trim()}”.`}
+                />
+              )}
+            </div>
           </div>
         </div>
-
-        <Label
-          as="footer"
-          tone="muted"
-          className="shrink-0 pb-4 text-center text-[11px]"
-        >
-          Taskscape 0.1.0
-        </Label>
       </div>
     </div>
   );

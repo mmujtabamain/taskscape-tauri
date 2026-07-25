@@ -47,6 +47,12 @@ export interface Task {
   note_items: Note[];
 }
 
+/** Absolute paths of the app's data locations (Settings shows and opens these). */
+export interface DataPaths {
+  data_dir: string;
+  screenshots_dir: string;
+}
+
 export interface TaskPatch {
   title?: string;
   notes?: string;
@@ -187,6 +193,12 @@ export const api = {
       linkType: a.link_type,
       location: a.location,
     }),
+  // data locations (Settings)
+  dataPaths: () => invoke<DataPaths>('data_paths'),
+  /** Open a folder in Finder/Explorer; falls back to its nearest existing
+   *  ancestor, since `screenshots/` only appears after the first capture. */
+  openPath: (path: string) => invoke<void>('open_path', { path }),
+
   revealAttachment: (a: Attachment) =>
     invoke<void>('reveal_attachment', {
       linkType: a.link_type,

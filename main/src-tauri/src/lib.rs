@@ -751,6 +751,39 @@ fn reveal_attachment(link_type: String, location: String) -> Result<(), String> 
     tauri_plugin_opener::reveal_item_in_dir(&target).map_err(err)
 }
 
+/// The user-visible data locations as absolute paths. `common::paths` owns the
+/// layout; this only hands it to the Settings window, which shows the paths and
+/// opens them.
+#[derive(Serialize)]
+struct DataPaths {
+    data_dir: String,
+    screenshots_dir: String,
+}
+
+#[tauri::command]
+fn data_paths() -> DataPaths {
+    let string = |p: std::path::PathBuf| p.to_string_lossy().into_owned();
+    DataPaths {
+        data_dir: string(taskscape_common::paths::root_dir()),
+        screenshots_dir: string(taskscape_common::paths::screenshots_dir()),
+    }
+}
+
+/// Open a folder in Finder/Explorer. Subdirectories of `~/.taskscape` are created
+/// lazily (`screenshots` only exists after the first capture), so rather than
+/// failing on a fresh install — or creating a directory as a side effect of a
+/// click — this opens the nearest ancestor that does exist.
+#[tauri::command]
+fn open_path(path: String) -> Result<(), String> {
+    let mut target = std::path::PathBuf::from(&path);
+    while !target.exists() {
+        if !target.pop() {
+            return Err(format!("{path} does not exist"));
+        }
+    }
+    tauri_plugin_opener::open_path(&target, None::<&str>).map_err(err)
+}
+
 /// The `initialization_script` that hands a fresh panel window its startup data.
 /// It sets `window.__PANEL__` before the bundle loads, so the frontend reads its
 /// kind + props synchronously instead of round-tripping back to Rust. The payload
@@ -1165,6 +1198,8 @@ pub fn run() {
             attach_screenshot,
             open_attachment,
             reveal_attachment,
+            data_paths,
+            open_path,
             set_active_list,
             set_active_project,
             get_setting,

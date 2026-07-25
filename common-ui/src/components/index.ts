@@ -27,3 +27,6 @@ export * from './inputs/Toggle';
 
 export * from './typography/Label';
 export * from './typography/SectionHeader';
+
+export * from './settings/SettingRow';
+export * from './settings/SettingsGroup';
