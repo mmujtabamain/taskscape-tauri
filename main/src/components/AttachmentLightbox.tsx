@@ -1,4 +1,3 @@
-import { cn } from '@taskscape/common-ui/cn';
 import { useEffect, useState } from 'react';
 import { api, type Attachment } from '../api';
 import {
@@ -13,6 +12,12 @@ import { propagateAttachmentRename } from '../lib/mentions';
 import { confirmModal, promptName } from '../lib/modal';
 import { setOverlay } from '../lib/overlays';
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  Backdrop,
+  Button,
+  IconButton,
+  Label,
+} from '@taskscape/common-ui/components';
 
 const TEXT_PREVIEW_CAP = 262144;
 
@@ -37,18 +42,18 @@ function BarButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <IconButton
+      icon={name}
+      size="xl"
+      radius="control"
+      iconSize={17}
+      variant="onMedia"
       onClick={onClick}
       title={title}
-      className={cn(
-        'rounded-control grid h-8 w-8 shrink-0 place-items-center text-white/70',
-        danger
-          ? 'hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white'
-          : 'hover:bg-white/15 hover:text-white'
-      )}
-    >
-      <Icon name={name} size={17} />
-    </button>
+      className={
+        danger ? 'hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white' : undefined
+      }
+    />
   );
 }
 
@@ -194,26 +199,27 @@ export function AttachmentLightbox({
   };
 
   const card = (label: string) => (
-    <div className="rounded-panel bg-surface-2l dark:bg-surface-2d flex flex-col items-center gap-3 px-10 py-12 text-center">
+    <div className="rounded-panel bg-surface-2l dark:bg-surface-2d flex flex-col items-center gap-space-5 px-10 py-12 text-center">
       <Icon
         name={kind.icon}
         size={44}
         weight={200}
         className="text-content-3l dark:text-content-3d"
       />
-      <div className="text-content-1l dark:text-content-1d max-w-xs truncate text-[14px]">
+      <Label as="div" tone="primary" truncate className="max-w-xs text-[14px]">
         {attachment.name}
-      </div>
-      <div className="text-content-3l dark:text-content-3d text-[12px]">
+      </Label>
+      <Label as="div" tone="muted" className="text-[12px]">
         {label}
-      </div>
-      <button
+      </Label>
+      <Button
+        variant="primary"
+        className="mt-1 gap-space-3"
         onClick={() => api.openAttachment(attachment)}
-        className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent hover:bg-accent-600l dark:hover:bg-accent-600d mt-1 flex h-9 items-center gap-1.5 px-4 text-[13px] font-semibold"
       >
         <Icon name="open_in_new" size={15} />
         Open externally
-      </button>
+      </Button>
     </div>
   );
 
@@ -285,12 +291,9 @@ export function AttachmentLightbox({
   };
 
   return (
-    <div
-      className="z-modal fixed inset-0 flex flex-col bg-black/75 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <Backdrop dim="75" blur className="flex flex-col" onClick={onClose}>
       <div
-        className="flex h-13 shrink-0 items-center gap-2 px-4"
+        className="flex h-13 shrink-0 items-center gap-space-4 px-space-7"
         onClick={(e) => e.stopPropagation()}
       >
         <Icon name={kind.icon} size={16} className="shrink-0 text-white/70" />
@@ -366,6 +369,6 @@ export function AttachmentLightbox({
           {body()}
         </div>
       </div>
-    </div>
+    </Backdrop>
   );
 }

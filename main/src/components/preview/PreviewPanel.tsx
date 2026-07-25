@@ -1,4 +1,4 @@
-import { Icon } from '@taskscape/common-ui/Icon';
+import { EmptyState } from '@taskscape/common-ui/components';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useTaskStore } from '../../stores/taskStore';
@@ -45,20 +45,12 @@ export function PreviewPanel() {
       ) : draftListId ? (
         <DraftInspector key={draftListId} />
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <Icon
-            name="left_click"
-            size={28}
-            weight={200}
-            className="text-content-3l dark:text-content-3d mb-1"
-          />
-          <p className="font-display text-content-2l dark:text-content-2d text-[17px] font-medium">
-            No task selected
-          </p>
-          <p className="text-content-3l dark:text-content-3d text-[13px]">
-            Select a task to inspect it
-          </p>
-        </div>
+        <EmptyState
+          icon="left_click"
+          iconSize={28}
+          title="No task selected"
+          subtitle="Select a task to inspect it"
+        />
       )}
     </div>
   );

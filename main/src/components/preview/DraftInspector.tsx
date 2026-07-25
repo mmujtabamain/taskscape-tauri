@@ -1,10 +1,15 @@
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  DashedButton,
+  IconButton,
+  Label,
+  SectionHeader,
+} from '@taskscape/common-ui/components';
 import { useEffect, useRef, useState } from 'react';
 import { runDraftAction } from '../../commands/tasks';
 import { useListStore } from '../../stores/listStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useUiStore } from '../../stores/uiStore';
-import { SectionHeader } from './SectionHeader';
 
 /** The new-task draft: a title field plus "start with" actions, shown before any
  *  DB row exists. Typing a title (commit) creates the task with that title; the
@@ -34,8 +39,6 @@ export function DraftInspector() {
     el.style.height = `${el.scrollHeight}px`;
   }, [title]);
   const noBlur = (e: React.MouseEvent) => e.preventDefault();
-  const startBtn =
-    'rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-2l dark:text-content-2d hover:border-content-3l dark:hover:border-content-3d hover:text-content-1l dark:hover:text-content-1d flex h-10 flex-1 items-center justify-center gap-1.5 border border-dashed text-[13px] font-semibold';
 
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
@@ -64,41 +67,52 @@ export function DraftInspector() {
               }}
               className="font-display text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d bg-surface-0l dark:bg-surface-0d ring-surface-0l dark:ring-surface-0d rounded-field -ml-1 block w-full resize-none overflow-hidden border-0 px-1 py-0 text-[18px] leading-6 font-semibold ring-2 outline-none"
             />
-            <div className="text-content-3l dark:text-content-3d mt-2.5 flex items-center gap-1.5 text-[11.5px]">
+            <Label
+              as="div"
+              tone="muted"
+              className="mt-2.5 flex items-center gap-1.5 text-[11.5px]"
+            >
               <Icon name="folder_open" size={13} weight={300} className="shrink-0" />
-              <span className="text-content-2l dark:text-content-2d truncate">
+              <Label tone="secondary" truncate>
                 {projectName ?? '—'}
-              </span>
+              </Label>
               {listName && <span className="shrink-0">/ {listName}</span>}
-            </div>
+            </Label>
           </div>
-          <button
+          <IconButton
+            icon="last_page"
+            iconSize={16}
             onMouseDown={noBlur}
             onClick={() => void runDraftAction('', 'cancel')}
             title="Discard draft"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
-          >
-            <Icon name="last_page" size={16} />
-          </button>
+          />
         </div>
       </div>
 
       <div className="p-4 pt-0">
         <SectionHeader label="Start with" />
-        <div className="flex gap-2">
-          <button onMouseDown={noBlur} onClick={() => void runDraftAction(title, 'note')} className={startBtn}>
+        <div className="flex gap-space-4">
+          <DashedButton
+            onMouseDown={noBlur}
+            onClick={() => void runDraftAction(title, 'note')}
+            className="h-10 flex-1 text-[13px] font-semibold"
+          >
             <Icon name="add" size={16} />
             Note
-          </button>
-          <button onMouseDown={noBlur} onClick={() => void runDraftAction(title, 'shot')} className={startBtn}>
+          </DashedButton>
+          <DashedButton
+            onMouseDown={noBlur}
+            onClick={() => void runDraftAction(title, 'shot')}
+            className="h-10 flex-1 text-[13px] font-semibold"
+          >
             <Icon name="screenshot_monitor" size={15} />
             Screenshot
-          </button>
+          </DashedButton>
         </div>
-        <p className="text-content-3l dark:text-content-3d mt-3 text-[12px] leading-4">
+        <Label as="p" tone="muted" className="mt-3 text-[12px] leading-4">
           Type a title, add a note, or take a screenshot — the task is created the
           moment it has something in it.
-        </p>
+        </Label>
       </div>
     </div>
   );

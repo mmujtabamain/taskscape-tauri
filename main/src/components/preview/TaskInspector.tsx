@@ -15,10 +15,16 @@ import { requestDeleteTask, updateTask } from '../../commands/tasks';
 import { absoluteDateTime, relativeTime } from '../../time';
 import { AttachmentLightbox } from '../AttachmentLightbox';
 import { AttachmentSection } from './AttachmentSection';
-import { DoneCheckbox } from './DoneCheckbox';
 import { NoteCard } from './NoteCard';
 import { AUTOSAVE_MS, requestNoteLink } from './noteEditing';
-import { SectionHeader } from './SectionHeader';
+import {
+  Checkbox,
+  DashedButton,
+  IconButton,
+  Label,
+  SectionHeader,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 
 const refresh = () => void useTaskStore.getState().load();
 const selectTask = (id: string) => useSelectionStore.getState().focus(id);
@@ -33,26 +39,28 @@ function SubtaskRow({ task, depth }: { task: Task; depth: number }) {
   return (
     <>
       <div
-        className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d -mx-1.5 flex h-8 items-center gap-2.5 pr-1.5"
+        className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d -mx-1.5 flex h-8 items-center gap-space-5 pr-space-4"
         style={{ paddingLeft: 6 + depth * SUBTASK_INDENT }}
       >
-        <DoneCheckbox
-          done={task.done}
-          size={14}
-          onToggle={() => void actToggleDone(task)}
+        <Checkbox
+          checked={task.done}
+          size="sm"
+          title={task.done ? 'Mark not done' : 'Mark done'}
+          onClick={() => void actToggleDone(task)}
         />
-        <button
+        <Label
+          as="button"
           onClick={() => selectTask(task.id)}
           title={task.title}
+          truncate
+          tone={task.done ? 'muted' : 'primary'}
           className={cn(
-            'min-w-0 flex-1 truncate text-left text-[13.5px]',
-            task.done
-              ? 'text-content-3l dark:text-content-3d line-through'
-              : 'text-content-1l dark:text-content-1d'
+            'min-w-0 flex-1 text-left text-[13.5px]',
+            task.done && 'line-through'
           )}
         >
           {task.title}
-        </button>
+        </Label>
       </div>
       {children.map((child) => (
         <SubtaskRow key={child.id} task={child} depth={depth + 1} />
@@ -239,17 +247,19 @@ export function TaskInspector({ task }: { task: Task }) {
     }
   };
 
-  const headBtn =
-    'rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center';
-
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
-      <div className="relative shrink-0 p-4">
+      <div className="relative shrink-0 p-space-7">
         {/* Index tick: the panel "receives" the selection. */}
         <span className="bg-accent-500l dark:bg-accent-500d absolute top-4.75 left-0 h-4 w-0.5" />
-        <div className="flex items-start gap-2.5">
+        <div className="flex items-start gap-space-5">
           <div className="mt-0.5">
-            <DoneCheckbox done={task.done} size={18} onToggle={() => void actToggleDone(task)} />
+            <Checkbox
+              checked={task.done}
+              size="md"
+              title={task.done ? 'Mark not done' : 'Mark done'}
+              onClick={() => void actToggleDone(task)}
+            />
           </div>
           <div className="min-w-0 flex-1">
             {/* One field for display and edit: readonly text that wraps, gaining a
@@ -282,7 +292,11 @@ export function TaskInspector({ task }: { task: Task }) {
                   'bg-surface-0l dark:bg-surface-0d ring-surface-0l dark:ring-surface-0d ring-2'
               )}
             />
-            <div className="text-content-3l dark:text-content-3d mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums">
+            <Label
+              as="div"
+              tone="muted"
+              className="mt-2.5 flex flex-col gap-1 text-[11.5px] tabular-nums"
+            >
               <span className="flex items-center gap-1.5">
                 <Icon
                   name="folder_open"
@@ -290,12 +304,10 @@ export function TaskInspector({ task }: { task: Task }) {
                   weight={300}
                   className="text-content-3l dark:text-content-3d shrink-0"
                 />
-                <span className="text-content-2l dark:text-content-2d truncate">
+                <Label tone="secondary" truncate>
                   {projectName ?? '—'}
-                </span>
-                {listName && (
-                  <span className="text-content-3l dark:text-content-3d shrink-0">/ {listName}</span>
-                )}
+                </Label>
+                {listName && <span className="shrink-0">/ {listName}</span>}
               </span>
               <span className="flex items-center gap-1.5" title={absoluteDateTime(task.created_at)}>
                 <Icon
@@ -315,57 +327,63 @@ export function TaskInspector({ task }: { task: Task }) {
                 />
                 Updated {relativeTime(task.updated_at)}
               </span>
-            </div>
+            </Label>
           </div>
-          <div className="-mt-1 -mr-1 flex shrink-0 flex-col items-center gap-0.5">
-            <button
+          <div className="-mt-1 -mr-1 flex shrink-0 flex-col items-center gap-space-1">
+            <IconButton
+              icon="last_page"
+              iconSize={16}
               onClick={() => useLayoutStore.getState().setPreviewOpen(false)}
               title="Close panel"
-              className={headBtn}
-            >
-              <Icon name="last_page" size={16} />
-            </button>
-            <button onClick={startTitleEdit} title="Rename" className={headBtn}>
-              <Icon name="edit" size={15} weight={300} />
-            </button>
-            <button onClick={copyTask} title={copied ? 'Copied' : 'Copy task'} className={headBtn}>
-              <Icon name={copied ? 'check' : 'content_copy'} size={15} />
-            </button>
-            <button
+            />
+            <IconButton
+              icon="edit"
+              iconSize={15}
+              iconWeight={300}
+              onClick={startTitleEdit}
+              title="Rename"
+            />
+            <IconButton
+              icon={copied ? 'check' : 'content_copy'}
+              iconSize={15}
+              onClick={copyTask}
+              title={copied ? 'Copied' : 'Copy task'}
+            />
+            <IconButton
+              icon="delete"
+              iconSize={15}
+              variant="danger"
               onClick={() => void requestDeleteTask(task)}
               title="Delete task"
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center"
-            >
-              <Icon name="delete" size={15} />
-            </button>
+            />
           </div>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div className="p-4 pt-0">
+        <div className="p-space-7 pt-0">
           <SectionHeader
             label="Notes"
             trailing={
               notes.length > 0 ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-content-3l dark:text-content-3d text-[11px] tabular-nums">
+                <div className="flex items-center gap-space-3">
+                  <Label tone="muted" className="text-[11px] tabular-nums">
                     {notes.length}
-                  </span>
-                  <button
+                  </Label>
+                  <ToolbarButton
+                    icon="add"
+                    iconSize={14}
                     onClick={() => setAddingNote(true)}
                     title="Add note"
-                    className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
                   >
-                    <Icon name="add" size={14} />
                     Note
-                  </button>
+                  </ToolbarButton>
                 </div>
               ) : undefined
             }
           />
 
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-space-5">
             {notes.map((note) => (
               <NoteCard
                 key={note.id}
@@ -397,25 +415,25 @@ export function TaskInspector({ task }: { task: Task }) {
                 }}
               />
             ) : notes.length === 0 ? (
-              <button
+              <DashedButton
                 onClick={() => setAddingNote(true)}
-                className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d text-content-3l dark:text-content-3d hover:border-content-3l dark:hover:border-content-3d hover:text-content-2l dark:hover:text-content-2d flex h-24 w-full items-center justify-center gap-1.5 border border-dashed font-semibold"
+                className="h-24 w-full font-semibold"
               >
                 <Icon name="add" size={16} />
                 Add note
-              </button>
+              </DashedButton>
             ) : null}
           </div>
         </div>
 
         {children.length > 0 && (
-          <div className="p-4 pt-0">
+          <div className="p-space-7 pt-0">
             <SectionHeader
               label="Subtasks"
               trailing={
-                <span className="text-content-3l dark:text-content-3d text-[11.5px] tabular-nums">
+                <Label tone="muted" className="text-[11.5px] tabular-nums">
                   {doneChildren} done / {children.length}
-                </span>
+                </Label>
               }
             />
             <div className="-mb-2">

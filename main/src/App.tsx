@@ -1,4 +1,5 @@
 import { cn } from '@taskscape/common-ui/cn';
+import { EmptyState } from '@taskscape/common-ui/components';
 import { useEffect, useMemo, useState } from 'react';
 import { buildCommands } from './commands/palette';
 import { CommandPalette } from './components/CommandPalette';
@@ -82,16 +83,15 @@ function App() {
               )}
             </div>
           ) : (
-            <div className="bg-surface-2l dark:bg-surface-2d flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-              <p className="font-display text-content-2l dark:text-content-2d text-[17px] font-medium">
-                {listsInProject.length === 0 ? 'No lists yet' : 'No list selected'}
-              </p>
-              <p className="text-content-3l dark:text-content-3d text-[13px]">
-                {listsInProject.length === 0
+            <EmptyState
+              className="bg-surface-2l dark:bg-surface-2d"
+              title={listsInProject.length === 0 ? 'No lists yet' : 'No list selected'}
+              subtitle={
+                listsInProject.length === 0
                   ? 'Create a list to start adding tasks'
-                  : 'Pick a list tab to view its tasks'}
-              </p>
-            </div>
+                  : 'Pick a list tab to view its tasks'
+              }
+            />
           )}
 
           {(previewOpen || trashOpen || filterOpen) && (

@@ -1,6 +1,16 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  Divider,
+  EmptyState,
+  IconButton,
+  InputWell,
+  Label,
+  ProgressBar,
+  TextInput,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type List, type Task } from '../api';
 import { registerSearchFocus } from '../lib/searchFocus';
@@ -179,14 +189,12 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
         className="bg-surface-2l dark:bg-surface-2d flex h-full min-w-0 flex-1 flex-col"
         onMouseDown={focusPane}
       >
-        <div className="rounded-control bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d mx-4 mt-3 mb-2 flex h-10 shrink-0 items-center gap-2.5 px-3 transition-shadow focus-within:ring-1">
-          <Icon
-            name="search"
-            size={18}
-            weight={300}
-            className="text-content-3l dark:text-content-3d shrink-0"
-          />
-          <input
+        <InputWell
+          className="mx-4 mt-3 mb-2 h-10 shrink-0"
+          leading={<Icon name="search" size={18} weight={300} />}
+        >
+          <TextInput
+            bare
             ref={searchRef}
             value={query}
             placeholder={`Search ${list.name}`}
@@ -199,41 +207,47 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
                 (e.target as HTMLInputElement).blur();
               } else if (e.key === 'Enter') cycleMatch(e.shiftKey ? -1 : 1);
             }}
-            className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d w-full bg-transparent text-[14px] outline-none"
+            className="w-full text-[14px]"
           />
           <ScopeFields />
           {query.trim() && (
             <>
-              <span className="text-content-3l dark:text-content-3d shrink-0 text-[11px] font-semibold tabular-nums">
+              <Label
+                tone="muted"
+                weight="semibold"
+                className="shrink-0 text-[11px] tabular-nums"
+              >
                 {matchCount}
-              </span>
-              <button
+              </Label>
+              <IconButton
+                icon="close"
+                iconSize={15}
+                iconWeight={300}
+                variant="plain"
                 onClick={() => useSearchStore.getState().clear(list.id)}
                 title="Clear search"
-                className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
-              >
-                <Icon name="close" size={15} weight={300} />
-              </button>
+              />
             </>
           )}
-          <span className="bg-edge-2l dark:bg-edge-2d h-4 w-px shrink-0" />
-          <button
+          <Divider orientation="vertical" className="h-4 shrink-0" />
+          <IconButton
+            icon="add"
+            iconSize={18}
+            iconWeight={400}
             onClick={() => startNewTask(list.id)}
             title="New task"
-            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
-          >
-            <Icon name="add" size={18} weight={400} />
-          </button>
+          />
           {isSplit && (
-            <button
+            <IconButton
+              icon="close"
+              iconSize={16}
+              iconWeight={300}
+              className="-mr-1"
               onClick={() => useLayoutStore.getState().closeSplit()}
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d -mr-1 grid h-6 w-6 shrink-0 place-items-center"
               title="Close split"
-            >
-              <Icon name="close" size={16} weight={300} />
-            </button>
+            />
           )}
-        </div>
+        </InputWell>
 
         <div
           ref={scrollRef}
@@ -270,28 +284,23 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
             ))}
             {rootDropOver && draggingId && (
               <div className="rounded-field bg-accent-500l dark:bg-accent-500d relative mx-3 mt-1 h-0.5">
-                <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-0.75 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
+                <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-space-2 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
               </div>
             )}
             {visibleRoots.length === 0 && (
-              <div className="flex flex-col items-center gap-2 pt-24 pb-10">
-                <Icon
-                  name={searching ? 'search_off' : 'landscape'}
-                  size={30}
-                  weight={200}
-                  className="text-content-3l dark:text-content-3d mb-1"
-                />
-                <p className="font-display text-content-2l dark:text-content-2d text-[16px] font-medium">
-                  {searching ? `No matches in ${list.name}` : 'Nothing here yet'}
-                </p>
-                <p className="text-content-3l dark:text-content-3d px-4 text-center text-[13px] tracking-[0.01em]">
-                  {searching
+              <EmptyState
+                icon={searching ? 'search_off' : 'landscape'}
+                iconSize={30}
+                title={searching ? `No matches in ${list.name}` : 'Nothing here yet'}
+                subtitle={
+                  searching
                     ? 'Try a different search or scope'
                     : captureHint
                       ? `Press + or ⌘N to add a task, or ${captureHint} anywhere to capture one`
-                      : 'Press + or ⌘N to add a task'}
-                </p>
-              </div>
+                      : 'Press + or ⌘N to add a task'
+                }
+                className="pt-24 pb-10"
+              />
             )}
           </div>
         </div>
@@ -339,14 +348,15 @@ function ScopeFields() {
     });
   };
   return (
-    <button
+    <IconButton
+      icon="tune"
+      iconSize={15}
+      iconWeight={300}
+      variant="plain"
       onMouseDown={(e) => e.preventDefault()}
       onClick={open}
       title="Search options"
-      className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
-    >
-      <Icon name="tune" size={15} weight={300} />
-    </button>
+    />
   );
 }
 
@@ -368,51 +378,73 @@ function BulkBar({ count }: { count: number }) {
       onPick: (id) => void bulkMove(listId, id),
     });
   };
-  const btn =
-    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d flex h-6 items-center gap-1 px-1.5 text-[12px] font-semibold normal-case tracking-normal disabled:pointer-events-none disabled:opacity-40';
   return (
-    <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d flex h-9 shrink-0 items-center gap-1 border-t px-3">
-      <span className="text-content-1l dark:text-content-1d mr-1 pl-1 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
+    <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d flex h-9 shrink-0 items-center gap-space-2 border-t px-space-6">
+      <Label
+        tone="primary"
+        weight="semibold"
+        className="mr-1 pl-1 text-[11px] tracking-[0.08em] uppercase tabular-nums"
+      >
         {count} selected
-      </span>
-      <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
-      <button className={btn} onClick={() => bulkSetDone(listId, true)} title="Mark done">
-        <Icon name="task_alt" size={15} weight={300} />
+      </Label>
+      <Divider orientation="vertical" className="h-3" />
+      <ToolbarButton
+        icon="task_alt"
+        iconWeight={300}
+        size="sm"
+        onClick={() => bulkSetDone(listId, true)}
+        title="Mark done"
+      >
         Done
-      </button>
-      <button className={btn} onClick={() => bulkSetDone(listId, false)} title="Mark not done">
-        <Icon name="radio_button_unchecked" size={15} weight={300} />
+      </ToolbarButton>
+      <ToolbarButton
+        icon="radio_button_unchecked"
+        iconWeight={300}
+        size="sm"
+        onClick={() => bulkSetDone(listId, false)}
+        title="Mark not done"
+      >
         Undone
-      </button>
-      <button
-        className={btn}
+      </ToolbarButton>
+      <ToolbarButton
+        icon="arrow_forward"
+        iconWeight={300}
+        size="sm"
         onClick={openMoveMenu}
         disabled={otherLists.length === 0}
         title="Move to another list"
       >
-        <Icon name="arrow_forward" size={15} weight={300} />
         Move to…
-      </button>
-      <button className={btn} onClick={() => bulkCopy(listId)} title="Copy as checklist">
-        <Icon name="content_copy" size={15} weight={300} />
+      </ToolbarButton>
+      <ToolbarButton
+        icon="content_copy"
+        iconWeight={300}
+        size="sm"
+        onClick={() => bulkCopy(listId)}
+        title="Copy as checklist"
+      >
         Copy
-      </button>
-      <button
-        className={cn(btn, 'hover:text-danger-500l dark:hover:text-danger-500d')}
+      </ToolbarButton>
+      <ToolbarButton
+        icon="delete"
+        iconWeight={300}
+        size="sm"
+        variant="danger"
         onClick={() => void bulkDelete(listId)}
         title="Delete selection"
       >
-        <Icon name="delete" size={15} weight={300} />
         Delete
-      </button>
-      <button
-        className={cn(btn, 'ml-auto')}
+      </ToolbarButton>
+      <ToolbarButton
+        icon="close"
+        iconWeight={300}
+        size="sm"
+        className="ml-auto"
         onClick={() => useSelectionStore.getState().clear(listId)}
         title="Clear selection"
       >
-        <Icon name="close" size={15} weight={300} />
         Clear
-      </button>
+      </ToolbarButton>
     </div>
   );
 }
@@ -428,24 +460,24 @@ function StatsBar({
   pct: number;
 }) {
   return (
-    <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d text-content-3l dark:text-content-3d flex h-9 shrink-0 items-center gap-3 border-t px-4 text-[11px] font-semibold tracking-[0.08em] uppercase tabular-nums">
+    <Label
+      as="div"
+      tone="muted"
+      weight="semibold"
+      className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d flex h-9 shrink-0 items-center gap-space-5 border-t px-space-7 text-[11px] tracking-[0.08em] uppercase tabular-nums"
+    >
       <ViewControl />
-      <span className="bg-edge-2l dark:bg-edge-2d h-3 w-px" />
+      <Divider orientation="vertical" className="h-3" />
       <span>
         {done}/{total} done
       </span>
-      <div className="ml-auto flex items-center gap-2">
-        <span className="bg-surface-0l dark:bg-surface-0d relative h-1 w-24 overflow-hidden rounded-full">
-          <span
-            className="bg-accent-500l dark:bg-accent-500d absolute inset-y-0 left-0 rounded-full transition-[width] duration-150"
-            style={{ width: `${pct}%` }}
-          />
-        </span>
-        <span className="text-content-2l dark:text-content-2d w-8 text-right">
+      <div className="ml-auto flex items-center gap-space-4">
+        <ProgressBar value={total ? done / total : 0} />
+        <Label tone="secondary" className="w-8 text-right">
           {pct}%
-        </span>
+        </Label>
       </div>
-    </div>
+    </Label>
   );
 }
 
@@ -465,7 +497,7 @@ function ViewControl() {
       onClick={toggle}
       title="Sort & filter"
       className={cn(
-        'rounded-field flex h-5.5 items-center gap-1 px-1.5 text-[11px] font-semibold tracking-normal normal-case',
+        'rounded-field flex h-5.5 items-center gap-space-2 px-space-4 text-[11px] font-semibold tracking-normal normal-case',
         active
           ? 'text-accent-500l dark:text-accent-500d'
           : 'text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d'

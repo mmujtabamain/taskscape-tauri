@@ -1,4 +1,10 @@
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  Divider,
+  IconButton,
+  Label,
+  Surface,
+} from '@taskscape/common-ui/components';
 import { useEffect, useRef, useState } from 'react';
 import {
   createProject,
@@ -40,12 +46,17 @@ export function ProjectSwitcher() {
     <div ref={rootRef} className="relative flex items-center" data-no-drag>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="rounded-control bg-surface-0l dark:bg-surface-0d hover:bg-wash-2l dark:hover:bg-wash-2d flex h-8 items-center gap-1.5 py-1.5 pr-2.5 pl-3.5"
+        className="rounded-control bg-surface-0l dark:bg-surface-0d hover:bg-wash-2l dark:hover:bg-wash-2d flex h-8 items-center gap-space-3 py-space-3 pr-space-6 pl-space-7"
         title="Switch project"
       >
-        <span className="font-display text-content-1l dark:text-content-1d max-w-44 truncate text-[14px] font-semibold">
+        <Label
+          tone="primary"
+          weight="semibold"
+          truncate
+          className="font-display max-w-44 text-[14px]"
+        >
           {selected?.name ?? 'Taskscape'}
-        </span>
+        </Label>
         <Icon
           name="unfold_more"
           size={15}
@@ -55,62 +66,71 @@ export function ProjectSwitcher() {
       </button>
 
       {open && (
-        <div className="z-dropdown rounded-panel border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu absolute top-10 left-0 min-w-60 border py-1.5">
+        <Surface
+          elevation="menu"
+          surface={3}
+          radius="panel"
+          className="z-dropdown absolute top-10 left-0 min-w-60 py-space-3"
+        >
           {projects.map((p) => (
             <div
               key={p.id}
-              className="group hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 cursor-default items-center gap-2 px-3"
+              className="group hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 cursor-default items-center gap-space-4 px-space-6"
               onClick={() => {
                 selectProject(p.id);
                 setOpen(false);
               }}
             >
-              <span className="text-accent-500l dark:text-accent-500d flex w-4 items-center">
+              <Label tone="accent" className="flex w-4 items-center">
                 {p.id === selectedId && <Icon name="check" size={15} weight={900} />}
-              </span>
-              <span className="text-content-1l dark:text-content-1d flex-1 truncate text-[13.5px]">
+              </Label>
+              <Label tone="primary" truncate className="flex-1 text-[13.5px]">
                 {p.name}
-              </span>
-              <button
+              </Label>
+              <IconButton
+                icon="edit"
+                iconSize={16}
+                iconWeight={500}
+                variant="plain"
+                className="opacity-0 group-hover:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
                   void renameProject(p);
                 }}
-                className="rounded-field text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center opacity-0 group-hover:opacity-100"
                 title="Rename project"
-              >
-                <Icon name="edit" size={16} weight={500} />
-              </button>
-              <button
+              />
+              <IconButton
+                icon="delete"
+                iconSize={16}
+                iconWeight={500}
+                variant="plain"
+                className="opacity-0 group-hover:opacity-100 hover:text-danger-500l dark:hover:text-danger-500d"
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
                   void deleteProject(p);
                 }}
-                className="rounded-field text-content-3l dark:text-content-3d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 place-items-center opacity-0 group-hover:opacity-100"
                 title="Delete project"
-              >
-                <Icon name="delete" size={16} weight={500} />
-              </button>
+              />
             </div>
           ))}
-          <div className="border-edge-1l dark:border-edge-1d mx-2 my-1 border-t" />
+          <Divider level={1} className="mx-space-5 my-space-3" />
           <button
             onClick={() => {
               setOpen(false);
               void createProject();
             }}
-            className="hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 w-full items-center gap-2 px-3 text-left"
+            className="hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 w-full items-center gap-space-4 px-space-6 text-left"
           >
-            <span className="text-content-3l dark:text-content-3d flex w-4 items-center">
+            <Label tone="muted" className="flex w-4 items-center">
               <Icon name="add" size={15} weight={900} />
-            </span>
-            <span className="text-content-1l dark:text-content-1d text-[13.5px]">
+            </Label>
+            <Label tone="primary" className="text-[13.5px]">
               New project…
-            </span>
+            </Label>
           </button>
-        </div>
+        </Surface>
       )}
     </div>
   );

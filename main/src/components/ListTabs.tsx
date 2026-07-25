@@ -1,5 +1,6 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import { IconButton, Label, TextInput } from '@taskscape/common-ui/components';
 import { useState } from 'react';
 import type { List } from '../api';
 import { createList, deleteList, exportList, renameList } from '../commands/lists';
@@ -155,7 +156,7 @@ export function ListTabs() {
                 }
               }}
               className={cn(
-                'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-2 border-b border-transparent pr-2 pl-4',
+                'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-space-4 border-b border-transparent pr-space-5 pl-space-7',
                 focused && 'bg-surface-2l dark:bg-surface-2d',
                 dropOver === list.id && 'bg-selection-1l dark:bg-selection-1d',
                 draggingTab === list.id && 'opacity-40'
@@ -168,7 +169,7 @@ export function ListTabs() {
                 />
               )}
               {editingId === list.id ? (
-                <input
+                <TextInput
                   autoFocus
                   defaultValue={list.name}
                   onClick={(e) => e.stopPropagation()}
@@ -186,31 +187,30 @@ export function ListTabs() {
                     if (name && name !== list.name) renameInline(list.id, name);
                     setEditingId(null);
                   }}
-                  className="rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d ring-focus-1l dark:ring-focus-1d max-w-40 px-1.5 py-0.5 text-[13px] font-medium ring-1 outline-none"
+                  className="ring-focus-1l dark:ring-focus-1d max-w-40 h-6 px-space-4 py-0 font-medium ring-1"
                 />
               ) : (
-                <span
-                  className={cn(
-                    'max-w-40 truncate text-[13px] font-medium tracking-[0.01em]',
-                    focused
-                      ? 'text-content-1l dark:text-content-1d'
-                      : 'text-content-3l dark:text-content-3d'
-                  )}
+                <Label
+                  truncate
+                  weight="medium"
+                  tone={focused ? 'primary' : 'muted'}
+                  className="max-w-40 text-[13px] tracking-[0.01em]"
                 >
                   {list.name}
-                </span>
+                </Label>
               )}
               <span className="relative">
-                <button
+                <IconButton
+                  icon="close"
+                  iconSize={15}
+                  iconWeight={500}
+                  variant="danger"
                   onClick={(e) => {
                     e.stopPropagation();
                     void deleteList(list);
                   }}
-                  className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-6 w-6 shrink-0 place-items-center"
                   title="Delete list"
-                >
-                  <Icon name="close" size={15} weight={500} />
-                </button>
+                />
               </span>
             </div>
           </div>
@@ -256,13 +256,15 @@ export function ListTabs() {
           />
         </div>
       )}
-      <button
+      <IconButton
+        icon="add"
+        iconSize={18}
+        iconWeight={300}
+        size="lg"
         onClick={() => void createList()}
-        className="text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d my-auto ml-2 grid h-7 w-7 shrink-0 place-items-center rounded-md"
+        className="my-auto ml-2 rounded-md"
         title="New list"
-      >
-        <Icon name="add" size={18} weight={300} />
-      </button>
+      />
       {/* Trailing empty strip drags the window (the tabs themselves are interactive). */}
       <span data-tauri-drag-region className="min-w-6 flex-1 self-stretch" />
     </div>

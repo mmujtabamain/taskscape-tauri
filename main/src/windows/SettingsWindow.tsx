@@ -2,6 +2,13 @@ import { emit } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  IconButton,
+  Label,
+  SectionHeader,
+  Segmented,
+  Toggle,
+} from '@taskscape/common-ui/components';
 import { api } from '../api';
 import { setTheme, type ThemePref } from '../lib/theme';
 import { ShortcutsPane } from './ShortcutsPane';
@@ -29,43 +36,7 @@ const PANES = [
 type PaneId = (typeof PANES)[number]['id'];
 
 function SectionLabel({ children }: { children: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-content-3l dark:text-content-3d text-[11px] font-semibold tracking-widest uppercase">
-        {children}
-      </span>
-      <span className="border-edge-1l dark:border-edge-1d -mr-5 flex-1 border-t" />
-    </div>
-  );
-}
-
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (next: T) => void;
-}) {
-  return (
-    <div className="rounded-control bg-surface-0l dark:bg-surface-0d flex p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`rounded-field h-7 flex-1 text-[12px] font-medium ${
-            value === o.value
-              ? 'border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d border'
-              : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <SectionHeader label={children} className="mb-0" />;
 }
 
 function GeneralPane({
@@ -87,49 +58,42 @@ function GeneralPane({
     <div className="space-y-5">
       <section className="space-y-3">
         <SectionLabel>Appearance</SectionLabel>
-        <Segmented options={THEME_OPTIONS} value={theme} onChange={onTheme} />
+        <Segmented
+          variant="surfaceThumb"
+          items={THEME_OPTIONS}
+          value={theme}
+          onChange={onTheme}
+        />
       </section>
 
       <section className="space-y-3">
         <SectionLabel>Screenshots</SectionLabel>
         <div className="space-y-1.5">
           <Segmented
-            options={SCREENSHOT_OPTIONS}
+            variant="surfaceThumb"
+            items={SCREENSHOT_OPTIONS}
             value={screenshotMode}
             onChange={onScreenshotMode}
           />
-          <p className="text-content-3l dark:text-content-3d text-[11px]">
+          <Label as="p" tone="muted" className="text-[11px]">
             {screenshotMode === 'region'
               ? 'Drag to select an area, or press Space to grab a window. Esc cancels.'
               : 'Capture the entire screen instantly.'}
-          </p>
+          </Label>
         </div>
       </section>
 
       <section className="space-y-3">
         <SectionLabel>Tasks</SectionLabel>
         <div className="flex items-center justify-between">
-          <span className="text-content-1l dark:text-content-1d text-[13px]">
+          <Label tone="primary" className="text-[13px]">
             Show completed tasks
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={showCompleted}
-            aria-label="Show completed tasks"
-            onClick={onToggleCompleted}
-            className={`relative h-5 w-8.5 shrink-0 rounded-full border transition-colors duration-160 ${
-              showCompleted
-                ? 'bg-accent-500l dark:bg-accent-500d border-transparent'
-                : 'border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d'
-            }`}
-          >
-            <span
-              className={`bg-surface-3l dark:bg-surface-3d absolute top-1/2 left-px h-4 w-4 -translate-y-1/2 rounded-full shadow-sm transition-transform duration-160 ${
-                showCompleted ? 'translate-x-3.5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+          </Label>
+          <Toggle
+            checked={showCompleted}
+            onChange={onToggleCompleted}
+            title="Show completed tasks"
+          />
         </div>
       </section>
     </div>
@@ -224,20 +188,23 @@ export function SettingsWindow() {
           data-tauri-drag-region
           className="border-edge-2l dark:border-edge-2d flex h-11 shrink-0 items-center border-b px-4"
         >
-          <h1
+          <Label
+            as="h1"
             data-tauri-drag-region
-            className="font-display text-content-1l dark:text-content-1d text-[15px] font-semibold"
+            tone="primary"
+            weight="semibold"
+            className="font-display text-[15px]"
           >
             Settings
-          </h1>
-          <button
-            type="button"
+          </Label>
+          <IconButton
+            icon="close"
+            iconSize={18}
+            variant="ghostStrong"
             aria-label="Close settings"
             onClick={() => void getCurrentWindow().close()}
-            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d ml-auto flex h-6 w-6 items-center justify-center"
-          >
-            <Icon name="close" size={18} />
-          </button>
+            className="ml-auto"
+          />
         </header>
 
         <div className="flex min-h-0 flex-1">
@@ -275,9 +242,13 @@ export function SettingsWindow() {
           </div>
         </div>
 
-        <footer className="text-content-3l dark:text-content-3d shrink-0 pb-4 text-center text-[11px]">
+        <Label
+          as="footer"
+          tone="muted"
+          className="shrink-0 pb-4 text-center text-[11px]"
+        >
           Taskscape 0.1.0
-        </footer>
+        </Label>
       </div>
     </div>
   );

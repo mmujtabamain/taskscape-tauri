@@ -1,5 +1,14 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  Button,
+  IconButton,
+  Label,
+  Segmented,
+  SectionHeader,
+  TextInput,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 import type { Task } from '../../api';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useListStore } from '../../stores/listStore';
@@ -112,7 +121,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="bg-surface-1l dark:bg-surface-1d flex h-full w-full flex-col">
-      <div className="border-edge-1l dark:border-edge-1d flex h-12 shrink-0 items-center gap-2.5 border-b px-3">
+      <div className="border-edge-1l dark:border-edge-1d flex h-11 shrink-0 items-center gap-space-5 border-b px-space-6">
         <Icon
           name="tune"
           size={18}
@@ -120,31 +129,30 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
           className="text-content-2l dark:text-content-2d shrink-0"
         />
         <div className="flex min-w-0 flex-1 flex-col justify-center">
-          <span className="font-display text-content-1l dark:text-content-1d truncate text-[14px] leading-tight font-semibold">
+          <Label
+            tone="primary"
+            weight="semibold"
+            truncate
+            className="font-display text-[14px] leading-tight"
+          >
             Filter &amp; Sort
-          </span>
-          <span className="text-content-3l dark:text-content-3d truncate text-[11px] leading-tight font-medium">
+          </Label>
+          <Label tone="muted" weight="medium" truncate className="text-[11px] leading-tight">
             {targets.length === 0
               ? 'No list open'
               : targets.map(name).join(', ')}
-          </span>
+          </Label>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-7 w-7 shrink-0 place-items-center"
-          title="Close"
-        >
-          <Icon name="close" size={16} />
-        </button>
+        <IconButton icon="close" size="lg" iconSize={16} onClick={onClose} title="Close" />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-space-8 overflow-y-auto px-space-7 py-space-7">
         <Section
           label="Sort"
           active={sortActive}
           onClear={() => update({ sort: 'manual', dir: 'asc' })}
         >
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-space-3">
             <MenuButton
               className="min-w-0 flex-1"
               icon={sortMeta.icon}
@@ -156,7 +164,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
               }))}
               onPick={(id) => update({ sort: id as SortMode })}
             />
-            <div className="bg-surface-0l dark:bg-surface-0d rounded-field flex shrink-0 gap-0.5 p-0.5">
+            <div className="bg-surface-0l dark:bg-surface-0d rounded-field flex shrink-0 gap-space-1 p-space-1">
               {(['asc', 'desc'] as SortDir[]).map((dir) => (
                 <button
                   key={dir}
@@ -164,7 +172,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
                   disabled={view.sort === 'manual'}
                   title={dir === 'asc' ? 'Ascending' : 'Descending'}
                   className={cn(
-                    'grid h-6.5 w-7 place-items-center rounded-[5px] disabled:pointer-events-none disabled:opacity-40',
+                    'grid h-6.5 w-7 place-items-center rounded-field disabled:pointer-events-none disabled:opacity-40',
                     view.dir === dir && view.sort !== 'manual'
                       ? 'bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift'
                       : 'text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d'
@@ -186,7 +194,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
           onClear={() => update({ filter: 'all' })}
         >
           <Segmented
-            options={SHOW}
+            items={SHOW.map((s) => ({ value: s.id, label: s.label }))}
             value={view.filter}
             onChange={(filter) => update({ filter })}
           />
@@ -234,7 +242,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
         >
           <div className="flex flex-col gap-1.5">
             <Segmented
-              options={FIELDS}
+              items={FIELDS.map((f) => ({ value: f.id, label: f.label }))}
               value={view.dateField}
               onChange={(dateField) => update({ dateField })}
             />
@@ -258,7 +266,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
         </Section>
       </div>
 
-      <div className="border-edge-1l dark:border-edge-1d flex h-9 shrink-0 items-center gap-2 border-t px-4">
+      <div className="border-edge-1l dark:border-edge-1d flex h-9 shrink-0 items-center gap-space-4 border-t px-space-7">
         <span
           className={cn(
             'h-1.5 w-1.5 shrink-0 rounded-full',
@@ -267,36 +275,39 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
               : 'bg-edge-3l dark:bg-edge-3d'
           )}
         />
-        <span className="text-content-2l dark:text-content-2d truncate text-[11.5px] font-medium tabular-nums">
+        <Label
+          tone="secondary"
+          weight="medium"
+          truncate
+          className="text-[11.5px] tabular-nums"
+        >
           {stats.length === 0
             ? 'Nothing to filter'
             : split
               ? stats.map((s) => `${s.name} ${s.shown}/${s.total}`).join(' · ')
               : `Showing ${stats[0].shown} of ${stats[0].total} tasks`}
-        </span>
+        </Label>
       </div>
 
-      <div className="border-edge-1l dark:border-edge-1d bg-surface-1l dark:bg-surface-1d flex items-center gap-2 border-t px-3 py-2.5">
-        <button
+      <div className="border-edge-1l dark:border-edge-1d bg-surface-1l dark:bg-surface-1d flex items-center gap-space-4 border-t px-space-6 py-space-6">
+        <ToolbarButton
+          icon="restart_alt"
+          size="lg"
           onClick={resetAll}
           disabled={!anyActive}
-          className="rounded-control text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d flex h-8 items-center gap-1 px-2.5 text-[12.5px] font-semibold disabled:pointer-events-none disabled:opacity-40"
         >
-          <Icon name="restart_alt" size={15} />
           Reset
-        </button>
-        <button
-          onClick={onClose}
-          className="rounded-control bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift hover:bg-accent-600l dark:hover:bg-accent-600d ml-auto flex h-8 items-center px-4 text-[12.5px] font-semibold"
-        >
+        </ToolbarButton>
+        <Button variant="primary" className="ml-auto" onClick={onClose}>
           Done
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
-/** Section header with an accent dot + clear button while it's non-default. */
+/** Section header with an accent dot + clear button while it's non-default —
+ *  delegates to the shared SectionHeader (keeps the restart_alt clear icon). */
 function Section({
   label,
   active,
@@ -310,63 +321,15 @@ function Section({
 }) {
   return (
     <section>
-      <div className="mb-2 flex h-5 items-center gap-2">
-        <span className="text-content-3l dark:text-content-3d text-[10.5px] font-semibold tracking-[0.08em] uppercase">
-          {label}
-        </span>
-        {active && (
-          <span className="bg-accent-500l dark:bg-accent-500d h-1 w-1 shrink-0 rounded-full" />
-        )}
-        <span className="border-edge-1l dark:border-edge-1d flex-1 border-t" />
-        {active && (
-          <button
-            onClick={onClear}
-            title={`Clear ${label.toLowerCase()}`}
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-5 w-5 place-items-center"
-          >
-            <Icon name="restart_alt" size={13} weight={300} />
-          </button>
-        )}
-      </div>
+      <SectionHeader
+        label={label}
+        active={active}
+        onClear={active ? onClear : undefined}
+        clearIcon="restart_alt"
+        clearTitle={`Clear ${label.toLowerCase()}`}
+      />
       {children}
     </section>
-  );
-}
-
-/** Joined segmented control on a recessed track; the active segment is a
- *  raised accent thumb. */
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-  size = 'md',
-}: {
-  options: { id: T; label: string }[];
-  value: T;
-  onChange: (id: T) => void;
-  size?: 'md' | 'sm';
-}) {
-  return (
-    <div className="bg-surface-0l dark:bg-surface-0d rounded-field grid auto-cols-fr grid-flow-col gap-0.5 p-0.5">
-      {options.map((o) => {
-        const on = o.id === value;
-        return (
-          <button
-            key={o.id}
-            onClick={() => onChange(o.id)}
-            className={cn(
-              'truncate rounded-[5px] font-medium',
-              size === 'md' ? 'h-6.5 px-2 text-[12px]' : 'h-5.5 px-1 text-[11px]',
-              on
-                ? 'bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift'
-                : 'text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d'
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -393,7 +356,7 @@ function MenuButton({
     <button
       onClick={open}
       className={cn(
-        'bg-surface-0l dark:bg-surface-0d rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-7.5 items-center gap-2 px-2.5',
+        'bg-surface-0l dark:bg-surface-0d rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-7.5 items-center gap-space-4 px-space-6',
         className
       )}
     >
@@ -405,9 +368,14 @@ function MenuButton({
           className="text-content-3l dark:text-content-3d shrink-0"
         />
       )}
-      <span className="text-content-1l dark:text-content-1d min-w-0 flex-1 truncate text-left text-[12.5px] font-medium">
+      <Label
+        tone="primary"
+        weight="medium"
+        truncate
+        className="min-w-0 flex-1 text-left text-[12.5px]"
+      >
         {label}
-      </span>
+      </Label>
       <Icon
         name="unfold_more"
         size={14}
@@ -430,25 +398,28 @@ function TriRow({
   onChange: (v: TriState) => void;
 }) {
   return (
-    <div className="flex h-8 items-center gap-2.5">
+    <div className="flex h-8 items-center gap-space-5">
       <Icon
         name={icon}
         size={15}
         weight={300}
         className="text-content-3l dark:text-content-3d shrink-0"
       />
-      <span
-        className={cn(
-          'min-w-0 flex-1 truncate text-[13px] font-medium',
-          value === 'any'
-            ? 'text-content-2l dark:text-content-2d'
-            : 'text-content-1l dark:text-content-1d'
-        )}
+      <Label
+        tone={value === 'any' ? 'secondary' : 'primary'}
+        weight="medium"
+        truncate
+        className="min-w-0 flex-1 text-[13px]"
       >
         {label}
-      </span>
+      </Label>
       <div className="w-40 shrink-0">
-        <Segmented size="sm" options={TRI} value={value} onChange={onChange} />
+        <Segmented
+          size="sm"
+          items={TRI.map((t) => ({ value: t.id, label: t.label }))}
+          value={value}
+          onChange={onChange}
+        />
       </div>
     </div>
   );
@@ -463,30 +434,42 @@ function DaysStepper({
   onChange: (n: number) => void;
 }) {
   const clamp = (n: number) => Math.min(365, Math.max(1, Math.round(n) || 1));
-  const btn =
-    'bg-surface-0l dark:bg-surface-0d rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6.5 w-6.5 shrink-0 place-items-center';
+  const stepper = 'h-6.5 w-6.5 bg-surface-0l dark:bg-surface-0d';
   return (
-    <div className="flex items-center gap-1.5 pl-0.5">
-      <span className="text-content-2l dark:text-content-2d min-w-0 flex-1 truncate text-[12.5px] font-medium">
+    <div className="flex items-center gap-space-3 pl-0.5">
+      <Label
+        tone="secondary"
+        weight="medium"
+        truncate
+        className="min-w-0 flex-1 text-[12.5px]"
+      >
         Within the last
-      </span>
-      <button className={btn} title="Fewer days" onClick={() => onChange(clamp(value - 1))}>
-        <Icon name="remove" size={14} />
-      </button>
-      <input
+      </Label>
+      <IconButton
+        icon="remove"
+        iconSize={14}
+        className={stepper}
+        title="Fewer days"
+        onClick={() => onChange(clamp(value - 1))}
+      />
+      <TextInput
         type="number"
         min={1}
         max={365}
         value={value}
         onChange={(e) => onChange(clamp(Number(e.target.value)))}
-        className="bg-surface-0l dark:bg-surface-0d rounded-field text-content-1l dark:text-content-1d focus:ring-focus-1l dark:focus:ring-focus-1d h-6.5 w-12 text-center text-[12.5px] font-medium tabular-nums outline-none focus:ring-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="h-6.5 w-12 px-0 text-center text-[12.5px] font-medium tabular-nums focus:ring-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
-      <button className={btn} title="More days" onClick={() => onChange(clamp(value + 1))}>
-        <Icon name="add" size={14} />
-      </button>
-      <span className="text-content-2l dark:text-content-2d text-[12.5px] font-medium">
+      <IconButton
+        icon="add"
+        iconSize={14}
+        className={stepper}
+        title="More days"
+        onClick={() => onChange(clamp(value + 1))}
+      />
+      <Label tone="secondary" weight="medium" className="text-[12.5px]">
         days
-      </span>
+      </Label>
     </div>
   );
 }

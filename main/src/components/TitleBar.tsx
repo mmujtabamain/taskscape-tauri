@@ -1,6 +1,6 @@
-import { cn } from '@taskscape/common-ui/cn';
 import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
+import { IconButton } from '@taskscape/common-ui/components';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { api } from '../api';
 import { splitTargetId } from '../commands/view';
@@ -60,7 +60,7 @@ export function TitleBar() {
 
       <ListTabs />
 
-      <div className="flex items-center gap-2 pr-3 pl-3">
+      <div className="flex items-center gap-space-4 pr-space-6 pl-space-6">
         {reducedMotion && (
           <div
             title="Reduced motion active on Low Power Mode"
@@ -116,18 +116,17 @@ function BarButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
+    <IconButton
+      icon={icon}
+      size="xl"
+      radius="control"
+      iconSize={19}
+      iconWeight={300}
+      filled={active}
+      active={active}
       disabled={disabled}
+      onClick={onClick}
       title={title}
-      className={cn(
-        'rounded-control hover:bg-wash-1l dark:hover:bg-wash-1d grid h-8 w-8 place-items-center disabled:pointer-events-none disabled:opacity-35',
-        active
-          ? 'text-content-1l dark:text-content-1d'
-          : 'text-content-2l dark:text-content-2d hover:text-content-1l dark:hover:text-content-1d'
-      )}
-    >
-      <Icon name={icon} size={19} weight={300} filled={active} />
-    </button>
+    />
   );
 }

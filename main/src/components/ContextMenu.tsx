@@ -8,6 +8,11 @@ import {
   type OpenMenu,
 } from './contextMenuContext';
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  Divider,
+  MenuItem as MenuRow,
+  Surface,
+} from '@taskscape/common-ui/components';
 
 /** App-wide context-menu layer. Wrap the window root once; open menus from
  *  anywhere via useContextMenu().open({ items, x, y, onPick }). */
@@ -96,54 +101,37 @@ function MenuPanel({
   }, [x, y, nested]);
 
   return (
-    <div
+    <Surface
       ref={ref}
+      elevation="menu"
+      surface={3}
+      radius="panel"
       style={nested ? undefined : { left: pos.x, top: pos.y }}
-      className={cn(
-        !nested && 'absolute',
-        'rounded-control border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-menu min-w-44 border py-1'
-      )}
+      className={cn(!nested && 'absolute', 'min-w-44 py-space-3')}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item) => (
         <div key={item.id} className="relative">
-          {item.dividerAbove && (
-            <div className="border-edge-2l dark:border-edge-2d mx-2 my-1 border-t" />
-          )}
-          <button
+          {item.dividerAbove && <Divider className="mx-space-5 my-space-3" />}
+          <MenuRow
+            tone={item.danger ? 'danger' : 'default'}
             disabled={item.disabled}
             onMouseEnter={() => setSubFor(item.submenu ? item.id : null)}
             onClick={() => {
               if (!item.submenu) onPick(item.id);
             }}
-            className={cn(
-              'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] disabled:pointer-events-none disabled:opacity-40',
-              item.danger
-                ? 'text-danger-500l dark:text-danger-500d hover:bg-danger-100l dark:hover:bg-danger-100d'
-                : 'text-content-1l dark:text-content-1d hover:bg-wash-2l dark:hover:bg-wash-2d'
-            )}
+            leading={item.icon && <Icon name={item.icon} size={15} />}
+            trailing={
+              (item.shortcut || item.submenu) && (
+                <span className="flex items-center gap-space-4">
+                  {item.shortcut && <span className="text-[11px]">{item.shortcut}</span>}
+                  {item.submenu && <Icon name="chevron_right" size={14} />}
+                </span>
+              )
+            }
           >
-            {item.icon && (
-              <Icon
-                name={item.icon}
-                size={15}
-                className="text-content-3l dark:text-content-3d"
-              />
-            )}
-            <span className="flex-1 truncate">{item.label}</span>
-            {item.shortcut && (
-              <span className="text-content-3l dark:text-content-3d text-[11px]">
-                {item.shortcut}
-              </span>
-            )}
-            {item.submenu && (
-              <Icon
-                name="chevron_right"
-                size={14}
-                className="text-content-3l dark:text-content-3d"
-              />
-            )}
-          </button>
+            {item.label}
+          </MenuRow>
           {item.submenu && subFor === item.id && (
             <Submenu>
               <MenuPanel
@@ -157,7 +145,7 @@ function MenuPanel({
           )}
         </div>
       ))}
-    </div>
+    </Surface>
   );
 }
 

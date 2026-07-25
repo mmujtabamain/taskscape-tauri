@@ -1,4 +1,11 @@
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  EmptyState,
+  IconButton,
+  Label,
+  PanelHeader,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 import { useEffect } from 'react';
 import { confirmModal } from '../lib/modal';
 import { useListStore } from '../stores/listStore';
@@ -36,76 +43,79 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="bg-surface-1l dark:bg-surface-1d flex h-full w-full flex-col">
-      <div className="border-edge-1l dark:border-edge-1d flex h-12 shrink-0 items-center gap-2 border-b px-3">
-        <Icon name="delete" size={18} weight={300} className="text-content-2l dark:text-content-2d shrink-0" />
-        <span className="font-display text-content-1l dark:text-content-1d flex-1 truncate text-[14px] font-semibold">
-          Trash
-        </span>
-        <button
-          onClick={onClose}
-          className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-7 w-7 shrink-0 place-items-center"
-          title="Close Trash"
-        >
-          <Icon name="close" size={16} />
-        </button>
-      </div>
+      <PanelHeader
+        title="Trash"
+        onClose={onClose}
+        closeTitle="Close Trash"
+        border="edge-1"
+        leading={
+          <Icon
+            name="delete"
+            size={18}
+            weight={300}
+            className="text-content-2l dark:text-content-2d shrink-0"
+          />
+        }
+      />
 
       {roots.length > 0 && (
-        <div className="border-edge-1l dark:border-edge-1d flex shrink-0 items-center gap-1.5 border-b px-3 py-2">
-          <button
-            onClick={restoreAll}
-            className="rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
-          >
-            <Icon name="restore" size={14} />
+        <div className="border-edge-1l dark:border-edge-1d flex shrink-0 items-center gap-space-3 border-b px-space-6 py-space-5">
+          <ToolbarButton icon="restore" iconSize={14} onClick={restoreAll}>
             Restore all
-          </button>
-          <button
+          </ToolbarButton>
+          <ToolbarButton
+            icon="delete_forever"
+            iconSize={14}
+            variant="danger"
+            className="ml-auto"
             onClick={emptyTrash}
-            className="rounded-field text-danger-500l dark:text-danger-500d hover:bg-danger-100l dark:hover:bg-danger-100d ml-auto flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
           >
-            <Icon name="delete_forever" size={14} />
             Empty
-          </button>
+          </ToolbarButton>
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div className="min-h-0 flex-1 overflow-y-auto p-space-5">
         {roots.length === 0 && (
-          <div className="flex flex-col items-center gap-1.5 py-16 text-center">
-            <Icon name="delete" size={28} weight={200} className="text-content-3l dark:text-content-3d" />
-            <p className="text-content-2l dark:text-content-2d text-[14px] font-medium">
-              {loading ? 'Loading…' : 'Trash is empty'}
-            </p>
-          </div>
+          <EmptyState
+            icon="delete"
+            iconSize={28}
+            title={loading ? 'Loading…' : 'Trash is empty'}
+            className="py-16"
+          />
         )}
         {roots.map((t) => (
           <div
             key={t.id}
-            className="group/trash rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-10 items-center gap-2.5 px-2"
+            className="group/trash rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-9 items-center gap-space-5 px-space-5"
           >
             <div className="min-w-0 flex-1">
-              <div className="text-content-1l dark:text-content-1d truncate text-[13.5px]">
+              <Label as="div" tone="primary" truncate className="text-[13.5px]">
                 {t.title}
-              </div>
-              <div className="text-content-3l dark:text-content-3d truncate text-[11px]">
+              </Label>
+              <Label as="div" tone="muted" truncate className="text-[11px]">
                 {listName(t.list_id) ? `${listName(t.list_id)} · ` : ''}
                 {t.deleted_at ? `deleted ${relativeTime(t.deleted_at)}` : ''}
-              </div>
+              </Label>
             </div>
-            <button
+            <IconButton
+              icon="restore"
+              size="lg"
+              iconSize={16}
+              variant="ghostStrong"
+              className="opacity-0 group-hover/trash:opacity-100"
               onClick={() => useTrashStore.getState().restore([t.id])}
               title="Restore"
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-7 w-7 shrink-0 place-items-center opacity-0 group-hover/trash:opacity-100"
-            >
-              <Icon name="restore" size={16} />
-            </button>
-            <button
+            />
+            <IconButton
+              icon="delete_forever"
+              size="lg"
+              iconSize={16}
+              variant="danger"
+              className="opacity-0 group-hover/trash:opacity-100"
               onClick={() => useTrashStore.getState().purge([t.id])}
               title="Delete permanently"
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d grid h-7 w-7 shrink-0 place-items-center opacity-0 group-hover/trash:opacity-100"
-            >
-              <Icon name="delete_forever" size={16} />
-            </button>
+            />
           </div>
         ))}
       </div>

@@ -1,5 +1,4 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { Icon } from '@taskscape/common-ui/Icon';
 import { useState } from 'react';
 import type { Task } from '../../api';
 import {
@@ -14,8 +13,14 @@ import { useListStore } from '../../stores/listStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useContextMenu } from '../contextMenuContext';
-import { DoneCheckbox } from './DoneCheckbox';
-import { SectionHeader } from './SectionHeader';
+import {
+  Badge,
+  Checkbox,
+  IconButton,
+  Label,
+  SectionHeader,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 
 /** Shown when the focused pane has more than one task selected: a combined tally,
  *  the bulk verbs, and a peek-able list. Clicking a row peeks (highlights without
@@ -56,104 +61,134 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
     });
   };
 
-  const act =
-    'rounded-field text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-8 items-center justify-center gap-1.5 text-[12.5px] font-semibold disabled:pointer-events-none disabled:opacity-40';
-
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 p-4">
-        <div className="flex items-center gap-2.5">
-          <span className="bg-accent-500l dark:bg-accent-500d text-on-accent grid h-8 min-w-8 place-items-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+      <div className="shrink-0 p-space-7">
+        <div className="flex items-center gap-space-5">
+          <Badge
+            tone="accent"
+            shape="round"
+            className="h-8 min-w-8 px-space-5 text-[13px] font-bold"
+          >
             {tasks.length}
-          </span>
+          </Badge>
           <div className="min-w-0 flex-1">
-            <p className="font-display text-content-1l dark:text-content-1d text-[16px] font-semibold">
+            <Label
+              as="p"
+              tone="primary"
+              weight="semibold"
+              className="font-display text-[16px]"
+            >
               {tasks.length} tasks selected
-            </p>
-            <p className="text-content-3l dark:text-content-3d text-[11.5px] tabular-nums">
+            </Label>
+            <Label as="p" tone="muted" className="text-[11.5px] tabular-nums">
               {done} done / {tasks.length}
-            </p>
+            </Label>
           </div>
-          <button
+          <IconButton
+            icon="close"
+            iconSize={16}
             onClick={() => focusedListId && useSelectionStore.getState().clear(focusedListId)}
             title="Clear selection"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center"
-          >
-            <Icon name="close" size={16} />
-          </button>
+          />
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-1">
-          <button
-            className={act}
+        <div className="mt-space-6 grid grid-cols-3 gap-space-2">
+          <ToolbarButton
+            icon="task_alt"
+            iconWeight={300}
+            size="lg"
+            className="justify-center"
             onClick={() => focusedListId && bulkSetDone(focusedListId, true)}
           >
-            <Icon name="task_alt" size={15} weight={300} />
             Done
-          </button>
-          <button
-            className={act}
+          </ToolbarButton>
+          <ToolbarButton
+            icon="radio_button_unchecked"
+            iconWeight={300}
+            size="lg"
+            className="justify-center"
             onClick={() => focusedListId && bulkSetDone(focusedListId, false)}
           >
-            <Icon name="radio_button_unchecked" size={15} weight={300} />
             Undone
-          </button>
-          <button className={act} onClick={openMoveMenu} disabled={moveTargets.length === 0}>
-            <Icon name="arrow_forward" size={15} weight={300} />
+          </ToolbarButton>
+          <ToolbarButton
+            icon="arrow_forward"
+            iconWeight={300}
+            size="lg"
+            className="justify-center"
+            onClick={openMoveMenu}
+            disabled={moveTargets.length === 0}
+          >
             Move
-          </button>
-          <button className={act} onClick={copy}>
-            <Icon name={copied ? 'check' : 'content_copy'} size={15} weight={300} />
+          </ToolbarButton>
+          <ToolbarButton
+            icon={copied ? 'check' : 'content_copy'}
+            iconWeight={300}
+            size="lg"
+            className="justify-center"
+            onClick={copy}
+          >
             {copied ? 'Copied' : 'Copy'}
-          </button>
-          <button
-            className={cn(act, 'col-span-2 hover:text-danger-500l dark:hover:text-danger-500d')}
+          </ToolbarButton>
+          <ToolbarButton
+            icon="delete"
+            iconWeight={300}
+            size="lg"
+            variant="danger"
+            className="col-span-2 justify-center"
             onClick={() => focusedListId && void bulkDelete(focusedListId)}
           >
-            <Icon name="delete" size={15} weight={300} />
             Delete
-          </button>
+          </ToolbarButton>
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 pt-0">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-space-7 pt-0">
         <SectionHeader label="Selected" />
         <div className="-mx-1.5 flex flex-col">
           {tasks.map((t) => (
             <div
               key={t.id}
               className={cn(
-                'group/sel rounded-field flex h-9 items-center gap-2.5 px-1.5',
+                'group/sel rounded-field flex h-9 items-center gap-space-5 px-space-4',
                 t.id === activeId
                   ? 'bg-selection-1l dark:bg-selection-1d'
                   : 'hover:bg-wash-1l dark:hover:bg-wash-1d'
               )}
             >
-              <DoneCheckbox done={t.done} size={14} onToggle={() => void actToggleDone(t)} />
-              <button
+              <Checkbox
+                checked={t.done}
+                size="sm"
+                title={t.done ? 'Mark not done' : 'Mark done'}
+                onClick={() => void actToggleDone(t)}
+              />
+              <Label
+                as="button"
                 onClick={() => useSelectionStore.getState().focus(t.id)}
                 title={t.title}
+                truncate
+                tone={t.done ? 'muted' : 'primary'}
                 className={cn(
-                  'min-w-0 flex-1 truncate text-left text-[13.5px]',
-                  t.done
-                    ? 'text-content-3l dark:text-content-3d line-through'
-                    : 'text-content-1l dark:text-content-1d'
+                  'min-w-0 flex-1 text-left text-[13.5px]',
+                  t.done && 'line-through'
                 )}
               >
                 {t.title}
-              </button>
+              </Label>
               {listNameById(t.list_id) && (
-                <span className="rounded-field border-edge-2l dark:border-edge-2d text-content-3l dark:text-content-3d shrink-0 border px-1.5 text-[10.5px] font-semibold">
+                <Badge tone="outline" size="sm" className="shrink-0 px-space-4">
                   {listNameById(t.list_id)}
-                </span>
+                </Badge>
               )}
-              <button
+              <IconButton
+                icon="open_in_full"
+                iconSize={13}
+                variant="ghostStrong"
+                className="opacity-0 group-hover/sel:opacity-100"
                 onClick={() => openOne(t.id)}
                 title="Open"
-                className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 shrink-0 place-items-center opacity-0 group-hover/sel:opacity-100"
-              >
-                <Icon name="open_in_full" size={13} />
-              </button>
+              />
             </div>
           ))}
         </div>

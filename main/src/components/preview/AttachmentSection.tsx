@@ -13,7 +13,12 @@ import { api, type Attachment, type Task } from '../../api';
 import { propagateAttachmentRename } from '../../lib/mentions';
 import { confirmModal, openModal, promptName } from '../../lib/modal';
 import { useContextMenu } from '../contextMenuContext';
-import { SectionHeader } from './SectionHeader';
+import {
+  Divider,
+  Label,
+  SectionHeader,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 
 function referenceName(location: string): string {
   if (isRemote(location)) {
@@ -156,36 +161,28 @@ export function AttachmentSection({
       <SectionHeader
         label="Attachments"
         trailing={
-          <div className="flex items-center gap-0.5">
-            <button
+          <div className="flex items-center gap-space-1">
+            <ToolbarButton
               onClick={addScreenshot}
               disabled={capturing}
               title={capturing ? 'Capturing …' : 'Capture the full screen and attach it'}
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold disabled:cursor-default disabled:hover:bg-transparent"
+              className="disabled:cursor-default disabled:hover:bg-transparent"
             >
               {capturing ? <Spinner size={12} /> : <Icon name="screenshot_monitor" size={14} />}
               {capturing ? 'Capturing …' : 'Shot'}
-            </button>
-            <button
-              onClick={addLink}
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
-            >
-              <Icon name="add_link" size={14} />
+            </ToolbarButton>
+            <ToolbarButton icon="add_link" iconSize={14} onClick={addLink}>
               Link
-            </button>
-            <button
-              onClick={addFile}
-              className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d flex h-7 items-center gap-1 px-2 text-[12px] font-semibold"
-            >
-              <Icon name="note_add" size={14} />
+            </ToolbarButton>
+            <ToolbarButton icon="note_add" iconSize={14} onClick={addFile}>
               File
-            </button>
+            </ToolbarButton>
           </div>
         }
       />
 
       {task.attachments.length > 0 ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-space-4">
           {task.attachments.map((a) => {
             const thumb = thumbs.get(a.id);
             return (
@@ -221,28 +218,33 @@ export function AttachmentSection({
                     <Icon name="open_in_full" size={14} />
                   </span>
                 </button>
-                <div className="text-content-3l dark:text-content-3d mt-1 truncate text-center text-[11px]">
+                <Label
+                  as="div"
+                  tone="muted"
+                  truncate
+                  className="mt-1 text-center text-[11px]"
+                >
                   {a.name}
-                </div>
+                </Label>
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d flex h-20 w-full items-stretch gap-1 border border-dashed p-1">
+        <div className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d flex h-20 w-full items-stretch gap-space-2 border border-dashed p-space-2">
           <button
             onClick={addFile}
             title="Copy a file into this task"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-space-2 text-[12.5px] font-semibold"
           >
             <Icon name="note_add" size={18} />
             Copy a file
           </button>
-          <span className="border-edge-2l dark:border-edge-2d my-2 border-l" />
+          <Divider orientation="vertical" level={2} className="my-2" />
           <button
             onClick={addLink}
             title="Link a file or URL without copying"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-1 text-[12.5px] font-semibold"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-space-2 text-[12.5px] font-semibold"
           >
             <Icon name="add_link" size={18} />
             Add a link

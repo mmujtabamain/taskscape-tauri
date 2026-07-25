@@ -1,5 +1,11 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  Badge,
+  IconButton,
+  Label,
+  TextInput,
+} from '@taskscape/common-ui/components';
 import { memo, useEffect, useRef, type ReactNode } from 'react';
 import {
   beginTitleEdit,
@@ -335,7 +341,7 @@ export const TaskRow = memo(function TaskRow({
           openMenu(e.clientX, e.clientY);
         }}
         className={cn(
-          'group/row relative flex min-h-10 items-center pr-3',
+          'group/row relative flex min-h-9 items-center pr-space-6',
           selected
             ? 'bg-selection-1l dark:bg-selection-1d'
             : 'hover:bg-wash-1l dark:hover:bg-wash-1d',
@@ -360,7 +366,7 @@ export const TaskRow = memo(function TaskRow({
             )}
             style={{ left: depth * INDENT + 44 }}
           >
-            <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-0.75 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
+            <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-space-2 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
           </span>
         )}
 
@@ -375,34 +381,31 @@ export const TaskRow = memo(function TaskRow({
           />
         </span>
 
-        <div className="ml-2.5 min-w-0 flex-1 py-2">
-          <div
-            className={cn(
-              'truncate text-[14px] leading-4.75 font-medium',
-              task.done
-                ? 'text-content-3l dark:text-content-3d'
-                : 'text-content-1l dark:text-content-1d'
-            )}
+        <div className="ml-space-6 min-w-0 flex-1 py-space-5">
+          <Label
+            as="div"
+            truncate
+            weight="medium"
+            tone={task.done ? 'muted' : 'primary'}
+            className="text-[14px] leading-4.75"
           >
             <span className={cn('strike', task.done && 'strike-on')}>
               {highlight(task.title, query)}
             </span>
-          </div>
+          </Label>
           {task.notes && (
-            <div
-              className={cn(
-                'truncate text-[12.5px] leading-4.25',
-                task.done
-                  ? 'text-content-3l dark:text-content-3d opacity-55'
-                  : 'text-content-2l dark:text-content-2d'
-              )}
+            <Label
+              as="div"
+              truncate
+              tone={task.done ? 'muted' : 'secondary'}
+              className={cn('text-[12.5px] leading-4.25', task.done && 'opacity-55')}
             >
               {highlight(task.notes, query)}
-            </div>
+            </Label>
           )}
         </div>
 
-        <div className={'ml-2.5 flex shrink-0 items-center gap-2'}>
+        <div className="ml-space-6 flex shrink-0 items-center gap-space-4">
           {/* Disclosure chevron, left of the checkbox in the gutter. */}
           {children.length > 0 && (
             <span className="grid w-5 shrink-0 place-items-center">
@@ -433,37 +436,34 @@ export const TaskRow = memo(function TaskRow({
             </span>
           )}
           {children.length > 0 && (
-            <span
-              className="rounded-field border-edge-2l dark:border-edge-2d bg-surface-3d text-content-3l dark:text-content-3d flex h-5 items-center gap-0.5 border px-1 text-[11px] font-semibold"
+            <Badge
+              className="px-space-3"
               title={`${doneChildren} of ${children.length} subtasks done`}
             >
               <span>{doneChildren}</span>
               <span>/</span>
               <span>{children.length}</span>
-            </span>
+            </Badge>
           )}
           {task.attachments.length > 0 && (
-            <span className="rounded-field border-edge-2l dark:border-edge-2d bg-surface-3d text-content-3l dark:text-content-3d flex h-5 items-center gap-0.5 border px-0.5 text-[11px] font-semibold">
+            <Badge className="px-space-2">
               <Icon name="attach_file" size={13} weight={500} />
               <span className="pr-0.5">{task.attachments.length}</span>
-            </span>
+            </Badge>
           )}
-          <button
+          <IconButton
+            icon="more_horiz"
+            iconSize={17}
+            iconWeight={300}
+            variant="ghostStrong"
+            title="More"
             onClick={(e) => {
               e.stopPropagation();
-              const r = (
-                e.currentTarget as HTMLElement
-              ).getBoundingClientRect();
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
-            className={cn(
-              'rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d grid h-6 w-6 place-items-center'
-            )}
-            title="More"
-          >
-            <Icon name="more_horiz" size={17} weight={300} />
-          </button>
+          />
         </div>
       </div>
 
@@ -587,7 +587,7 @@ function SubtaskComposer({
   }, []);
   return (
     <div
-      className="flex h-9 items-center gap-2 pr-3"
+      className="flex h-9 items-center gap-space-4 pr-space-6"
       style={{ paddingLeft: depth * INDENT + 6 }}
     >
       <Icon
@@ -596,7 +596,7 @@ function SubtaskComposer({
         weight={300}
         className="text-content-3l dark:text-content-3d"
       />
-      <input
+      <TextInput
         ref={ref}
         placeholder="Subtask title — Enter to add"
         onKeyDown={(e) => {
@@ -611,7 +611,7 @@ function SubtaskComposer({
           if (e.key === 'Escape') onDismiss();
         }}
         onBlur={onDismiss}
-        className="rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d h-7 flex-1 px-2.5 text-[13px] outline-none"
+        className="flex-1"
       />
     </div>
   );

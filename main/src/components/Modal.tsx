@@ -1,5 +1,14 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import {
+  Backdrop,
+  Button,
+  IconButton,
+  Label,
+  PanelHeader,
+  Surface,
+  TextInput,
+} from '@taskscape/common-ui/components';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { setOverlay } from '../lib/overlays';
 import type { ModalButton, ModalProps, ModalResult } from '../lib/modal';
@@ -12,17 +21,6 @@ function suggestFor(kind: 'project' | 'list' | undefined): string {
   if (kind === 'list') return suggestListName();
   return '';
 }
-
-const BTN =
-  'inline-flex h-8 items-center justify-center rounded-control px-4 text-[12.5px] font-semibold tracking-[0.01em] transition-transform duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-1l dark:focus-visible:ring-focus-1d';
-const BTN_VARIANT: Record<NonNullable<ModalButton['variant']>, string> = {
-  ghost:
-    'border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d text-content-1l dark:text-content-1d hover:border-edge-3l dark:hover:border-edge-3d hover:bg-surface-2l dark:hover:bg-surface-2d',
-  primary:
-    'bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift hover:bg-accent-600l dark:hover:bg-accent-600d active:bg-accent-700l dark:active:bg-accent-700d',
-  danger:
-    'bg-danger-500l dark:bg-danger-500d text-on-accent shadow-lift hover:bg-danger-600l dark:hover:bg-danger-600d',
-};
 
 // The tone-tinted icon badge anchors the body — a soft fill that carries the
 // dialog's intent.
@@ -137,30 +135,27 @@ function Modal({
   const tone = props.tone === 'danger' ? 'danger' : 'default';
 
   return (
-    <div
-      className="z-tooltip fixed inset-0 flex items-center justify-center bg-black/30"
+    <Backdrop
+      dim="30"
+      className="flex items-center justify-center"
       onMouseDown={() => resolve(null)}
     >
-      <div
+      <Surface
+        elevation="lift"
+        surface={2}
+        radius="control"
         onMouseDown={(e) => e.stopPropagation()}
-        className="rounded-control border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d shadow-lift w-[min(400px,92vw)] overflow-hidden border"
+        className="w-[min(400px,92vw)] overflow-hidden"
       >
-        <div className="relative flex h-11 shrink-0 items-center pr-2 pl-4">
-          <h1 className="font-display text-content-1l dark:text-content-1d min-w-0 flex-1 truncate text-[14px] leading-none font-semibold">
-            {props.title}
-          </h1>
-          <button
-            type="button"
-            onClick={() => resolve(null)}
-            title="Close"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d grid h-7 w-7 shrink-0 place-items-center"
-          >
-            <Icon name="close" size={16} />
-          </button>
-        </div>
+        <PanelHeader
+          title={props.title}
+          onClose={() => resolve(null)}
+          border="none"
+          className="pr-space-4 pl-space-7"
+        />
 
         {(props.message || props.input) && (
-          <div className="flex items-start gap-3.5 px-4 pt-1.5 pb-5">
+          <div className="flex items-start gap-space-7 px-space-7 pt-space-4 pb-space-8">
             {props.icon && (
               <div
                 className={cn('rounded-control grid size-9 shrink-0 place-items-center', BADGE_TONE[tone])}
@@ -169,28 +164,35 @@ function Modal({
               </div>
             )}
 
-            <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-space-7">
               {props.message && (
-                <p className="text-content-2l dark:text-content-2d text-[13px] leading-5 font-[450] text-pretty">
+                <Label
+                  as="p"
+                  tone="secondary"
+                  className="text-[13px] leading-5 font-[450] text-pretty"
+                >
                   {props.message}
-                </p>
+                </Label>
               )}
 
               {props.input && (
                 <div>
                   {props.input.label && (
-                    <label
+                    <Label
+                      as="label"
                       htmlFor="modal-input"
-                      className="text-content-2l dark:text-content-2d mb-1.5 block text-[12px] font-medium"
+                      tone="secondary"
+                      weight="medium"
+                      className="mb-space-4 block text-[12px]"
                     >
                       {props.input.label}
-                    </label>
+                    </Label>
                   )}
                   <div className="relative">
                     {props.input.suffix ? (
                       // Locked-extension field: the name grows to fit and the greyed
                       // extension stays glued to its right; `.` is stripped as typed.
-                      <div className="rounded-field bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d flex h-9 w-full items-center overflow-hidden px-3 text-[13px] focus-within:ring-2">
+                      <div className="rounded-field bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d flex h-9 w-full items-center overflow-hidden px-space-6 text-[13px] focus-within:ring-2">
                         <span className="relative inline-flex max-w-full min-w-[1ch] flex-none">
                           <span
                             aria-hidden
@@ -232,12 +234,12 @@ function Modal({
                             className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d absolute inset-0 w-full bg-transparent text-[13px] outline-none"
                           />
                         </span>
-                        <span className="text-content-3l dark:text-content-3d flex-none whitespace-pre select-none">
+                        <Label tone="muted" className="flex-none whitespace-pre select-none">
                           {props.input.suffix}
-                        </span>
+                        </Label>
                       </div>
                     ) : (
-                      <input
+                      <TextInput
                         id="modal-input"
                         ref={inputRef}
                         autoFocus
@@ -250,22 +252,22 @@ function Modal({
                             e.currentTarget.select();
                         }}
                         className={cn(
-                          'rounded-field bg-surface-0l dark:bg-surface-0d text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d focus:ring-focus-1l dark:focus:ring-focus-1d h-9 w-full pl-3 text-[13px] focus:ring-2',
-                          props.input.suggest ? 'pr-9' : 'pr-3'
+                          'h-9 w-full pl-space-6',
+                          props.input.suggest ? 'pr-9' : 'pr-space-6'
                         )}
                       />
                     )}
                     {props.input.suggest && (
-                      <button
-                        type="button"
+                      <IconButton
+                        icon="casino"
+                        iconSize={16}
+                        variant="ghostStrong"
                         tabIndex={-1}
                         aria-label="Suggest another name"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={rollSuggestion}
-                        className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-2l dark:hover:bg-wash-2d hover:text-content-1l dark:hover:text-content-1d absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center"
-                      >
-                        <Icon name="casino" size={16} />
-                      </button>
+                        className="absolute top-1/2 right-1.5 -translate-y-1/2"
+                      />
                     )}
                   </div>
                 </div>
@@ -274,19 +276,18 @@ function Modal({
           </div>
         )}
 
-        <div className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d flex items-center justify-end gap-2 border-t px-2 py-2.5">
+        <div className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d flex items-center justify-end gap-space-5 border-t px-space-5 py-space-6">
           {props.buttons.map((b, i) => (
-            <button
+            <Button
               key={b.id}
-              type="button"
+              variant={b.variant ?? 'ghost'}
               onClick={() => press(b, i === props.buttons.length - 1)}
-              className={cn(BTN, BTN_VARIANT[b.variant ?? 'ghost'])}
             >
               {b.label}
-            </button>
+            </Button>
           ))}
         </div>
-      </div>
-    </div>
+      </Surface>
+    </Backdrop>
   );
 }
