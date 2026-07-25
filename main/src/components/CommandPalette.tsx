@@ -1,7 +1,7 @@
 import { Icon } from '@taskscape/common-ui/Icon';
-import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import {
   Backdrop,
+  HotkeyHint,
   Label,
   MenuItem,
   Surface,
@@ -144,9 +144,7 @@ export function CommandPalette({
                   }
                   trailing={
                     cmd.accel && (
-                      <span className="text-[12px] tabular-nums">
-                        {formatAccel(cmd.accel)}
-                      </span>
+                      <HotkeyHint accel={cmd.accel} size="md" tone="inherit" />
                     )
                   }
                 >

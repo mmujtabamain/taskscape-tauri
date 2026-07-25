@@ -1,6 +1,6 @@
 import { applyDark } from '@taskscape/common-ui/theme';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { api } from './api';
+import { api } from '../api';
 
 // The tray has no theme UI of its own; it mirrors the main app's Appearance
 // preference. The effective light/dark is resolved in Rust (the shared setting,

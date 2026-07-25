@@ -1,4 +1,4 @@
-import { formatAccel } from '@taskscape/common-ui/hotkeys';
+import { Divider } from '@taskscape/common-ui/components';
 import { useCallback } from 'react';
 import { api } from './api';
 import { Footer } from './components/Footer';
@@ -30,7 +30,7 @@ function App() {
   useCursorAutohide();
 
   const clearAccel = hotkeyMap['clear_draft'] ?? '';
-  const screenshotHint = formatAccel(hotkeyMap['screenshot_capture'] ?? '');
+  const screenshotAccel = hotkeyMap['screenshot_capture'] ?? '';
   useClearDraftHotkey(clearAccel, draft.clearDraft);
 
   // The editor stops its own keydowns from bubbling here, so this only ever sees
@@ -65,7 +65,7 @@ function App() {
         onClear={draft.clearDraft}
       />
 
-      <div className="bg-edge-2l dark:bg-edge-2d h-px shrink-0" />
+      <Divider className="shrink-0" />
 
       <NotesSection
         notesOpen={draft.notesOpen}
@@ -80,7 +80,7 @@ function App() {
         capturing={draft.capturing}
         error={draft.error}
         count={draft.count}
-        screenshotHint={screenshotHint}
+        screenshotAccel={screenshotAccel}
         onAddScreenshot={draft.addScreenshot}
       />
     </div>

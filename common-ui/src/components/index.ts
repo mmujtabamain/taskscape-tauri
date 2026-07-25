@@ -7,6 +7,7 @@ export * from './buttons/ToolbarButton';
 export * from './buttons/DashedButton';
 
 export * from './content/Badge';
+export * from './content/HotkeyHint';
 export * from './content/Keycap';
 export * from './content/ProgressBar';
 export * from './content/EmptyState';

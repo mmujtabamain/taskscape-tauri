@@ -22,7 +22,6 @@ export interface CaptureDraft {
   hasDraft: boolean;
   titleRef: RefObject<HTMLInputElement | null>;
   editorRef: RefObject<RichTextHandle | null>;
-  focusTitle: () => void;
   focusDraft: () => void;
   clearDraft: () => void;
   save: () => void;
@@ -129,7 +128,6 @@ export function useCaptureDraft(): CaptureDraft {
     hasDraft,
     titleRef,
     editorRef,
-    focusTitle,
     focusDraft,
     clearDraft,
     save,

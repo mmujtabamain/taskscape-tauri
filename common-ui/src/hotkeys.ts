@@ -23,11 +23,16 @@ export const bindingsToMap = (
 
 const isMac = navigator.userAgent.includes('Mac');
 
-interface Parsed {
+export type HotkeyModifier = 'cmd' | 'ctrl' | 'alt' | 'shift';
+
+/** An accelerator split into its parts — the structure every renderer works
+ *  from, so a shortcut looks the same everywhere it appears. */
+export interface Hotkey {
   cmd: boolean;
   ctrl: boolean;
   alt: boolean;
   shift: boolean;
+  /** Canonical key token: "K", "5", "Enter", "ArrowUp", ",", "F3", … */
   key: string;
 }
 
@@ -69,8 +74,9 @@ function keyFromEvent(e: KeyboardEvent): string | null {
   return null;
 }
 
-function parseAccel(accel: string): Parsed | null {
-  const p: Parsed = { cmd: false, ctrl: false, alt: false, shift: false, key: '' };
+/** Split a canonical accelerator into its parts; null when malformed/unbound. */
+export function parseAccel(accel: string): Hotkey | null {
+  const p: Hotkey = { cmd: false, ctrl: false, alt: false, shift: false, key: '' };
   for (const part of accel.split('+')) {
     if (part === 'Cmd') p.cmd = true;
     else if (part === 'Ctrl') p.ctrl = true;
@@ -114,11 +120,23 @@ export function eventToAccel(e: KeyboardEvent): string | null {
   return parts.join('+');
 }
 
-const MOD_GLYPHS: [keyof Omit<Parsed, 'key'>, string, string][] = [
-  ['cmd', '⌘', 'Ctrl+'],
-  ['ctrl', '⌃', 'Ctrl+'],
-  ['alt', '⌥', 'Alt+'],
-  ['shift', '⇧', 'Shift+'],
+interface ModifierSpec {
+  flag: HotkeyModifier;
+  /** macOS glyph, for the plain-string form (tooltips, `title` attributes). */
+  glyph: string;
+  icon: string;
+  label: string;
+  /** Text form used off macOS, which has no standard modifier glyphs. */
+  pc: string;
+}
+
+// Fixed canonical order (Cmd, Ctrl, Alt, Shift) — every display path reads this
+// one table, so the string and the rendered forms can't drift apart.
+const MODIFIERS: ModifierSpec[] = [
+  { flag: 'cmd', glyph: '⌘', icon: 'keyboard_command_key', label: 'Command', pc: 'Ctrl' },
+  { flag: 'ctrl', glyph: '⌃', icon: 'keyboard_control_key', label: 'Control', pc: 'Ctrl' },
+  { flag: 'alt', glyph: '⌥', icon: 'keyboard_option_key', label: 'Option', pc: 'Alt' },
+  { flag: 'shift', glyph: '⇧', icon: 'shift', label: 'Shift', pc: 'Shift' },
 ];
 
 const KEY_GLYPHS: Record<string, string> = {
@@ -134,14 +152,70 @@ const KEY_GLYPHS: Record<string, string> = {
   Plus: '+',
 };
 
+// Keys Material Symbols draws properly. Anything absent here (Escape, forward
+// Delete, letters, digits, punctuation) renders as its glyph/text instead.
+const KEY_ICONS: Record<string, string> = {
+  Enter: 'keyboard_return',
+  Backspace: 'backspace',
+  Tab: 'keyboard_tab',
+  Space: 'space_bar',
+  ArrowUp: 'arrow_upward',
+  ArrowDown: 'arrow_downward',
+  ArrowLeft: 'arrow_back',
+  ArrowRight: 'arrow_forward',
+};
+
+const KEY_LABELS: Record<string, string> = {
+  Enter: 'Return',
+  Backspace: 'Backspace',
+  Delete: 'Forward delete',
+  Tab: 'Tab',
+  Escape: 'Escape',
+  Space: 'Space',
+  ArrowUp: 'Up arrow',
+  ArrowDown: 'Down arrow',
+  ArrowLeft: 'Left arrow',
+  ArrowRight: 'Right arrow',
+  Plus: 'Plus',
+};
+
+/** One rendered part of a hotkey — an icon glyph or a literal, plus the name
+ *  assistive tech should read. */
+export type HotkeyToken =
+  | { kind: 'icon'; icon: string; label: string }
+  | { kind: 'text'; text: string; label: string };
+
+/** Render form: the parts of an accelerator, in canonical order. Empty when
+ *  unbound or malformed. Consumed by `<HotkeyHint>`; use `formatAccel` where a
+ *  plain string is required (tooltips, `title`, `aria-label`). */
+export function hotkeyTokens(accel: string): HotkeyToken[] {
+  const p = parseAccel(accel);
+  if (!p) return [];
+  const out: HotkeyToken[] = [];
+  for (const m of MODIFIERS) {
+    if (!p[m.flag]) continue;
+    out.push(
+      isMac
+        ? { kind: 'icon', icon: m.icon, label: m.label }
+        : { kind: 'text', text: m.pc, label: m.pc }
+    );
+  }
+  const label = KEY_LABELS[p.key] ?? p.key;
+  const icon = KEY_ICONS[p.key];
+  out.push(
+    icon ? { kind: 'icon', icon, label } : { kind: 'text', text: KEY_GLYPHS[p.key] ?? p.key, label }
+  );
+  return out;
+}
+
 /** Display form: "Cmd+Shift+Enter" → "⌘⇧↩" (macOS glyphs). */
 export function formatAccel(accel: string): string {
   if (!accel) return '';
   const p = parseAccel(accel);
   if (!p) return accel;
   let out = '';
-  for (const [mod, mac, other] of MOD_GLYPHS) {
-    if (p[mod]) out += isMac ? mac : other;
+  for (const m of MODIFIERS) {
+    if (p[m.flag]) out += isMac ? m.glyph : `${m.pc}+`;
   }
   return out + (KEY_GLYPHS[p.key] ?? p.key);
 }

@@ -1,8 +1,8 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
-import { applyAnchor, hideCard } from '../anchor';
+import { applyAnchor, hideCard } from '../lib/anchor';
 import { api } from '../api';
-import { refreshTheme } from '../theme';
+import { refreshTheme } from '../lib/theme';
 import type { CaptureDraft } from './useCaptureDraft';
 
 /** Wire the Rust-driven events the bar responds to: reveal (`mini-shown`), the

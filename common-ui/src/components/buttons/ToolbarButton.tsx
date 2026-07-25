@@ -2,11 +2,15 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
 
-export type ToolbarButtonSize = 'sm' | 'md' | 'lg';
-/** Shares IconButton's variant vocabulary — same names, same hover treatments. */
-export type ToolbarButtonVariant = 'ghost' | 'accent' | 'danger';
+export type ToolbarButtonSize = 'xs' | 'sm' | 'md' | 'lg';
+/** `ghost`/`accent`/`danger` share IconButton's vocabulary — same names, same
+ *  hover treatments. `well` is this component's own. */
+export type ToolbarButtonVariant = 'ghost' | 'well' | 'accent' | 'danger';
 
 const SIZE: Record<ToolbarButtonSize, string> = {
+  // Height-less and tighter than the rest: the mini capture bar sizes its rows
+  // itself, so this one is padding-only.
+  xs: 'gap-1.5 rounded-control px-2 py-1 text-xs font-normal',
   sm: 'h-6 px-space-4 text-[12px]',
   md: 'h-7 px-space-5 text-[12px]',
   lg: 'h-8 px-space-5 text-[12px]',
@@ -14,6 +18,11 @@ const SIZE: Record<ToolbarButtonSize, string> = {
 const VARIANT: Record<ToolbarButtonVariant, string> = {
   ghost:
     'text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-1l dark:hover:text-content-1d',
+  // A solid-surface fill rather than ghost's translucent wash, for buttons on a
+  // surface a wash would disappear against. Text tone is the caller's — `well`'s
+  // users color by state (idle / attached / failed), so a resting or hover tone
+  // here would fight them.
+  well: 'hover:bg-surface-1l dark:hover:bg-surface-1d disabled:cursor-default disabled:hover:bg-transparent',
   accent: 'text-accent-500l dark:text-accent-500d hover:bg-wash-1l dark:hover:bg-wash-1d',
   danger:
     'text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d',

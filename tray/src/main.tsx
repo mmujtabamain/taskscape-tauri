@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./material-symbols.css";
 import "./index.css";
-import { initTheme } from "./theme";
+import { initTheme } from "./lib/theme";
 
 // Mirror the main app's Appearance preference before the first paint (and follow
 // live system flips). App.tsx re-reads it on every reveal.

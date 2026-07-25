@@ -1,3 +1,4 @@
+import { Divider } from '@taskscape/common-ui/components';
 import {
   RichTextEditor,
   type RichTextHandle,
@@ -42,7 +43,7 @@ export function NotesSection({
             if (editorRef.current?.isEmpty()) onCollapse();
           }}
         />
-        <div className="bg-edge-2l dark:bg-edge-2d h-px" />
+        <Divider />
       </div>
     );
   }
@@ -54,7 +55,7 @@ export function NotesSection({
       >
         Press Tab to add a note
       </button>
-      <div className="bg-edge-2l dark:bg-edge-2d h-px" />
+      <Divider />
     </div>
   );
 }

@@ -7,15 +7,8 @@
 @import '../../common-ui/styles/tokens.css';
 @import '../../common-ui/styles/note-rt.css';
 
-/* Tokens unique to the tray (not in the shared file): the single-value accent
-   used by the capture button + spinner, the count-badge halo, content-4. */
-@theme {
-  --color-halo-1l: oklch(0.995 0.001 255);
-  --color-halo-1d: oklch(0.24 0.005 260);
-}
-
 /* The tray tracks the system appearance by toggling the shared `.dark` class on
-   <html> from main.tsx (it has no user override, unlike the main app). That
+   <html> from lib/theme.ts (it has no user override, unlike the main app). That
    drives both Tailwind's `dark:` variant and the theme-swap aliases + Material
    Symbols weight defined for `:root`/`.dark` in the shared tokens.css. */
 
@@ -54,8 +47,9 @@ body,
   opacity: 1;
 }
 
-/* Toggled from App.tsx while the user is typing to hide the mouse pointer (it
-   opens right over the title field). Removed on the next mouse move. The
+/* Toggled from hooks/useCursorAutohide.ts while the user is typing to hide the
+   mouse pointer (it opens right over the title field). Removed on the next
+   mouse move. The
    `:root.cursor-hidden` compound out-specifies the input's UA text cursor and
    any `cursor-*` utility, so no `!important` is needed. */
 :root.cursor-hidden * {

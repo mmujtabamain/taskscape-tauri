@@ -1,8 +1,9 @@
 import { cn } from '@taskscape/common-ui/cn';
+import { HotkeyHint, ToolbarButton } from '@taskscape/common-ui/components';
+import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { Spinner } from '@taskscape/common-ui/Spinner';
 import { api, type CaptureTarget } from '../api';
-import { ghostButtonBase } from '../ui';
 
 /** The capture bar's footer: the target (project / list, opens the main window)
  *  and the screenshot control with its spinner / count / error states. */
@@ -11,14 +12,14 @@ export function Footer({
   capturing,
   error,
   count,
-  screenshotHint,
+  screenshotAccel,
   onAddScreenshot,
 }: {
   target: CaptureTarget | null;
   capturing: boolean;
   error: string | null;
   count: number;
-  screenshotHint: string;
+  screenshotAccel: string;
   onAddScreenshot: () => void;
 }) {
   const shotTextColor = error
@@ -26,6 +27,9 @@ export function Footer({
     : count && !capturing
       ? 'text-accent-500 dark:text-accent-400'
       : 'text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d';
+
+  const hint = formatAccel(screenshotAccel);
+  const hintSuffix = hint ? ` (${hint})` : '';
 
   return (
     <div
@@ -57,19 +61,29 @@ export function Footer({
       </button>
 
       <div className="flex shrink-0 items-center gap-1">
-        <button
+        <ToolbarButton
+          size="xs"
+          variant="well"
+          icon={capturing ? undefined : error ? 'error' : 'screenshot_monitor'}
+          iconSize={15}
+          filled={!capturing && !error && count > 0}
           onClick={onAddScreenshot}
           disabled={capturing}
           tabIndex={-1}
-          className={cn(ghostButtonBase, shotTextColor)}
+          // Disabled here means "busy", not "unavailable" — the in-flight state
+          // keeps its contrast and its tooltip.
+          className={cn(
+            'shrink-0 disabled:pointer-events-auto disabled:opacity-100',
+            shotTextColor
+          )}
           title={
             capturing
               ? 'Capturing screenshot …'
               : error
                 ? error
                 : count
-                  ? `${count} screenshot${count > 1 ? 's' : ''} attached — add another${screenshotHint ? ` (${screenshotHint})` : ''}`
-                  : `Attach a full-screen screenshot${screenshotHint ? ` (${screenshotHint})` : ''}`
+                  ? `${count} screenshot${count > 1 ? 's' : ''} attached — add another${hintSuffix}`
+                  : `Attach a full-screen screenshot${hintSuffix}`
           }
         >
           {capturing ? (
@@ -78,22 +92,16 @@ export function Footer({
               <span>Capturing …</span>
             </>
           ) : error ? (
-            <>
-              <Icon name="error" size={15} />
-              <span>Capture failed</span>
-            </>
+            <span>Capture failed</span>
           ) : (
             <>
-              <Icon name="screenshot_monitor" size={15} filled={count > 0} />
-              <span>{count ? `${count} shot${count > 1 ? 's' : ''}` : 'Screenshot'}</span>
-              {screenshotHint && (
-                <kbd className="text-content-3l dark:text-content-3d font-sans text-[11px] not-italic">
-                  {screenshotHint}
-                </kbd>
-              )}
+              <span>
+                {count ? `${count} shot${count > 1 ? 's' : ''}` : 'Screenshot'}
+              </span>
+              <HotkeyHint accel={screenshotAccel} />
             </>
           )}
-        </button>
+        </ToolbarButton>
       </div>
     </div>
   );
