@@ -3,7 +3,7 @@ import {
   TextInput,
   ToolbarButton,
 } from '@taskscape/common-ui/components';
-import { formatAccel } from '@taskscape/common-ui/hotkeys';
+import { formatAccel, parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
 import { type RefObject } from 'react';
 
 /** The capture bar's title field plus the (conditional) Clear affordance. */
@@ -19,7 +19,7 @@ export function TitleRow({
   onChange: (v: string) => void;
   titleRef: RefObject<HTMLInputElement | null>;
   hasDraft: boolean;
-  clearAccel: string;
+  clearAccel: Accel;
   onClear: () => void;
 }) {
   return (
@@ -53,7 +53,7 @@ export function TitleRow({
           }
         >
           <p className="px-1">Clear</p>
-          <HotkeyHint accel={clearAccel} />
+          <HotkeyHint hotkey={parseAccel(clearAccel)} />
         </ToolbarButton>
       )}
     </div>

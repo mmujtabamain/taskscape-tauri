@@ -1,14 +1,14 @@
 // The effective hotkey combos by command id. Rust owns the catalog; this mirrors
 // it and refreshes when the settings window reports `hotkeys-changed` (wired in
 // bootstrap).
-import { bindingsToMap } from '@taskscape/common-ui/hotkeys';
+import { bindingsToMap, type Accel } from '@taskscape/common-ui/hotkeys';
 import { create } from 'zustand';
 import { api } from '../api';
 
 interface HotkeyState {
-  map: Record<string, string>;
+  map: Record<string, Accel>;
   load: () => Promise<void>;
-  accel: (id: string) => string;
+  accel: (id: string) => Accel;
 }
 
 export const useHotkeyStore = create<HotkeyState>((set, get) => ({

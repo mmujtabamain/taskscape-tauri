@@ -1,3 +1,4 @@
+import { parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import {
   Backdrop,
@@ -15,8 +16,8 @@ export interface PaletteCommand {
   label: string;
   /** Group heading, e.g. "Navigate", "Task", "View". */
   group: string;
-  /** Effective accelerator string (canonical), shown as a glyph hint. */
-  accel?: string;
+  /** Effective accelerator (canonical), shown as a glyph hint. */
+  accel?: Accel;
   icon?: string;
   run: () => void;
 }
@@ -144,7 +145,7 @@ export function CommandPalette({
                   }
                   trailing={
                     cmd.accel && (
-                      <HotkeyHint accel={cmd.accel} size="md" tone="inherit" />
+                      <HotkeyHint hotkey={parseAccel(cmd.accel)} size="md" tone="inherit" />
                     )
                   }
                 >

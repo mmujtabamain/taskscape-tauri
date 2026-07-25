@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
-import { hotkeyTokens } from '@taskscape/common-ui/hotkeys';
+import { hotkeyTokens, type Hotkey } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 
 export type HotkeyHintSize = 'sm' | 'md';
@@ -21,8 +21,9 @@ const TONE: Record<HotkeyHintTone, string> = {
 
 export interface HotkeyHintProps
   extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
-  /** Canonical accelerator ("Cmd+Shift+Enter"). Renders nothing when unbound. */
-  accel: string;
+  /** The shortcut to show. `null` (an unbound or unparseable combo) renders
+   *  nothing, so callers can pass `parseAccel(…)` straight through. */
+  hotkey: Hotkey | null;
   size?: HotkeyHintSize;
   tone?: HotkeyHintTone;
 }
@@ -32,14 +33,14 @@ export interface HotkeyHintProps
  *  shortcut is also clickable to rebind; `formatAccel` covers the places that
  *  need a plain string (tooltips, `title`). */
 export function HotkeyHint({
-  accel,
+  hotkey,
   size = 'sm',
   tone = 'muted',
   className,
   ...rest
 }: HotkeyHintProps) {
-  const tokens = hotkeyTokens(accel);
-  if (!tokens.length) return null;
+  if (!hotkey) return null;
+  const tokens = hotkeyTokens(hotkey);
   return (
     <kbd
       aria-label={tokens.map((t) => t.label).join(' ')}

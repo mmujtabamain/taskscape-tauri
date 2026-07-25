@@ -1,6 +1,6 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { HotkeyHint, ToolbarButton } from '@taskscape/common-ui/components';
-import { formatAccel } from '@taskscape/common-ui/hotkeys';
+import { formatAccel, parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { Spinner } from '@taskscape/common-ui/Spinner';
 import { api, type CaptureTarget } from '../api';
@@ -19,7 +19,7 @@ export function Footer({
   capturing: boolean;
   error: string | null;
   count: number;
-  screenshotAccel: string;
+  screenshotAccel: Accel;
   onAddScreenshot: () => void;
 }) {
   const shotTextColor = error
@@ -98,7 +98,7 @@ export function Footer({
               <span>
                 {count ? `${count} shot${count > 1 ? 's' : ''}` : 'Screenshot'}
               </span>
-              <HotkeyHint accel={screenshotAccel} />
+              <HotkeyHint hotkey={parseAccel(screenshotAccel)} />
             </>
           )}
         </ToolbarButton>

@@ -1,4 +1,4 @@
-import { bindingsToMap } from '@taskscape/common-ui/hotkeys';
+import { bindingsToMap, type Accel } from '@taskscape/common-ui/hotkeys';
 import { useEvent } from '@taskscape/common-ui/useEvent';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
@@ -8,10 +8,10 @@ import { api } from '../api';
  *  it, reloading on the initial mount and whenever the settings window reports
  *  `hotkeys-changed`. `reload` is exposed so the reveal handler can refresh too. */
 export function useHotkeyMap(): {
-  hotkeyMap: Record<string, string>;
+  hotkeyMap: Record<string, Accel>;
   reload: () => void;
 } {
-  const [hotkeyMap, setMap] = useState<Record<string, string>>({});
+  const [hotkeyMap, setMap] = useState<Record<string, Accel>>({});
   const reload = useEvent(() => {
     api
       .listHotkeys()

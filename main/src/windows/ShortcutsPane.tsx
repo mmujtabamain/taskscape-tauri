@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { eventToAccel } from '@taskscape/common-ui/hotkeys';
+import { eventToAccel, parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
 import {
   HotkeyHint,
   IconButton,
@@ -36,7 +36,7 @@ export function ShortcutsPane() {
   }, [load]);
 
   const assign = useCallback(
-    async (id: string, accel: string) => {
+    async (id: string, accel: Accel) => {
       setRecording(null);
       setError(null);
       try {
@@ -124,7 +124,7 @@ export function ShortcutsPane() {
                       {recording === b.id ? (
                         'Type shortcut…'
                       ) : b.accel ? (
-                        <HotkeyHint accel={b.accel} tone="inherit" />
+                        <HotkeyHint hotkey={parseAccel(b.accel)} tone="inherit" />
                       ) : (
                         <span className="italic">None</span>
                       )}

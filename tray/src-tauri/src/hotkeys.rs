@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
-use taskscape_common::{hotkeys, Store};
+use taskscape_common::{
+    hotkeys::{self, Accel, Key},
+    Store,
+};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcut, GlobalShortcutExt, Modifiers, Shortcut};
 
@@ -49,127 +52,104 @@ pub fn global_hotkeys() -> &'static Mutex<GlobalHotkeys> {
     HOTKEYS.get_or_init(|| Mutex::new(GlobalHotkeys::default()))
 }
 
-fn key_code(key: &str) -> Option<Code> {
+/// `Key` → the plugin's `Code`. Deliberately an exhaustive match rather than a
+/// name lookup: adding a key to the catalog's vocabulary then fails to build
+/// here, instead of registering nothing at runtime.
+fn key_code(key: Key) -> Option<Code> {
     use Code::*;
     Some(match key {
-        "A" => KeyA,
-        "B" => KeyB,
-        "C" => KeyC,
-        "D" => KeyD,
-        "E" => KeyE,
-        "F" => KeyF,
-        "G" => KeyG,
-        "H" => KeyH,
-        "I" => KeyI,
-        "J" => KeyJ,
-        "K" => KeyK,
-        "L" => KeyL,
-        "M" => KeyM,
-        "N" => KeyN,
-        "O" => KeyO,
-        "P" => KeyP,
-        "Q" => KeyQ,
-        "R" => KeyR,
-        "S" => KeyS,
-        "T" => KeyT,
-        "U" => KeyU,
-        "V" => KeyV,
-        "W" => KeyW,
-        "X" => KeyX,
-        "Y" => KeyY,
-        "Z" => KeyZ,
-        "0" => Digit0,
-        "1" => Digit1,
-        "2" => Digit2,
-        "3" => Digit3,
-        "4" => Digit4,
-        "5" => Digit5,
-        "6" => Digit6,
-        "7" => Digit7,
-        "8" => Digit8,
-        "9" => Digit9,
-        "Enter" => Enter,
-        "Backspace" => Backspace,
-        "Delete" => Delete,
-        "Space" => Space,
-        "Tab" => Tab,
-        "Escape" => Escape,
-        "ArrowUp" => ArrowUp,
-        "ArrowDown" => ArrowDown,
-        "ArrowLeft" => ArrowLeft,
-        "ArrowRight" => ArrowRight,
-        "," => Comma,
-        "\\" => Backslash,
-        "/" => Slash,
-        "." => Period,
-        ";" => Semicolon,
-        "'" => Quote,
-        "[" => BracketLeft,
-        "]" => BracketRight,
-        "-" => Minus,
-        "=" => Equal,
-        "`" => Backquote,
-        "F1" => F1,
-        "F2" => F2,
-        "F3" => F3,
-        "F4" => F4,
-        "F5" => F5,
-        "F6" => F6,
-        "F7" => F7,
-        "F8" => F8,
-        "F9" => F9,
-        "F10" => F10,
-        "F11" => F11,
-        "F12" => F12,
-        _ => return None,
+        Key::A => KeyA,
+        Key::B => KeyB,
+        Key::C => KeyC,
+        Key::D => KeyD,
+        Key::E => KeyE,
+        Key::F => KeyF,
+        Key::G => KeyG,
+        Key::H => KeyH,
+        Key::I => KeyI,
+        Key::J => KeyJ,
+        Key::K => KeyK,
+        Key::L => KeyL,
+        Key::M => KeyM,
+        Key::N => KeyN,
+        Key::O => KeyO,
+        Key::P => KeyP,
+        Key::Q => KeyQ,
+        Key::R => KeyR,
+        Key::S => KeyS,
+        Key::T => KeyT,
+        Key::U => KeyU,
+        Key::V => KeyV,
+        Key::W => KeyW,
+        Key::X => KeyX,
+        Key::Y => KeyY,
+        Key::Z => KeyZ,
+        Key::Digit0 => Digit0,
+        Key::Digit1 => Digit1,
+        Key::Digit2 => Digit2,
+        Key::Digit3 => Digit3,
+        Key::Digit4 => Digit4,
+        Key::Digit5 => Digit5,
+        Key::Digit6 => Digit6,
+        Key::Digit7 => Digit7,
+        Key::Digit8 => Digit8,
+        Key::Digit9 => Digit9,
+        Key::Enter => Enter,
+        Key::Backspace => Backspace,
+        Key::Delete => Delete,
+        Key::Space => Space,
+        Key::Tab => Tab,
+        Key::Escape => Escape,
+        Key::ArrowUp => ArrowUp,
+        Key::ArrowDown => ArrowDown,
+        Key::ArrowLeft => ArrowLeft,
+        Key::ArrowRight => ArrowRight,
+        Key::Comma => Comma,
+        Key::Backslash => Backslash,
+        Key::Slash => Slash,
+        Key::Period => Period,
+        Key::Semicolon => Semicolon,
+        Key::Quote => Quote,
+        Key::BracketLeft => BracketLeft,
+        Key::BracketRight => BracketRight,
+        Key::Minus => Minus,
+        Key::Equal => Equal,
+        Key::Backquote => Backquote,
+        Key::F1 => F1,
+        Key::F2 => F2,
+        Key::F3 => F3,
+        Key::F4 => F4,
+        Key::F5 => F5,
+        Key::F6 => F6,
+        Key::F7 => F7,
+        Key::F8 => F8,
+        Key::F9 => F9,
+        Key::F10 => F10,
+        Key::F11 => F11,
+        Key::F12 => F12,
+        // The `+` key has no code of its own — it is typed as Shift+Equal.
+        Key::Plus => return None,
     })
 }
 
-/// Canonical accel string → plugin `Shortcut`. `None` for the empty (unbound)
-/// accel or a key the plugin can't register.
-fn to_shortcut(accel: &str) -> Option<Shortcut> {
-    let p = hotkeys::parse_accel(accel)?;
+/// Typed accel → plugin `Shortcut`. `None` for an unbound command or a key the
+/// plugin can't register; the accel itself is already known-good.
+fn to_shortcut(accel: Option<Accel>) -> Option<Shortcut> {
+    let accel = accel?;
     let mut mods = Modifiers::empty();
-    if p.cmd {
+    if accel.cmd() {
         mods |= Modifiers::SUPER;
     }
-    if p.ctrl {
+    if accel.ctrl() {
         mods |= Modifiers::CONTROL;
     }
-    if p.alt {
+    if accel.alt() {
         mods |= Modifiers::ALT;
     }
-    if p.shift {
+    if accel.shift() {
         mods |= Modifiers::SHIFT;
     }
-    Some(Shortcut::new(Some(mods), key_code(&p.key)?))
-}
-
-/// macOS display form of an accel ("Cmd+Shift+Enter" → "⌘⇧↩") for the tray
-/// tooltip.
-fn accel_glyphs(accel: &str) -> String {
-    let Some(p) = hotkeys::parse_accel(accel) else {
-        return accel.to_string();
-    };
-    let mut out = String::new();
-    for (on, glyph) in [(p.cmd, "⌘"), (p.ctrl, "⌃"), (p.alt, "⌥"), (p.shift, "⇧")] {
-        if on {
-            out.push_str(glyph);
-        }
-    }
-    out.push_str(match p.key.as_str() {
-        "Enter" => "↩",
-        "Backspace" => "⌫",
-        "Delete" => "⌦",
-        "Tab" => "⇥",
-        "Escape" => "⎋",
-        "ArrowUp" => "↑",
-        "ArrowDown" => "↓",
-        "ArrowLeft" => "←",
-        "ArrowRight" => "→",
-        other => other,
-    });
-    out
+    Some(Shortcut::new(Some(mods), key_code(accel.key)?))
 }
 
 /// Replace one registered shortcut with a new combo. If the OS refuses the new
@@ -220,13 +200,7 @@ pub fn refresh_global_shortcuts(app: AppHandle) {
 /// belongs on the main thread — callers off it hop over via
 /// `run_on_main_thread`.
 fn apply_global_shortcuts(app: &AppHandle, bindings: &[hotkeys::ResolvedBinding]) {
-    let accel = |id: &str| {
-        bindings
-            .iter()
-            .find(|b| b.id == id)
-            .map(|b| b.accel.as_str())
-            .unwrap_or("")
-    };
+    let accel = |id: &str| bindings.iter().find(|b| b.id == id).and_then(|b| b.accel);
     let toggle_accel = accel("toggle_capture_bar");
 
     let gs = app.global_shortcut();
@@ -241,14 +215,31 @@ fn apply_global_shortcuts(app: &AppHandle, bindings: &[hotkeys::ResolvedBinding]
     drop(state);
 
     if let Some(tray) = app.tray_by_id("tray") {
-        let tip = if toggle_accel.is_empty() {
-            "Taskscape".to_string()
-        } else {
-            format!(
-                "Taskscape — press {} to capture",
-                accel_glyphs(toggle_accel)
-            )
+        let tip = match toggle_accel {
+            Some(a) => format!("Taskscape — press {} to capture", a.glyphs()),
+            None => "Taskscape".to_string(),
         };
         let _ = tray.set_tooltip(Some(tip));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The match in `key_code` is exhaustive, so the compiler already proves
+    /// every key has an arm. What it can't prove is that each arm is the *right*
+    /// code — `Key::Comma => Period` would build happily. Two keys landing on
+    /// one code is what that mistake looks like.
+    #[test]
+    fn key_code_maps_each_key_to_a_distinct_code() {
+        let mut seen: Vec<(Key, Code)> = Vec::new();
+        for &key in Key::ALL {
+            let Some(code) = key_code(key) else { continue };
+            if let Some((other, _)) = seen.iter().find(|(_, c)| *c == code) {
+                panic!("{key:?} and {other:?} both map to {code:?}");
+            }
+            seen.push((key, code));
+        }
     }
 }
