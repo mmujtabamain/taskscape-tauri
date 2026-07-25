@@ -39,22 +39,34 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
   clear: (paneId) =>
     set((s) => ({
-      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), query: '' } },
+      byPane: {
+        ...s.byPane,
+        [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), query: '' },
+      },
     })),
 
   setQuery: (paneId, query) =>
     set((s) => ({
-      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), query } },
+      byPane: {
+        ...s.byPane,
+        [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), query },
+      },
     })),
 
   setScope: (paneId, scope) =>
     set((s) => ({
-      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), scope } },
+      byPane: {
+        ...s.byPane,
+        [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), scope },
+      },
     })),
 
   setFields: (paneId, fields) =>
     set((s) => ({
-      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), fields } },
+      byPane: {
+        ...s.byPane,
+        [paneId]: { ...(s.byPane[paneId] ?? DEFAULT), fields },
+      },
     })),
 }));
 

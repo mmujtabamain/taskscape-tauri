@@ -1,22 +1,4 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { Icon } from '@taskscape/common-ui/Icon';
-import { RichTextEditor, type RichTextHandle } from './RichTextEditorLazy';
-import { useEffect, useRef, useState } from 'react';
-import { api, type Note, type Task } from '../../api';
-import { confirmModal } from '../../lib/modal';
-import { toggleDone as actToggleDone } from '../../stores/actions';
-import { useLayoutStore } from '../../stores/layoutStore';
-import { useListStore } from '../../stores/listStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useSelectionStore } from '../../stores/selectionStore';
-import { useTaskStore } from '../../stores/taskStore';
-import { useUiStore } from '../../stores/uiStore';
-import { requestDeleteTask, updateTask } from '../../commands/tasks';
-import { absoluteDateTime, relativeTime } from '../../time';
-import { AttachmentLightbox } from '../AttachmentLightbox';
-import { AttachmentSection } from './AttachmentSection';
-import { NoteCard } from './NoteCard';
-import { AUTOSAVE_MS, requestNoteLink } from './noteEditing';
 import {
   Checkbox,
   DashedButton,
@@ -25,6 +7,24 @@ import {
   SectionHeader,
   ToolbarButton,
 } from '@taskscape/common-ui/components';
+import { Icon } from '@taskscape/common-ui/Icon';
+import { useEffect, useRef, useState } from 'react';
+import { api, type Note, type Task } from '../../api';
+import { requestDeleteTask, updateTask } from '../../commands/tasks';
+import { confirmModal } from '../../lib/modal';
+import { toggleDone as actToggleDone } from '../../stores/actions';
+import { useLayoutStore } from '../../stores/layoutStore';
+import { useListStore } from '../../stores/listStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useSelectionStore } from '../../stores/selectionStore';
+import { useTaskStore } from '../../stores/taskStore';
+import { useUiStore } from '../../stores/uiStore';
+import { absoluteDateTime, relativeTime } from '../../time';
+import { AttachmentLightbox } from '../AttachmentLightbox';
+import { AttachmentSection } from './AttachmentSection';
+import { NoteCard } from './NoteCard';
+import { AUTOSAVE_MS, requestNoteLink } from './noteEditing';
+import { RichTextEditor, type RichTextHandle } from './RichTextEditorLazy';
 
 const refresh = () => void useTaskStore.getState().load();
 const selectTask = (id: string) => useSelectionStore.getState().focus(id);
@@ -39,7 +39,7 @@ function SubtaskRow({ task, depth }: { task: Task; depth: number }) {
   return (
     <>
       <div
-        className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d -mx-1.5 flex h-8 items-center gap-space-5 pr-space-4"
+        className="rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d gap-space-5 pr-space-4 -mx-1.5 flex h-8 items-center"
         style={{ paddingLeft: 6 + depth * SUBTASK_INDENT }}
       >
         <Checkbox
@@ -78,7 +78,8 @@ export function TaskInspector({ task }: { task: Task }) {
   const projects = useProjectStore((s) => s.projects);
   const list = lists.find((l) => l.id === task.list_id);
   const listName = list?.name ?? null;
-  const projectName = projects.find((p) => p.id === list?.project_id)?.name ?? null;
+  const projectName =
+    projects.find((p) => p.id === list?.project_id)?.name ?? null;
   const children = useTaskStore((s) => s.childrenByParent[task.id]) ?? [];
   const doneChildren = children.filter((c) => c.done).length;
 
@@ -162,13 +163,18 @@ export function TaskInspector({ task }: { task: Task }) {
   };
 
   const enqueueAddNote = (final: boolean) => {
-    addChain.current = addChain.current.then(() => addNoteSave(final)).catch(() => {});
+    addChain.current = addChain.current
+      .then(() => addNoteSave(final))
+      .catch(() => {});
     return addChain.current;
   };
 
   const scheduleAddNote = () => {
     window.clearTimeout(addTimer.current);
-    addTimer.current = window.setTimeout(() => enqueueAddNote(false), AUTOSAVE_MS);
+    addTimer.current = window.setTimeout(
+      () => enqueueAddNote(false),
+      AUTOSAVE_MS
+    );
   };
 
   const finishAddNote = async () => {
@@ -179,7 +185,8 @@ export function TaskInspector({ task }: { task: Task }) {
     addCreated.current = null;
     addLastSaved.current = '';
     setAddingNote(false);
-    if (created && html) setNotes((prev) => [...prev, { ...created, content: html }]);
+    if (created && html)
+      setNotes((prev) => [...prev, { ...created, content: html }]);
     refresh();
   };
 
@@ -249,10 +256,10 @@ export function TaskInspector({ task }: { task: Task }) {
 
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
-      <div className="relative shrink-0 p-space-7">
+      <div className="p-space-7 relative shrink-0">
         {/* Index tick: the panel "receives" the selection. */}
         <span className="bg-accent-500l dark:bg-accent-500d absolute top-4.75 left-0 h-4 w-0.5" />
-        <div className="flex items-start gap-space-5">
+        <div className="gap-space-5 flex items-start">
           <div className="mt-0.5">
             <Checkbox
               checked={task.done}
@@ -309,7 +316,10 @@ export function TaskInspector({ task }: { task: Task }) {
                 </Label>
                 {listName && <span className="shrink-0">/ {listName}</span>}
               </span>
-              <span className="flex items-center gap-1.5" title={absoluteDateTime(task.created_at)}>
+              <span
+                className="flex items-center gap-1.5"
+                title={absoluteDateTime(task.created_at)}
+              >
                 <Icon
                   name="schedule"
                   size={13}
@@ -318,7 +328,10 @@ export function TaskInspector({ task }: { task: Task }) {
                 />
                 Created {relativeTime(task.created_at)}
               </span>
-              <span className="flex items-center gap-1.5" title={absoluteDateTime(task.updated_at)}>
+              <span
+                className="flex items-center gap-1.5"
+                title={absoluteDateTime(task.updated_at)}
+              >
                 <Icon
                   name="update"
                   size={13}
@@ -329,7 +342,7 @@ export function TaskInspector({ task }: { task: Task }) {
               </span>
             </Label>
           </div>
-          <div className="-mt-1 -mr-1 flex shrink-0 flex-col items-center gap-space-1">
+          <div className="gap-space-1 -mt-1 -mr-1 flex shrink-0 flex-col items-center">
             <IconButton
               icon="last_page"
               iconSize={16}
@@ -366,7 +379,7 @@ export function TaskInspector({ task }: { task: Task }) {
             label="Notes"
             trailing={
               notes.length > 0 ? (
-                <div className="flex items-center gap-space-3">
+                <div className="gap-space-3 flex items-center">
                   <Label tone="muted" className="text-[11px] tabular-nums">
                     {notes.length}
                   </Label>
@@ -383,7 +396,7 @@ export function TaskInspector({ task }: { task: Task }) {
             }
           />
 
-          <div className="flex flex-col gap-space-5">
+          <div className="gap-space-5 flex flex-col">
             {notes.map((note) => (
               <NoteCard
                 key={note.id}
@@ -444,7 +457,11 @@ export function TaskInspector({ task }: { task: Task }) {
           </div>
         )}
 
-        <AttachmentSection task={task} onRefresh={refresh} onOpenLightbox={setLightboxIndex} />
+        <AttachmentSection
+          task={task}
+          onRefresh={refresh}
+          onOpenLightbox={setLightboxIndex}
+        />
       </div>
 
       {lightboxIndex !== null && (

@@ -1,8 +1,8 @@
 import { IconButton } from '@taskscape/common-ui/components';
-import { RichTextEditor, type RichTextHandle } from './RichTextEditorLazy';
 import { useEffect, useRef } from 'react';
 import type { Attachment, Note } from '../../api';
 import { AUTOSAVE_MS, requestNoteLink } from './noteEditing';
+import { RichTextEditor, type RichTextHandle } from './RichTextEditorLazy';
 
 /** A saved note: its own rich-text editor that autosaves as you type (debounced)
  *  and on blur; clearing it to empty and blurring deletes it. The hover
@@ -69,7 +69,7 @@ export function NoteCard({
         variant="plain"
         onClick={onDelete}
         title="Delete note"
-        className="z-raised absolute -top-2 -right-2 rounded-full border border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-lift opacity-0 group-hover/note:opacity-100 hover:text-danger-500l dark:hover:text-danger-500d"
+        className="z-raised border-edge-2l dark:border-edge-2d bg-surface-3l dark:bg-surface-3d shadow-lift hover:text-danger-500l dark:hover:text-danger-500d absolute -top-2 -right-2 rounded-full border opacity-0 group-hover/note:opacity-100"
       />
     </div>
   );

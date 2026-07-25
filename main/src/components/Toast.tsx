@@ -16,7 +16,7 @@ export function Toast() {
         elevation="lift"
         surface={3}
         radius="control"
-        className="animate-rise pointer-events-auto flex items-center gap-space-5 py-space-5 pr-space-5 pl-space-7"
+        className="animate-rise gap-space-5 py-space-5 pr-space-5 pl-space-7 pointer-events-auto flex items-center"
       >
         <Label tone="primary" weight="medium" className="text-[13px]">
           {toast.message}

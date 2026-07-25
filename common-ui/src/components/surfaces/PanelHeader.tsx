@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { IconButton } from '@taskscape/common-ui/components/buttons/IconButton';
 import { Label } from '@taskscape/common-ui/components/typography/Label';
+import type { ReactNode } from 'react';
 
 export type PanelHeaderBorder = 'edge-1' | 'edge-2' | 'none';
 
@@ -36,7 +36,7 @@ export function PanelHeader({
   return (
     <div
       className={cn(
-        'flex h-11 shrink-0 items-center gap-space-4 px-space-6',
+        'gap-space-4 px-space-6 flex h-11 shrink-0 items-center',
         BORDER[border],
         className
       )}
@@ -47,15 +47,20 @@ export function PanelHeader({
         tone="primary"
         weight="semibold"
         truncate
-        className="min-w-0 flex-1 font-display text-[13.5px]"
+        className="font-display min-w-0 flex-1 text-[13.5px]"
       >
         {title}
       </Label>
       {(trailing || onClose) && (
-        <div className="flex items-center gap-space-3">
+        <div className="gap-space-3 flex items-center">
           {trailing}
           {onClose && (
-            <IconButton icon="close" size="md" onClick={onClose} title={closeTitle} />
+            <IconButton
+              icon="close"
+              size="md"
+              onClick={onClose}
+              title={closeTitle}
+            />
           )}
         </div>
       )}

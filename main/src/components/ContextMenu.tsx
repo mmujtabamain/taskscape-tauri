@@ -1,4 +1,10 @@
+import { Icon } from '@taskscape/common-ui/Icon';
 import { cn } from '@taskscape/common-ui/cn';
+import {
+  Divider,
+  MenuItem as MenuRow,
+  Surface,
+} from '@taskscape/common-ui/components';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { setOverlay } from '../lib/overlays';
@@ -7,12 +13,6 @@ import {
   type MenuItem,
   type OpenMenu,
 } from './contextMenuContext';
-import { Icon } from '@taskscape/common-ui/Icon';
-import {
-  Divider,
-  MenuItem as MenuRow,
-  Surface,
-} from '@taskscape/common-ui/components';
 
 /** App-wide context-menu layer. Wrap the window root once; open menus from
  *  anywhere via useContextMenu().open({ items, x, y, onPick }). */
@@ -107,7 +107,7 @@ function MenuPanel({
       surface={3}
       radius="panel"
       style={nested ? undefined : { left: pos.x, top: pos.y }}
-      className={cn(!nested && 'absolute', 'min-w-44 py-space-3')}
+      className={cn(!nested && 'absolute', 'py-space-3 min-w-44')}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item) => (
@@ -123,8 +123,10 @@ function MenuPanel({
             leading={item.icon && <Icon name={item.icon} size={15} />}
             trailing={
               (item.shortcut || item.submenu) && (
-                <span className="flex items-center gap-space-4">
-                  {item.shortcut && <span className="text-[11px]">{item.shortcut}</span>}
+                <span className="gap-space-4 flex items-center">
+                  {item.shortcut && (
+                    <span className="text-[11px]">{item.shortcut}</span>
+                  )}
                   {item.submenu && <Icon name="chevron_right" size={14} />}
                 </span>
               )

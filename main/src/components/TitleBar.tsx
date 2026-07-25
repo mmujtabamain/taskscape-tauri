@@ -1,6 +1,6 @@
+import { IconButton } from '@taskscape/common-ui/components';
 import { formatAccel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { IconButton } from '@taskscape/common-ui/components';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { api } from '../api';
 import { splitTargetId } from '../commands/view';
@@ -60,7 +60,7 @@ export function TitleBar() {
 
       <ListTabs />
 
-      <div className="flex items-center gap-space-4 pr-space-6 pl-space-6">
+      <div className="gap-space-4 pr-space-6 pl-space-6 flex items-center">
         {reducedMotion && (
           <div
             title="Reduced motion active on Low Power Mode"

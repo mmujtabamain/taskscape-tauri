@@ -1,14 +1,14 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { Icon } from '@taskscape/common-ui/Icon';
 import {
   Button,
   IconButton,
   Label,
-  Segmented,
   SectionHeader,
+  Segmented,
   TextInput,
   ToolbarButton,
 } from '@taskscape/common-ui/components';
+import { Icon } from '@taskscape/common-ui/Icon';
 import type { Task } from '../../api';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useListStore } from '../../stores/listStore';
@@ -115,13 +115,15 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
 
   const sortActive = view.sort !== 'manual' || view.dir !== 'asc';
   const refineActive =
-    view.notes !== 'any' || view.attachments !== 'any' || view.subtasks !== 'any';
+    view.notes !== 'any' ||
+    view.attachments !== 'any' ||
+    view.subtasks !== 'any';
   const dateActive = view.dateRange !== 'any';
   const sortMeta = SORTS.find((s) => s.id === view.sort) ?? SORTS[0];
 
   return (
     <div className="bg-surface-1l dark:bg-surface-1d flex h-full w-full flex-col">
-      <div className="border-edge-1l dark:border-edge-1d flex h-11 shrink-0 items-center gap-space-5 border-b px-space-6">
+      <div className="border-edge-1l dark:border-edge-1d gap-space-5 px-space-6 flex h-11 shrink-0 items-center border-b">
         <Icon
           name="tune"
           size={18}
@@ -137,22 +139,33 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
           >
             Filter &amp; Sort
           </Label>
-          <Label tone="muted" weight="medium" truncate className="text-[11px] leading-tight">
+          <Label
+            tone="muted"
+            weight="medium"
+            truncate
+            className="text-[11px] leading-tight"
+          >
             {targets.length === 0
               ? 'No list open'
               : targets.map(name).join(', ')}
           </Label>
         </div>
-        <IconButton icon="close" size="lg" iconSize={16} onClick={onClose} title="Close" />
+        <IconButton
+          icon="close"
+          size="lg"
+          iconSize={16}
+          onClick={onClose}
+          title="Close"
+        />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-space-8 overflow-y-auto px-space-7 py-space-7">
+      <div className="gap-space-8 px-space-7 py-space-7 flex min-h-0 flex-1 flex-col overflow-y-auto">
         <Section
           label="Sort"
           active={sortActive}
           onClear={() => update({ sort: 'manual', dir: 'asc' })}
         >
-          <div className="flex items-center gap-space-3">
+          <div className="gap-space-3 flex items-center">
             <MenuButton
               className="min-w-0 flex-1"
               icon={sortMeta.icon}
@@ -164,7 +177,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
               }))}
               onPick={(id) => update({ sort: id as SortMode })}
             />
-            <div className="bg-surface-0l dark:bg-surface-0d rounded-field flex shrink-0 gap-space-1 p-space-1">
+            <div className="bg-surface-0l dark:bg-surface-0d rounded-field gap-space-1 p-space-1 flex shrink-0">
               {(['asc', 'desc'] as SortDir[]).map((dir) => (
                 <button
                   key={dir}
@@ -172,7 +185,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
                   disabled={view.sort === 'manual'}
                   title={dir === 'asc' ? 'Ascending' : 'Descending'}
                   className={cn(
-                    'grid h-6.5 w-7 place-items-center rounded-field disabled:pointer-events-none disabled:opacity-40',
+                    'rounded-field grid h-6.5 w-7 place-items-center disabled:pointer-events-none disabled:opacity-40',
                     view.dir === dir && view.sort !== 'manual'
                       ? 'bg-accent-500l dark:bg-accent-500d text-on-accent shadow-lift'
                       : 'text-content-2l dark:text-content-2d hover:bg-wash-1l dark:hover:bg-wash-1d'
@@ -266,7 +279,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
         </Section>
       </div>
 
-      <div className="border-edge-1l dark:border-edge-1d flex h-9 shrink-0 items-center gap-space-4 border-t px-space-7">
+      <div className="border-edge-1l dark:border-edge-1d gap-space-4 px-space-7 flex h-9 shrink-0 items-center border-t">
         <span
           className={cn(
             'h-1.5 w-1.5 shrink-0 rounded-full',
@@ -289,7 +302,7 @@ export function FilterPanel({ onClose }: { onClose: () => void }) {
         </Label>
       </div>
 
-      <div className="border-edge-1l dark:border-edge-1d bg-surface-1l dark:bg-surface-1d flex items-center gap-space-4 border-t px-space-6 py-space-6">
+      <div className="border-edge-1l dark:border-edge-1d bg-surface-1l dark:bg-surface-1d gap-space-4 px-space-6 py-space-6 flex items-center border-t">
         <ToolbarButton
           icon="restart_alt"
           size="lg"
@@ -356,7 +369,7 @@ function MenuButton({
     <button
       onClick={open}
       className={cn(
-        'bg-surface-0l dark:bg-surface-0d rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-7.5 items-center gap-space-4 px-space-6',
+        'bg-surface-0l dark:bg-surface-0d rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d gap-space-4 px-space-6 flex h-7.5 items-center',
         className
       )}
     >
@@ -398,7 +411,7 @@ function TriRow({
   onChange: (v: TriState) => void;
 }) {
   return (
-    <div className="flex h-8 items-center gap-space-5">
+    <div className="gap-space-5 flex h-8 items-center">
       <Icon
         name={icon}
         size={15}
@@ -436,7 +449,7 @@ function DaysStepper({
   const clamp = (n: number) => Math.min(365, Math.max(1, Math.round(n) || 1));
   const stepper = 'h-6.5 w-6.5 bg-surface-0l dark:bg-surface-0d';
   return (
-    <div className="flex items-center gap-space-3 pl-0.5">
+    <div className="gap-space-3 flex items-center pl-0.5">
       <Label
         tone="secondary"
         weight="medium"
@@ -458,7 +471,7 @@ function DaysStepper({
         max={365}
         value={value}
         onChange={(e) => onChange(clamp(Number(e.target.value)))}
-        className="h-6.5 w-12 px-0 text-center text-[12.5px] font-medium tabular-nums focus:ring-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="h-6.5 w-12 [appearance:textfield] px-0 text-center text-[12.5px] font-medium tabular-nums focus:ring-1 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       <IconButton
         icon="add"

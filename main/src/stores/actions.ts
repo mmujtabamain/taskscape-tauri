@@ -3,13 +3,14 @@
 // optimistically to `taskStore` before the api round-trip. Drag/positioning math
 // lives here too (the store is the single owner of sort_order arithmetic).
 import { api, type Task } from '../api';
-import type { DropZone } from './dragStore';
 import { collapseToRoots } from '../lib/selection';
 import { effSort } from './derive';
+import type { DropZone } from './dragStore';
 import { useHistoryStore, type Command } from './history';
 import { useTaskStore } from './taskStore';
 
-const task = (id: string): Task | undefined => useTaskStore.getState().taskById[id];
+const task = (id: string): Task | undefined =>
+  useTaskStore.getState().taskById[id];
 const run = (cmd: Command) => useHistoryStore.getState().run(cmd);
 
 function isInSubtree(candidateId: string, rootId: string): boolean {
@@ -112,7 +113,11 @@ export function rename(id: string, title: string) {
       throw e;
     }
   };
-  return run({ label: 'Rename', apply: () => set(title), invert: () => set(prev) });
+  return run({
+    label: 'Rename',
+    apply: () => set(title),
+    invert: () => set(prev),
+  });
 }
 
 // ----- delete (soft, undoable) -----
@@ -180,8 +185,12 @@ function reposition(label: string, ops: Op[]): Promise<void> {
     // the first. Awaiting one before the next keeps every op on its own snapshot.
     apply: async () => {
       const { taskById, load } = useTaskStore.getState();
-      snaps = ops.map((o) => taskById[o.id]).filter(Boolean).map(snapOf);
-      for (const o of ops) await api.moveTask(o.id, o.parentId, o.listArg, o.sort);
+      snaps = ops
+        .map((o) => taskById[o.id])
+        .filter(Boolean)
+        .map(snapOf);
+      for (const o of ops)
+        await api.moveTask(o.id, o.parentId, o.listArg, o.sort);
       await load();
     },
     invert: async () => {
@@ -198,20 +207,24 @@ export function move(
   listId: string | null,
   sort?: number
 ) {
-  const listArg = parentId ? null : listId ?? task(id)?.list_id ?? null;
+  const listArg = parentId ? null : (listId ?? task(id)?.list_id ?? null);
   return reposition('Move', [{ id, parentId, listArg, sort }]);
 }
 
 const siblingsOf = (parentId: string | null, listId: string) => {
   const { childrenByParent, rootsByList } = useTaskStore.getState();
-  return parentId ? childrenByParent[parentId] ?? [] : rootsByList[listId] ?? [];
+  return parentId
+    ? (childrenByParent[parentId] ?? [])
+    : (rootsByList[listId] ?? []);
 };
 
 /** Single-row drop (before/nest/after), with the midpoint-or-rebuild sort math. */
 export function dropOnRow(draggedId: string, target: Task, zone: DropZone) {
   if (isInSubtree(target.id, draggedId)) return Promise.resolve();
   if (zone === 'nest') {
-    const kids = siblingsOf(target.id, target.list_id).filter((t) => t.id !== draggedId);
+    const kids = siblingsOf(target.id, target.list_id).filter(
+      (t) => t.id !== draggedId
+    );
     const last = kids[kids.length - 1];
     return reposition('Move', [
       {
@@ -224,7 +237,9 @@ export function dropOnRow(draggedId: string, target: Task, zone: DropZone) {
   }
   const parentId = target.parent_id;
   const listArg = parentId ? null : target.list_id;
-  const siblings = siblingsOf(parentId, target.list_id).filter((t) => t.id !== draggedId);
+  const siblings = siblingsOf(parentId, target.list_id).filter(
+    (t) => t.id !== draggedId
+  );
   const targetIdx = siblings.findIndex((t) => t.id === target.id);
   const insertIdx = zone === 'before' ? targetIdx : targetIdx + 1;
   const prev = siblings[insertIdx - 1];
@@ -258,7 +273,12 @@ export function dropOnRoot(draggedId: string, listId: string) {
   );
   const last = roots[roots.length - 1];
   return reposition('Move', [
-    { id: draggedId, parentId: null, listArg: listId, sort: last ? effSort(last) + 1000 : undefined },
+    {
+      id: draggedId,
+      parentId: null,
+      listArg: listId,
+      sort: last ? effSort(last) + 1000 : undefined,
+    },
   ]);
 }
 
@@ -267,16 +287,25 @@ export function dropSetOnRow(ids: string[], target: Task, zone: DropZone) {
   if (ids.some((id) => isInSubtree(target.id, id))) return Promise.resolve();
   const idset = new Set(ids);
   if (zone === 'nest') {
-    const kids = siblingsOf(target.id, target.list_id).filter((t) => !idset.has(t.id));
+    const kids = siblingsOf(target.id, target.list_id).filter(
+      (t) => !idset.has(t.id)
+    );
     const base = kids.length ? effSort(kids[kids.length - 1]) + 1000 : 1000;
     return reposition(
       'Move',
-      ids.map((id, i) => ({ id, parentId: target.id, listArg: null, sort: base + i * 1000 }))
+      ids.map((id, i) => ({
+        id,
+        parentId: target.id,
+        listArg: null,
+        sort: base + i * 1000,
+      }))
     );
   }
   const parentId = target.parent_id;
   const listArg = parentId ? null : target.list_id;
-  const siblings = siblingsOf(parentId, target.list_id).filter((t) => !idset.has(t.id));
+  const siblings = siblingsOf(parentId, target.list_id).filter(
+    (t) => !idset.has(t.id)
+  );
   const targetIdx = siblings.findIndex((t) => t.id === target.id);
   const insertIdx = zone === 'before' ? targetIdx : targetIdx + 1;
   const ordered = [
@@ -299,7 +328,12 @@ export function dropSetOnRoot(ids: string[], listId: string) {
   const base = roots.length ? effSort(roots[roots.length - 1]) + 1000 : 1000;
   return reposition(
     `Move ${ids.length} task${ids.length === 1 ? '' : 's'}`,
-    ids.map((id, i) => ({ id, parentId: null, listArg: listId, sort: base + i * 1000 }))
+    ids.map((id, i) => ({
+      id,
+      parentId: null,
+      listArg: listId,
+      sort: base + i * 1000,
+    }))
   );
 }
 

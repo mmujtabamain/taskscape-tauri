@@ -18,7 +18,8 @@ import { useTaskStore } from './taskStore';
 async function reconcileLayout() {
   const activeId = useProjectStore.getState().activeId;
   const inProject = useListStore.getState().listsInProject(activeId);
-  const valid = (id: string | null) => !!id && inProject.some((l) => l.id === id);
+  const valid = (id: string | null) =>
+    !!id && inProject.some((l) => l.id === id);
 
   const layout = useLayoutStore.getState();
   let activeListId = layout.activeListId;
@@ -66,7 +67,10 @@ export function startBootstrap(): () => void {
     void useSettingsStore.getState().load();
     void reloadData();
   });
-  const hotkeys = listen('hotkeys-changed', () => void useHotkeyStore.getState().load());
+  const hotkeys = listen(
+    'hotkeys-changed',
+    () => void useHotkeyStore.getState().load()
+  );
 
   return () => {
     unsubTasks();

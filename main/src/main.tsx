@@ -1,4 +1,3 @@
-import './material-symbols.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { api } from './api';
@@ -6,6 +5,7 @@ import App from './App';
 import './index.css';
 import { initReducedMotion } from './lib/reducedMotion';
 import { initTheme } from './lib/theme';
+import './material-symbols.css';
 
 initTheme();
 initReducedMotion();

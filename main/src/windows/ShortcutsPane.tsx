@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
-import { eventToAccel, parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
 import {
   HotkeyHint,
   IconButton,
@@ -7,6 +5,12 @@ import {
   Label,
   SectionHeader,
 } from '@taskscape/common-ui/components';
+import {
+  eventToAccel,
+  parseAccel,
+  type Accel,
+} from '@taskscape/common-ui/hotkeys';
+import { useCallback, useEffect, useState } from 'react';
 import { api, type HotkeyBinding } from '../api';
 
 const SCOPES: { id: HotkeyBinding['scope']; label: string; hint?: string }[] = [
@@ -88,8 +92,8 @@ export function ShortcutsPane() {
   return (
     <div className="space-y-5">
       <Label as="p" tone="muted" className="text-[12px]">
-        Click a shortcut to change it — press the new keys, Backspace to
-        remove, Esc to cancel.
+        Click a shortcut to change it — press the new keys, Backspace to remove,
+        Esc to cancel.
       </Label>
 
       {SCOPES.map((scope) => {
@@ -97,7 +101,11 @@ export function ShortcutsPane() {
         if (rows.length === 0) return null;
         return (
           <section key={scope.id} className="space-y-1.5">
-            <SectionHeader label={scope.label} hint={scope.hint} className="mb-0" />
+            <SectionHeader
+              label={scope.label}
+              hint={scope.hint}
+              className="mb-0"
+            />
 
             {rows.map((b) => (
               <div key={b.id}>
@@ -105,7 +113,7 @@ export function ShortcutsPane() {
                   <Label tone="primary" className="text-[13px]">
                     {b.label}
                   </Label>
-                  <span className="flex items-center gap-space-2">
+                  <span className="gap-space-2 flex items-center">
                     {b.accel !== b.default && recording !== b.id && (
                       <IconButton
                         icon="restart_alt"
@@ -124,7 +132,10 @@ export function ShortcutsPane() {
                       {recording === b.id ? (
                         'Type shortcut…'
                       ) : b.accel ? (
-                        <HotkeyHint hotkey={parseAccel(b.accel)} tone="inherit" />
+                        <HotkeyHint
+                          hotkey={parseAccel(b.accel)}
+                          tone="inherit"
+                        />
                       ) : (
                         <span className="italic">None</span>
                       )}
@@ -132,7 +143,11 @@ export function ShortcutsPane() {
                   </span>
                 </div>
                 {error?.id === b.id && (
-                  <Label as="p" tone="danger" className="pb-1 text-right text-[11px]">
+                  <Label
+                    as="p"
+                    tone="danger"
+                    className="pb-1 text-right text-[11px]"
+                  >
                     {error.message}
                   </Label>
                 )}

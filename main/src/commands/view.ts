@@ -11,7 +11,9 @@ export function splitTargetId(): string | null {
   const listsInProject = useListStore
     .getState()
     .listsInProject(useProjectStore.getState().activeId);
-  return splitListId ?? listsInProject.find((l) => l.id !== activeListId)?.id ?? null;
+  return (
+    splitListId ?? listsInProject.find((l) => l.id !== activeListId)?.id ?? null
+  );
 }
 
 /** Move keyboard focus to the other pane (no-op when not split). */

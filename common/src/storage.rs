@@ -245,7 +245,10 @@ impl Store {
         notes: Option<&str>,
         done: Option<bool>,
     ) -> Result<Task> {
-        if let Some(model) = tasks::Entity::find_by_id(id.to_string()).one(&self.db).await? {
+        if let Some(model) = tasks::Entity::find_by_id(id.to_string())
+            .one(&self.db)
+            .await?
+        {
             let mut active: tasks::ActiveModel = model.into();
             let mut dirty = false;
             if let Some(title) = title {
@@ -410,7 +413,9 @@ impl Store {
                 }
                 parent_list
             }
-            None => list_id.map(str::to_string).unwrap_or_else(|| current_list.clone()),
+            None => list_id
+                .map(str::to_string)
+                .unwrap_or_else(|| current_list.clone()),
         };
 
         let now = now_millis();
@@ -869,7 +874,10 @@ mod tests {
         let store = temp_store().await;
         let project = store.create_project("P").await.unwrap();
         let list = store.create_list(&project.id, "L").await.unwrap();
-        let parent = store.create_task(&list.id, "parent", None, None).await.unwrap();
+        let parent = store
+            .create_task(&list.id, "parent", None, None)
+            .await
+            .unwrap();
         let child = store
             .create_task(&list.id, "child", None, Some(&parent.id))
             .await
@@ -889,12 +897,18 @@ mod tests {
         let store = temp_store().await;
         let project = store.create_project("P").await.unwrap();
         let list = store.create_list(&project.id, "L").await.unwrap();
-        let parent = store.create_task(&list.id, "parent", None, None).await.unwrap();
+        let parent = store
+            .create_task(&list.id, "parent", None, None)
+            .await
+            .unwrap();
         let child = store
             .create_task(&list.id, "child", None, Some(&parent.id))
             .await
             .unwrap();
-        let other = store.create_task(&list.id, "other", None, None).await.unwrap();
+        let other = store
+            .create_task(&list.id, "other", None, None)
+            .await
+            .unwrap();
 
         // Soft-deleting the root stamps the whole subtree and returns exactly the
         // ids it flagged (parent + child), not the untouched sibling.
@@ -927,7 +941,10 @@ mod tests {
         let project = store.create_project("P").await.unwrap();
         let l1 = store.create_list(&project.id, "L1").await.unwrap();
         let l2 = store.create_list(&project.id, "L2").await.unwrap();
-        let parent = store.create_task(&l1.id, "parent", None, None).await.unwrap();
+        let parent = store
+            .create_task(&l1.id, "parent", None, None)
+            .await
+            .unwrap();
         let child = store
             .create_task(&l1.id, "child", None, Some(&parent.id))
             .await
@@ -948,7 +965,10 @@ mod tests {
         let store = temp_store().await;
         let project = store.create_project("P").await.unwrap();
         let list = store.create_list(&project.id, "L").await.unwrap();
-        let parent = store.create_task(&list.id, "parent", None, None).await.unwrap();
+        let parent = store
+            .create_task(&list.id, "parent", None, None)
+            .await
+            .unwrap();
         let child = store
             .create_task(&list.id, "child", None, Some(&parent.id))
             .await

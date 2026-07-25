@@ -1,10 +1,18 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { Icon } from '@taskscape/common-ui/Icon';
 import { IconButton, Label, TextInput } from '@taskscape/common-ui/components';
+import { Icon } from '@taskscape/common-ui/Icon';
 import { useState } from 'react';
 import type { List } from '../api';
-import { createList, deleteList, exportList, renameList } from '../commands/lists';
-import { dropSetOnRoot as actDropSetOnRoot, move as actMove } from '../stores/actions';
+import {
+  createList,
+  deleteList,
+  exportList,
+  renameList,
+} from '../commands/lists';
+import {
+  dropSetOnRoot as actDropSetOnRoot,
+  move as actMove,
+} from '../stores/actions';
 import { readDroppedIds } from '../stores/dragStore';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useListStore } from '../stores/listStore';
@@ -29,7 +37,10 @@ export function ListTabs() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dropOver, setDropOver] = useState<string | null>(null);
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
-  const [tabOver, setTabOver] = useState<{ id: string; before: boolean } | null>(null);
+  const [tabOver, setTabOver] = useState<{
+    id: string;
+    before: boolean;
+  } | null>(null);
   const [tabOverEnd, setTabOverEnd] = useState(false);
   const focusedIdx = lists.findIndex((l) => l.id === focusedListId);
   const inSplit = splitListId != null;
@@ -40,8 +51,10 @@ export function ListTabs() {
     void useListStore.getState().rename(id, name);
   const reorder = (draggedId: string, targetId: string, before: boolean) =>
     void useListStore.getState().reorder(draggedId, targetId, before);
-  const dropTask = (taskId: string, listId: string) => void actMove(taskId, null, listId);
-  const dropTaskSet = (ids: string[], listId: string) => void actDropSetOnRoot(ids, listId);
+  const dropTask = (taskId: string, listId: string) =>
+    void actMove(taskId, null, listId);
+  const dropTaskSet = (ids: string[], listId: string) =>
+    void actDropSetOnRoot(ids, listId);
 
   const openMenu = (e: React.MouseEvent, list: List) => {
     e.preventDefault();
@@ -56,8 +69,19 @@ export function ListTabs() {
           icon: 'vertical_split',
           disabled: list.id === activeListId && list.id !== splitListId,
         },
-        { id: 'export', label: 'Export list…', icon: 'ios_share', dividerAbove: true },
-        { id: 'delete', label: 'Delete list…', icon: 'delete', danger: true, dividerAbove: true },
+        {
+          id: 'export',
+          label: 'Export list…',
+          icon: 'ios_share',
+          dividerAbove: true,
+        },
+        {
+          id: 'delete',
+          label: 'Delete list…',
+          icon: 'delete',
+          danger: true,
+          dividerAbove: true,
+        },
       ],
       onPick: (id) => {
         if (id === 'rename') void renameList(list);
@@ -97,7 +121,8 @@ export function ListTabs() {
               className={cn(
                 'bg-edge-1l dark:bg-edge-1d my-auto h-4 w-px shrink-0',
                 sepAdjacentActive && 'bg-edge-2l dark:bg-edge-2d h-full',
-                sepDragOver && 'bg-accent-500l dark:bg-accent-500d h-6 w-1 rounded-full'
+                sepDragOver &&
+                  'bg-accent-500l dark:bg-accent-500d h-6 w-1 rounded-full'
               )}
             />
             <div
@@ -124,13 +149,20 @@ export function ListTabs() {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
                   setDropOver(list.id);
-                } else if (types.includes(TAB_MIME) && draggingTab !== list.id) {
+                } else if (
+                  types.includes(TAB_MIME) &&
+                  draggingTab !== list.id
+                ) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
-                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  const r = (
+                    e.currentTarget as HTMLElement
+                  ).getBoundingClientRect();
                   const before = e.clientX < r.left + r.width / 2;
                   setTabOver((v) =>
-                    v?.id === list.id && v.before === before ? v : { id: list.id, before }
+                    v?.id === list.id && v.before === before
+                      ? v
+                      : { id: list.id, before }
                   );
                 }
               }}
@@ -156,7 +188,7 @@ export function ListTabs() {
                 }
               }}
               className={cn(
-                'group hover:bg-wash-1l dark:hover:bg-wash-1d relative flex cursor-default items-center gap-space-4 border-b border-transparent pr-space-5 pl-space-7',
+                'group hover:bg-wash-1l dark:hover:bg-wash-1d gap-space-4 pr-space-5 pl-space-7 relative flex cursor-default items-center border-b border-transparent',
                 focused && 'bg-surface-2l dark:bg-surface-2d',
                 dropOver === list.id && 'bg-selection-1l dark:bg-selection-1d',
                 draggingTab === list.id && 'opacity-40'
@@ -178,7 +210,8 @@ export function ListTabs() {
                     e.stopPropagation();
                     if (e.key === 'Enter') {
                       const name = (e.target as HTMLInputElement).value.trim();
-                      if (name && name !== list.name) renameInline(list.id, name);
+                      if (name && name !== list.name)
+                        renameInline(list.id, name);
                       setEditingId(null);
                     } else if (e.key === 'Escape') setEditingId(null);
                   }}
@@ -187,7 +220,7 @@ export function ListTabs() {
                     if (name && name !== list.name) renameInline(list.id, name);
                     setEditingId(null);
                   }}
-                  className="ring-focus-1l dark:ring-focus-1d max-w-40 h-6 px-space-4 py-0 font-medium ring-1"
+                  className="ring-focus-1l dark:ring-focus-1d px-space-4 h-6 max-w-40 py-0 font-medium ring-1"
                 />
               ) : (
                 <Label
@@ -246,7 +279,8 @@ export function ListTabs() {
           <span
             className={cn(
               'bg-edge-1l dark:bg-edge-1d my-auto h-4 w-px shrink-0',
-              focusedIdx === lists.length - 1 && 'bg-edge-2l dark:bg-edge-2d h-full',
+              focusedIdx === lists.length - 1 &&
+                'bg-edge-2l dark:bg-edge-2d h-full',
               (tabOverEnd ||
                 (tabOver != null &&
                   tabOver.id === lists[lists.length - 1]?.id &&

@@ -1,5 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 export type MenuItemTone = 'default' | 'danger';
 
@@ -36,7 +36,7 @@ export function MenuItem({
     <button
       type={type}
       className={cn(
-        'flex w-full items-center gap-space-5 px-space-6 py-space-4 text-left text-[13px] disabled:pointer-events-none disabled:opacity-40',
+        'gap-space-5 px-space-6 py-space-4 flex w-full items-center text-left text-[13px] disabled:pointer-events-none disabled:opacity-40',
         rounded && 'rounded-field',
         TONE[tone],
         active && 'bg-selection-1l dark:bg-selection-1d',
@@ -56,7 +56,9 @@ export function MenuItem({
       )}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {trailing && (
-        <span className="ml-auto shrink-0 text-content-3l dark:text-content-3d">{trailing}</span>
+        <span className="text-content-3l dark:text-content-3d ml-auto shrink-0">
+          {trailing}
+        </span>
       )}
     </button>
   );

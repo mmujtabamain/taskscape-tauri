@@ -7,14 +7,14 @@ use std::sync::Arc;
 
 use axum::{extract::State as AxumState, http::StatusCode, routing::post, Router};
 use serde::{Deserialize, Serialize};
+use taskscape_common::{
+    hotkeys, server, settings, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT,
+    TRAY_PORT,
+};
 use tauri::{
     menu::{Menu, MenuItem, Submenu},
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl,
     WebviewWindowBuilder, WindowEvent,
-};
-use taskscape_common::{
-    hotkeys, server, settings, Attachment, LinkType, List, Note, Project, Store, Task, MAIN_PORT,
-    TRAY_PORT,
 };
 use tokio::sync::OnceCell;
 
@@ -51,7 +51,11 @@ const WINDOW_BG_DARK: tauri::window::Color = tauri::window::Color(22, 23, 25, 25
 /// frame is already themed and a later resize never exposes a stale
 /// white/wrong-mode edge.
 fn paint_window_background(window: &tauri::WebviewWindow, dark: bool) {
-    let color = if dark { WINDOW_BG_DARK } else { WINDOW_BG_LIGHT };
+    let color = if dark {
+        WINDOW_BG_DARK
+    } else {
+        WINDOW_BG_LIGHT
+    };
     let _ = window.set_background_color(Some(color));
 }
 
@@ -256,7 +260,10 @@ async fn reorder_task(
 /// pass the forest roots of the selection. Returns every stamped id so the
 /// delete is undoable/restorable as an exact set.
 #[tauri::command]
-async fn delete_tasks(store: State<'_, StoreCell>, ids: Vec<String>) -> Result<Vec<String>, String> {
+async fn delete_tasks(
+    store: State<'_, StoreCell>,
+    ids: Vec<String>,
+) -> Result<Vec<String>, String> {
     let store = store_of(&store).await?;
     store.soft_delete_tasks(&ids).await.map_err(err)
 }
@@ -509,7 +516,10 @@ async fn import_list(
     let list_name = name
         .filter(|s| !s.trim().is_empty())
         .unwrap_or(export.list.name);
-    let list = store.create_list(&project_id, &list_name).await.map_err(err)?;
+    let list = store
+        .create_list(&project_id, &list_name)
+        .await
+        .map_err(err)?;
     for t in &export.tasks {
         import_task(&store, &list.id, None, t).await?;
     }
@@ -649,7 +659,10 @@ async fn attach_screenshot(
 #[tauri::command]
 async fn set_active_list(store: State<'_, StoreCell>, id: String) -> Result<(), String> {
     let store = store_of(&store).await?;
-    store.set_setting("last_active_list", &id).await.map_err(err)
+    store
+        .set_setting("last_active_list", &id)
+        .await
+        .map_err(err)
 }
 
 /// Remember which project the user last had open, so we can restore it on launch.
@@ -664,10 +677,7 @@ async fn set_active_project(store: State<'_, StoreCell>, id: String) -> Result<(
 
 /// Read a persisted setting (e.g. `last_active_project`).
 #[tauri::command]
-async fn get_setting(
-    store: State<'_, StoreCell>,
-    key: String,
-) -> Result<Option<String>, String> {
+async fn get_setting(store: State<'_, StoreCell>, key: String) -> Result<Option<String>, String> {
     let store = store_of(&store).await?;
     store.get_setting(&key).await.map_err(err)
 }
@@ -694,11 +704,7 @@ async fn list_hotkeys(
 /// Persist one binding (`""` unbinds). The error carries the conflict message
 /// the shortcuts editor shows inline.
 #[tauri::command]
-async fn set_hotkey(
-    store: State<'_, StoreCell>,
-    id: String,
-    accel: String,
-) -> Result<(), String> {
+async fn set_hotkey(store: State<'_, StoreCell>, id: String, accel: String) -> Result<(), String> {
     let store = store_of(&store).await?;
     hotkeys::set_binding(&store, &id, &accel).await.map_err(err)
 }
@@ -805,7 +811,9 @@ fn present_window(
     width: f64,
     height: f64,
 ) -> Result<(), String> {
-    window.set_size(LogicalSize::new(width, height)).map_err(err)?;
+    window
+        .set_size(LogicalSize::new(width, height))
+        .map_err(err)?;
     match app.get_webview_window("main") {
         Some(main) => {
             let main_pos = main.outer_position().map_err(err)?;
@@ -816,7 +824,9 @@ fn present_window(
             let scale = main.scale_factor().map_err(err)?;
             let x = main_pos.x + (main_size.width as i32 - (width * scale) as i32) / 2;
             let y = main_pos.y + (main_size.height as i32 - (height * scale) as i32) / 2;
-            window.set_position(PhysicalPosition::new(x, y)).map_err(err)?;
+            window
+                .set_position(PhysicalPosition::new(x, y))
+                .map_err(err)?;
         }
         None => window.center().map_err(err)?,
     }
@@ -836,7 +846,16 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
     let script = panel_init_script(serde_json::json!({ "kind": "settings" }));
-    build_panel(&app, "settings", &script, "Settings", 640., 520., true, Some((640., 520.)))?;
+    build_panel(
+        &app,
+        "settings",
+        &script,
+        "Settings",
+        640.,
+        520.,
+        true,
+        Some((640., 520.)),
+    )?;
     Ok(())
 }
 
@@ -1078,10 +1097,14 @@ pub fn run() {
             // Report focus to the tray so its global ⌘Enter / ⌘⇧Enter act on this
             // window (new task / screenshot) while it's frontmost.
             ("main", WindowEvent::Focused(focused)) => {
-                let path = if *focused { "/main-focused" } else { "/main-blurred" };
+                let path = if *focused {
+                    "/main-focused"
+                } else {
+                    "/main-blurred"
+                };
                 tauri::async_runtime::spawn(async move {
-                    let _ = server::client::post_json(TRAY_PORT, path, &serde_json::json!({}))
-                        .await;
+                    let _ =
+                        server::client::post_json(TRAY_PORT, path, &serde_json::json!({})).await;
                 });
             }
             // Closing Settings may have rebound hotkeys: tell the main window's

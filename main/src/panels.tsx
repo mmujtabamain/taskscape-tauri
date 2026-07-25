@@ -1,9 +1,9 @@
-import './material-symbols.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import { initReducedMotion } from './lib/reducedMotion';
 import { initTheme } from './lib/theme';
+import './material-symbols.css';
 import { SettingsWindow } from './windows/SettingsWindow';
 
 // The Settings window is built fresh with an init script that sets

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import type { ReactNode } from 'react';
 
 export type SegmentedVariant = 'accentThumb' | 'surfaceThumb';
 
@@ -54,7 +54,7 @@ export function Segmented<T extends string | number>({
   return (
     <div
       className={cn(
-        'grid auto-cols-fr grid-flow-col gap-space-1 rounded-field bg-surface-0l dark:bg-surface-0d p-space-1',
+        'gap-space-1 rounded-field bg-surface-0l dark:bg-surface-0d p-space-1 grid auto-cols-fr grid-flow-col',
         className
       )}
     >
@@ -67,7 +67,7 @@ export function Segmented<T extends string | number>({
             title={it.title}
             onClick={() => onChange(it.value)}
             className={cn(
-              'flex items-center justify-center gap-space-2 truncate rounded-field font-semibold',
+              'gap-space-2 rounded-field flex items-center justify-center truncate font-semibold',
               SIZE[size],
               active ? THUMB[variant].active : THUMB[variant].inactive
             )}

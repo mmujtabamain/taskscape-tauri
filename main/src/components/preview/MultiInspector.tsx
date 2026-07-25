@@ -1,4 +1,12 @@
 import { cn } from '@taskscape/common-ui/cn';
+import {
+  Badge,
+  Checkbox,
+  IconButton,
+  Label,
+  SectionHeader,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 import { useState } from 'react';
 import type { Task } from '../../api';
 import {
@@ -13,14 +21,6 @@ import { useListStore } from '../../stores/listStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useContextMenu } from '../contextMenuContext';
-import {
-  Badge,
-  Checkbox,
-  IconButton,
-  Label,
-  SectionHeader,
-  ToolbarButton,
-} from '@taskscape/common-ui/components';
 
 /** Shown when the focused pane has more than one task selected: a combined tally,
  *  the bulk verbs, and a peek-able list. Clicking a row peeks (highlights without
@@ -33,7 +33,8 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
   const activeProjectId = useProjectStore((s) => s.activeId);
   const lists = useListStore((s) => s.lists);
   const moveTargets = lists.filter((l) => l.project_id === activeProjectId);
-  const listNameById = (id: string) => lists.find((l) => l.id === id)?.name ?? null;
+  const listNameById = (id: string) =>
+    lists.find((l) => l.id === id)?.name ?? null;
 
   const done = tasks.filter((t) => t.done).length;
 
@@ -63,12 +64,12 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
 
   return (
     <div className="animate-rise flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 p-space-7">
-        <div className="flex items-center gap-space-5">
+      <div className="p-space-7 shrink-0">
+        <div className="gap-space-5 flex items-center">
           <Badge
             tone="accent"
             shape="round"
-            className="h-8 min-w-8 px-space-5 text-[13px] font-bold"
+            className="px-space-5 h-8 min-w-8 text-[13px] font-bold"
           >
             {tasks.length}
           </Badge>
@@ -88,12 +89,14 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
           <IconButton
             icon="close"
             iconSize={16}
-            onClick={() => focusedListId && useSelectionStore.getState().clear(focusedListId)}
+            onClick={() =>
+              focusedListId && useSelectionStore.getState().clear(focusedListId)
+            }
             title="Clear selection"
           />
         </div>
 
-        <div className="mt-space-6 grid grid-cols-3 gap-space-2">
+        <div className="mt-space-6 gap-space-2 grid grid-cols-3">
           <ToolbarButton
             icon="task_alt"
             iconWeight={300}
@@ -144,14 +147,14 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-space-7 pt-0">
+      <div className="p-space-7 flex min-h-0 flex-1 flex-col overflow-y-auto pt-0">
         <SectionHeader label="Selected" />
         <div className="-mx-1.5 flex flex-col">
           {tasks.map((t) => (
             <div
               key={t.id}
               className={cn(
-                'group/sel rounded-field flex h-9 items-center gap-space-5 px-space-4',
+                'group/sel rounded-field gap-space-5 px-space-4 flex h-9 items-center',
                 t.id === activeId
                   ? 'bg-selection-1l dark:bg-selection-1d'
                   : 'hover:bg-wash-1l dark:hover:bg-wash-1d'
@@ -177,7 +180,7 @@ export function MultiInspector({ tasks }: { tasks: Task[] }) {
                 {t.title}
               </Label>
               {listNameById(t.list_id) && (
-                <Badge tone="outline" size="sm" className="shrink-0 px-space-4">
+                <Badge tone="outline" size="sm" className="px-space-4 shrink-0">
                   {listNameById(t.list_id)}
                 </Badge>
               )}

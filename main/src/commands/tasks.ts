@@ -8,12 +8,12 @@ import { collapseToRoots } from '../lib/selection';
 import {
   createSubtask as actCreateSubtask,
   createTask as actCreateTask,
-  deleteSelection,
-  deleteTasks,
   dropOnRow as actDropOnRow,
   dropSetOnRoot as actDropSetOnRoot,
   rename as actRename,
   setTasksDone as actSetTasksDone,
+  deleteSelection,
+  deleteTasks,
 } from '../stores/actions';
 import { useHistoryStore } from '../stores/history';
 import { useLayoutStore } from '../stores/layoutStore';
@@ -39,7 +39,10 @@ const showUndoToast = (message: string) =>
     .show(message, 'Undo', () => void useHistoryStore.getState().undo());
 
 /** Add a subtask, un-collapsing the parent so it's visible. */
-export async function createSubtask(parentId: string, title: string): Promise<void> {
+export async function createSubtask(
+  parentId: string,
+  title: string
+): Promise<void> {
   const { collapsed, setCollapsed } = useLayoutStore.getState();
   if (collapsed.has(parentId)) {
     const next = new Set(collapsed);
@@ -115,7 +118,10 @@ export async function bulkDelete(listId: string): Promise<void> {
   showUndoToast(`${roots.length} moved to Trash`);
 }
 
-export async function bulkMove(listId: string, targetListId: string): Promise<void> {
+export async function bulkMove(
+  listId: string,
+  targetListId: string
+): Promise<void> {
   const roots = selectionRootsOf(listId);
   if (roots.length === 0) return;
   await actDropSetOnRoot(roots, targetListId);
@@ -123,7 +129,10 @@ export async function bulkMove(listId: string, targetListId: string): Promise<vo
 }
 
 export function bulkSetDone(listId: string, done: boolean): void {
-  void actSetTasksDone([...useSelectionStore.getState().paneSel(listId).ids], done);
+  void actSetTasksDone(
+    [...useSelectionStore.getState().paneSel(listId).ids],
+    done
+  );
 }
 
 export async function copyToClipboard(ids: string[]): Promise<void> {
@@ -227,7 +236,8 @@ export function reorderSelected(dir: -1 | 1): void {
   const t = selectedTaskId ? taskById[selectedTaskId] : null;
   if (!t) return;
   const sibs =
-    (t.parent_id ? childrenByParent[t.parent_id] : rootsByList[t.list_id]) ?? [];
+    (t.parent_id ? childrenByParent[t.parent_id] : rootsByList[t.list_id]) ??
+    [];
   const idx = sibs.findIndex((s) => s.id === t.id);
   const target = dir < 0 ? sibs[idx - 1] : sibs[idx + 1];
   if (target) void actDropOnRow(t.id, target, dir < 0 ? 'before' : 'after');
@@ -236,7 +246,9 @@ export function reorderSelected(dir: -1 | 1): void {
 export function collapseAll(): void {
   useLayoutStore
     .getState()
-    .setCollapsed(new Set(Object.keys(useTaskStore.getState().childrenByParent)));
+    .setCollapsed(
+      new Set(Object.keys(useTaskStore.getState().childrenByParent))
+    );
 }
 
 export function expandAll(): void {

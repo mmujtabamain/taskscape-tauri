@@ -1,6 +1,12 @@
 import { type RichTextHandle } from '@taskscape/common-ui/RichTextEditor';
 import { useEvent } from '@taskscape/common-ui/useEvent';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { api } from '../api';
 
 /** Handlers the Rust `screenshot-*` events drive into the draft. */
@@ -50,7 +56,8 @@ export function useCaptureDraft(): CaptureDraft {
   // already holds a note, otherwise the title field.
   const focusDraft = useEvent(() =>
     requestAnimationFrame(() => {
-      if (notesOpen && !editorRef.current?.isEmpty()) editorRef.current?.focus();
+      if (notesOpen && !editorRef.current?.isEmpty())
+        editorRef.current?.focus();
       else titleRef.current?.focus();
     })
   );
@@ -74,7 +81,11 @@ export function useCaptureDraft(): CaptureDraft {
     const notesHtml = editorRef.current?.isEmpty()
       ? null
       : (editorRef.current?.getHtml() ?? null);
-    await api.submitCapture({ title: t, notes: notesHtml, screenshotPaths: screenshots });
+    await api.submitCapture({
+      title: t,
+      notes: notesHtml,
+      screenshotPaths: screenshots,
+    });
     clearDraft();
   });
 

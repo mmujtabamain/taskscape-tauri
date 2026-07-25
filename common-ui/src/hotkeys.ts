@@ -14,14 +14,76 @@
 // Spelled out rather than spread from a string: `...('AB' as const)` widens to
 // `string[]`, which would collapse KeyToken — and Accel with it — to `string`.
 const KEY_TOKENS = [
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-  'F1', 'F2', 'F3', 'F4', 'F5', 'F6',
-  'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
-  'Enter', 'Backspace', 'Delete', 'Space', 'Tab', 'Escape', 'Plus',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  ',', '\\', '/', '.', ';', "'", '[', ']', '-', '=', '`',
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+  'G',
+  'H',
+  'I',
+  'J',
+  'K',
+  'L',
+  'M',
+  'N',
+  'O',
+  'P',
+  'Q',
+  'R',
+  'S',
+  'T',
+  'U',
+  'V',
+  'W',
+  'X',
+  'Y',
+  'Z',
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  'F1',
+  'F2',
+  'F3',
+  'F4',
+  'F5',
+  'F6',
+  'F7',
+  'F8',
+  'F9',
+  'F10',
+  'F11',
+  'F12',
+  'Enter',
+  'Backspace',
+  'Delete',
+  'Space',
+  'Tab',
+  'Escape',
+  'Plus',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  ',',
+  '\\',
+  '/',
+  '.',
+  ';',
+  "'",
+  '[',
+  ']',
+  '-',
+  '=',
+  '`',
 ] as const;
 
 export type KeyToken = (typeof KEY_TOKENS)[number];
@@ -44,7 +106,9 @@ type WithCtrl<K extends string> = WithAlt<K> | `Ctrl+${WithAlt<K>}`;
 export type Accel = '' | WithCtrl<KeyToken> | `Cmd+${WithCtrl<KeyToken>}`;
 
 type Assert<T extends true> = T;
-type Rejects<A extends string> = [Extract<A, Accel>] extends [never] ? true : false;
+type Rejects<A extends string> = [Extract<A, Accel>] extends [never]
+  ? true
+  : false;
 type Accepts<A extends string> = A extends Accel ? true : false;
 
 /** Compile-time guard, erased at build time. `Accel` is only worth anything
@@ -223,10 +287,38 @@ interface ModifierSpec {
 // Fixed canonical order (Cmd, Ctrl, Alt, Shift) — every path that writes or
 // renders an accelerator reads this one table, so they can't drift apart.
 const MODIFIERS: ModifierSpec[] = [
-  { flag: 'cmd', token: 'Cmd', glyph: '⌘', icon: 'keyboard_command_key', label: 'Command', pc: 'Ctrl' },
-  { flag: 'ctrl', token: 'Ctrl', glyph: '⌃', icon: 'keyboard_control_key', label: 'Control', pc: 'Ctrl' },
-  { flag: 'alt', token: 'Alt', glyph: '⌥', icon: 'keyboard_option_key', label: 'Option', pc: 'Alt' },
-  { flag: 'shift', token: 'Shift', glyph: '⇧', icon: 'shift', label: 'Shift', pc: 'Shift' },
+  {
+    flag: 'cmd',
+    token: 'Cmd',
+    glyph: '⌘',
+    icon: 'keyboard_command_key',
+    label: 'Command',
+    pc: 'Ctrl',
+  },
+  {
+    flag: 'ctrl',
+    token: 'Ctrl',
+    glyph: '⌃',
+    icon: 'keyboard_control_key',
+    label: 'Control',
+    pc: 'Ctrl',
+  },
+  {
+    flag: 'alt',
+    token: 'Alt',
+    glyph: '⌥',
+    icon: 'keyboard_option_key',
+    label: 'Option',
+    pc: 'Alt',
+  },
+  {
+    flag: 'shift',
+    token: 'Shift',
+    glyph: '⇧',
+    icon: 'shift',
+    label: 'Shift',
+    pc: 'Shift',
+  },
 ];
 
 // Keyed by KeyToken, so a typo in any of these tables is a build error.

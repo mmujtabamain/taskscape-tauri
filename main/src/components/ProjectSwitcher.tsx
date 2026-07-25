@@ -46,7 +46,7 @@ export function ProjectSwitcher() {
     <div ref={rootRef} className="relative flex items-center" data-no-drag>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="rounded-control bg-surface-0l dark:bg-surface-0d hover:bg-wash-2l dark:hover:bg-wash-2d flex h-8 items-center gap-space-3 py-space-3 pr-space-6 pl-space-7"
+        className="rounded-control bg-surface-0l dark:bg-surface-0d hover:bg-wash-2l dark:hover:bg-wash-2d gap-space-3 py-space-3 pr-space-6 pl-space-7 flex h-8 items-center"
         title="Switch project"
       >
         <Label
@@ -70,19 +70,21 @@ export function ProjectSwitcher() {
           elevation="menu"
           surface={3}
           radius="panel"
-          className="z-dropdown absolute top-10 left-0 min-w-60 py-space-3"
+          className="z-dropdown py-space-3 absolute top-10 left-0 min-w-60"
         >
           {projects.map((p) => (
             <div
               key={p.id}
-              className="group hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 cursor-default items-center gap-space-4 px-space-6"
+              className="group hover:bg-wash-2l dark:hover:bg-wash-2d gap-space-4 px-space-6 flex h-9 cursor-default items-center"
               onClick={() => {
                 selectProject(p.id);
                 setOpen(false);
               }}
             >
               <Label tone="accent" className="flex w-4 items-center">
-                {p.id === selectedId && <Icon name="check" size={15} weight={900} />}
+                {p.id === selectedId && (
+                  <Icon name="check" size={15} weight={900} />
+                )}
               </Label>
               <Label tone="primary" truncate className="flex-1 text-[13.5px]">
                 {p.name}
@@ -105,7 +107,7 @@ export function ProjectSwitcher() {
                 iconSize={16}
                 iconWeight={500}
                 variant="plain"
-                className="opacity-0 group-hover:opacity-100 hover:text-danger-500l dark:hover:text-danger-500d"
+                className="hover:text-danger-500l dark:hover:text-danger-500d opacity-0 group-hover:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
@@ -121,7 +123,7 @@ export function ProjectSwitcher() {
               setOpen(false);
               void createProject();
             }}
-            className="hover:bg-wash-2l dark:hover:bg-wash-2d flex h-9 w-full items-center gap-space-4 px-space-6 text-left"
+            className="hover:bg-wash-2l dark:hover:bg-wash-2d gap-space-4 px-space-6 flex h-9 w-full items-center text-left"
           >
             <Label tone="muted" className="flex w-4 items-center">
               <Icon name="add" size={15} weight={900} />

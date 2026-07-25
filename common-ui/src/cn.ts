@@ -33,7 +33,19 @@ const merge = extendTailwindMerge({
     classGroups: {
       // Not theme keys in tailwind-merge — extended so `z-modal` and `z-50` land
       // in one group, and likewise for the --duration-* ramp.
-      z: [{ z: ['base', 'raised', 'popover', 'dropdown', 'overlay', 'modal', 'tooltip'] }],
+      z: [
+        {
+          z: [
+            'base',
+            'raised',
+            'popover',
+            'dropdown',
+            'overlay',
+            'modal',
+            'tooltip',
+          ],
+        },
+      ],
       duration: [{ duration: ['fast', 'base', 'slow'] }],
     },
   },

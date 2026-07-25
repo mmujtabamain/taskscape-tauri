@@ -1,6 +1,6 @@
-import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import type { ButtonHTMLAttributes } from 'react';
 
 export type CheckboxShape = 'square' | 'round';
 export type CheckboxSize = 'sm' | 'md';
@@ -41,7 +41,7 @@ export function Checkbox({
         SHAPE[shape],
         SIZE[size],
         checked
-          ? 'border-transparent bg-done-lamp-1l dark:bg-done-lamp-1d text-on-accent'
+          ? 'bg-done-lamp-1l dark:bg-done-lamp-1d text-on-accent border-transparent'
           : 'border-edge-3l dark:border-edge-3d hover:border-content-3l dark:hover:border-content-3d',
         className
       )}

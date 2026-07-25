@@ -1,6 +1,10 @@
 import { cn } from '@taskscape/common-ui/cn';
 import { HotkeyHint, ToolbarButton } from '@taskscape/common-ui/components';
-import { formatAccel, parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
+import {
+  formatAccel,
+  parseAccel,
+  type Accel,
+} from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { Spinner } from '@taskscape/common-ui/Spinner';
 import { api, type CaptureTarget } from '../api';

@@ -76,7 +76,10 @@ export async function deleteList(list: List): Promise<void> {
     .listsInProject(useProjectStore.getState().activeId);
   useLayoutStore
     .getState()
-    .reconcileLists(new Set(inProject.map((l) => l.id)), inProject[0]?.id ?? null);
+    .reconcileLists(
+      new Set(inProject.map((l) => l.id)),
+      inProject[0]?.id ?? null
+    );
 }
 
 /** Move focus to the next/previous tab in the active project. */

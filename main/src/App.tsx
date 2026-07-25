@@ -62,7 +62,9 @@ function App() {
             <div className="flex min-w-0 flex-1">
               <div
                 className="flex min-w-0"
-                style={{ flexBasis: splitList ? `${splitRatio * 100}%` : '100%' }}
+                style={{
+                  flexBasis: splitList ? `${splitRatio * 100}%` : '100%',
+                }}
               >
                 <TaskPane list={activeList} isSplit={false} />
               </div>
@@ -72,7 +74,12 @@ function App() {
                     onResize={(x, rect) =>
                       useLayoutStore
                         .getState()
-                        .setSplitRatio(Math.min(0.75, Math.max(0.25, (x - rect.left) / rect.width)))
+                        .setSplitRatio(
+                          Math.min(
+                            0.75,
+                            Math.max(0.25, (x - rect.left) / rect.width)
+                          )
+                        )
                     }
                     onReset={() => useLayoutStore.getState().resetSplitRatio()}
                   />
@@ -85,7 +92,11 @@ function App() {
           ) : (
             <EmptyState
               className="bg-surface-2l dark:bg-surface-2d"
-              title={listsInProject.length === 0 ? 'No lists yet' : 'No list selected'}
+              title={
+                listsInProject.length === 0
+                  ? 'No lists yet'
+                  : 'No list selected'
+              }
               subtitle={
                 listsInProject.length === 0
                   ? 'Create a list to start adding tasks'
@@ -108,7 +119,9 @@ function App() {
                 className="border-edge-2l dark:border-edge-2d shrink-0 border-l"
               >
                 {trashOpen ? (
-                  <TrashPane onClose={() => useUiStore.getState().setTrashOpen(false)} />
+                  <TrashPane
+                    onClose={() => useUiStore.getState().setTrashOpen(false)}
+                  />
                 ) : filterOpen ? (
                   <FilterPanel
                     onClose={() => useUiStore.getState().setFilterOpen(false)}
@@ -149,7 +162,9 @@ function Resizer({
       onMouseDown={(e) => {
         e.preventDefault();
         setActive(true);
-        const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+        const rect = (
+          e.currentTarget.parentElement as HTMLElement
+        ).getBoundingClientRect();
         const move = (ev: MouseEvent) => onResize(ev.clientX, rect);
         const up = () => {
           setActive(false);

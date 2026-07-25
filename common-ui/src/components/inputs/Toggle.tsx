@@ -9,7 +9,13 @@ export interface ToggleProps {
 }
 
 /** A pill switch (settings). No transition, per the app's motion policy. */
-export function Toggle({ checked, onChange, disabled, title, className }: ToggleProps) {
+export function Toggle({
+  checked,
+  onChange,
+  disabled,
+  title,
+  className,
+}: ToggleProps) {
   return (
     <button
       type="button"
@@ -21,14 +27,14 @@ export function Toggle({ checked, onChange, disabled, title, className }: Toggle
       className={cn(
         'relative inline-flex h-5 w-8.5 shrink-0 items-center rounded-full border disabled:pointer-events-none disabled:opacity-40',
         checked
-          ? 'border-transparent bg-accent-500l dark:bg-accent-500d'
+          ? 'bg-accent-500l dark:bg-accent-500d border-transparent'
           : 'border-edge-2l dark:border-edge-2d bg-surface-0l dark:bg-surface-0d',
         className
       )}
     >
       <span
         className={cn(
-          'grid h-4 w-4 place-items-center rounded-full bg-surface-3l dark:bg-surface-3d shadow-lift',
+          'bg-surface-3l dark:bg-surface-3d shadow-lift grid h-4 w-4 place-items-center rounded-full',
           checked ? 'translate-x-3.5' : 'translate-x-0.5'
         )}
       />

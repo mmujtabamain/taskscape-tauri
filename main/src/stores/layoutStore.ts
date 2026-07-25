@@ -96,7 +96,12 @@ export const useLayoutStore = create<LayoutState>((set, get) => {
 
     toggleSplit: (id) =>
       set((s) => {
-        const next = s.splitListId === id ? null : id === s.activeListId ? s.splitListId : id;
+        const next =
+          s.splitListId === id
+            ? null
+            : id === s.activeListId
+              ? s.splitListId
+              : id;
         if (next) localStorage.setItem('ui.split', next);
         else localStorage.removeItem('ui.split');
         return { splitListId: next };
@@ -125,7 +130,11 @@ export const useLayoutStore = create<LayoutState>((set, get) => {
 
     resetForProject: (firstListId) => {
       localStorage.removeItem('ui.split');
-      set({ activeListId: firstListId, splitListId: null, paneFocus: firstListId });
+      set({
+        activeListId: firstListId,
+        splitListId: null,
+        paneFocus: firstListId,
+      });
       persistFocus();
     },
 
@@ -134,8 +143,14 @@ export const useLayoutStore = create<LayoutState>((set, get) => {
       set((s) => {
         const activeListId = keep(s.activeListId) ?? fallbackId;
         const splitListId =
-          keep(s.splitListId) && s.splitListId !== activeListId ? s.splitListId : null;
-        return { activeListId, splitListId, paneFocus: keep(s.paneFocus) ?? activeListId };
+          keep(s.splitListId) && s.splitListId !== activeListId
+            ? s.splitListId
+            : null;
+        return {
+          activeListId,
+          splitListId,
+          paneFocus: keep(s.paneFocus) ?? activeListId,
+        };
       });
       if (!get().splitListId) localStorage.removeItem('ui.split');
       persistFocus();

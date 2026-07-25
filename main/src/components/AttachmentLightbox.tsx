@@ -1,16 +1,3 @@
-import { useEffect, useState } from 'react';
-import { api, type Attachment } from '../api';
-import {
-  attachmentSrc,
-  fileKindFor,
-  isRemote,
-  previewKindFor,
-  splitFileName,
-} from '@taskscape/common-ui/fileKind';
-import { SelectableText } from './SelectableText';
-import { propagateAttachmentRename } from '../lib/mentions';
-import { confirmModal, promptName } from '../lib/modal';
-import { setOverlay } from '../lib/overlays';
 import { Icon } from '@taskscape/common-ui/Icon';
 import {
   Backdrop,
@@ -18,6 +5,19 @@ import {
   IconButton,
   Label,
 } from '@taskscape/common-ui/components';
+import {
+  attachmentSrc,
+  fileKindFor,
+  isRemote,
+  previewKindFor,
+  splitFileName,
+} from '@taskscape/common-ui/fileKind';
+import { useEffect, useState } from 'react';
+import { api, type Attachment } from '../api';
+import { propagateAttachmentRename } from '../lib/mentions';
+import { confirmModal, promptName } from '../lib/modal';
+import { setOverlay } from '../lib/overlays';
+import { SelectableText } from './SelectableText';
 
 const TEXT_PREVIEW_CAP = 262144;
 
@@ -51,7 +51,9 @@ function BarButton({
       onClick={onClick}
       title={title}
       className={
-        danger ? 'hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white' : undefined
+        danger
+          ? 'hover:bg-danger-500l dark:hover:bg-danger-500d hover:text-white'
+          : undefined
       }
     />
   );
@@ -199,7 +201,7 @@ export function AttachmentLightbox({
   };
 
   const card = (label: string) => (
-    <div className="rounded-panel bg-surface-2l dark:bg-surface-2d flex flex-col items-center gap-space-5 px-10 py-12 text-center">
+    <div className="rounded-panel bg-surface-2l dark:bg-surface-2d gap-space-5 flex flex-col items-center px-10 py-12 text-center">
       <Icon
         name={kind.icon}
         size={44}
@@ -214,7 +216,7 @@ export function AttachmentLightbox({
       </Label>
       <Button
         variant="primary"
-        className="mt-1 gap-space-3"
+        className="gap-space-3 mt-1"
         onClick={() => api.openAttachment(attachment)}
       >
         <Icon name="open_in_new" size={15} />
@@ -293,7 +295,7 @@ export function AttachmentLightbox({
   return (
     <Backdrop dim="75" blur className="flex flex-col" onClick={onClose}>
       <div
-        className="flex h-13 shrink-0 items-center gap-space-4 px-space-7"
+        className="gap-space-4 px-space-7 flex h-13 shrink-0 items-center"
         onClick={(e) => e.stopPropagation()}
       >
         <Icon name={kind.icon} size={16} className="shrink-0 text-white/70" />

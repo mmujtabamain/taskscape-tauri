@@ -695,7 +695,15 @@ mod tests {
 
     #[test]
     fn parsing_rejects_malformed_accels() {
-        for bad in ["", "Cmd", "Cmd+", "Cmd+Shft+K", "Cmd+K+J", "Cmd+%", "Cmd+F13"] {
+        for bad in [
+            "",
+            "Cmd",
+            "Cmd+",
+            "Cmd+Shft+K",
+            "Cmd+K+J",
+            "Cmd+%",
+            "Cmd+F13",
+        ] {
             assert!(
                 bad.parse::<Accel>().is_err(),
                 "{bad:?} should not parse as an accelerator"

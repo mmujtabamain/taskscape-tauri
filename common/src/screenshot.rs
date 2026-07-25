@@ -42,10 +42,8 @@ pub fn capture() -> Result<Option<PathBuf>> {
     use std::process::Command;
 
     crate::paths::ensure_dirs()?;
-    let path = crate::paths::screenshots_dir().join(format!(
-        "screenshot-{}.png",
-        crate::util::now_millis()
-    ));
+    let path = crate::paths::screenshots_dir()
+        .join(format!("screenshot-{}.png", crate::util::now_millis()));
 
     // -x: do not play the capture sound. -i (region only): interactive selection.
     let mut cmd = Command::new("screencapture");

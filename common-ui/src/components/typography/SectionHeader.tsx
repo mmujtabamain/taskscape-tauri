@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { IconButton } from '@taskscape/common-ui/components/buttons/IconButton';
 import { Label } from '@taskscape/common-ui/components/typography/Label';
+import type { ReactNode } from 'react';
 
 export interface SectionHeaderProps {
   label: string;
@@ -31,9 +31,9 @@ export function SectionHeader({
   className,
 }: SectionHeaderProps) {
   return (
-    <div className={cn('mb-space-5 flex items-center gap-space-5', className)}>
+    <div className={cn('mb-space-5 gap-space-5 flex items-center', className)}>
       {active && (
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500l dark:bg-accent-500d" />
+        <span className="bg-accent-500l dark:bg-accent-500d h-1.5 w-1.5 shrink-0 rounded-full" />
       )}
       <Label
         tone="muted"
@@ -47,7 +47,7 @@ export function SectionHeader({
           {hint}
         </Label>
       )}
-      <span className="flex-1 border-t border-edge-1l dark:border-edge-1d" />
+      <span className="border-edge-1l dark:border-edge-1d flex-1 border-t" />
       {onClear && (
         <IconButton
           icon={clearIcon}

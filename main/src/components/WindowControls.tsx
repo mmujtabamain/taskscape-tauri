@@ -1,8 +1,8 @@
 import { cn } from '@taskscape/common-ui/cn';
+import { Icon } from '@taskscape/common-ui/Icon';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useState } from 'react';
 import { isMac } from '../lib/platform';
-import { Icon } from '@taskscape/common-ui/Icon';
 import { GLYPHS, INNER, OUTER, useWindowFocused } from './windowChrome';
 
 /** Custom-drawn traffic lights matching the native macOS geometry: red/yellow/

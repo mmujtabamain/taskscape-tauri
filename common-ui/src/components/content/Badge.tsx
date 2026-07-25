@@ -1,5 +1,5 @@
-import type { HTMLAttributes } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
+import type { HTMLAttributes } from 'react';
 
 export type BadgeTone = 'muted' | 'outline' | 'accent' | 'danger' | 'recessed';
 export type BadgeShape = 'field' | 'round';
@@ -45,7 +45,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center gap-space-1 font-semibold tabular-nums',
+        'gap-space-1 inline-flex items-center justify-center font-semibold tabular-nums',
         SHAPE[shape],
         SIZE[size],
         TONE[tone],

@@ -1,11 +1,11 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { Icon } from '@taskscape/common-ui/Icon';
 import {
   Badge,
   IconButton,
   Label,
   TextInput,
 } from '@taskscape/common-ui/components';
+import { Icon } from '@taskscape/common-ui/Icon';
 import { memo, useEffect, useRef, type ReactNode } from 'react';
 import {
   beginTitleEdit,
@@ -341,7 +341,7 @@ export const TaskRow = memo(function TaskRow({
           openMenu(e.clientX, e.clientY);
         }}
         className={cn(
-          'group/row relative flex min-h-9 items-center pr-space-6',
+          'group/row pr-space-6 relative flex min-h-9 items-center',
           selected
             ? 'bg-selection-1l dark:bg-selection-1d'
             : 'hover:bg-wash-1l dark:hover:bg-wash-1d',
@@ -366,7 +366,7 @@ export const TaskRow = memo(function TaskRow({
             )}
             style={{ left: depth * INDENT + 44 }}
           >
-            <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-space-2 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
+            <span className="bg-accent-500l dark:bg-accent-500d -left-space-2 absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
           </span>
         )}
 
@@ -381,7 +381,7 @@ export const TaskRow = memo(function TaskRow({
           />
         </span>
 
-        <div className="ml-space-6 min-w-0 flex-1 py-space-5">
+        <div className="ml-space-6 py-space-5 min-w-0 flex-1">
           <Label
             as="div"
             truncate
@@ -398,14 +398,17 @@ export const TaskRow = memo(function TaskRow({
               as="div"
               truncate
               tone={task.done ? 'muted' : 'secondary'}
-              className={cn('text-[12.5px] leading-4.25', task.done && 'opacity-55')}
+              className={cn(
+                'text-[12.5px] leading-4.25',
+                task.done && 'opacity-55'
+              )}
             >
               {highlight(task.notes, query)}
             </Label>
           )}
         </div>
 
-        <div className="ml-space-6 flex shrink-0 items-center gap-space-4">
+        <div className="ml-space-6 gap-space-4 flex shrink-0 items-center">
           {/* Disclosure chevron, left of the checkbox in the gutter. */}
           {children.length > 0 && (
             <span className="grid w-5 shrink-0 place-items-center">
@@ -459,7 +462,9 @@ export const TaskRow = memo(function TaskRow({
             title="More"
             onClick={(e) => {
               e.stopPropagation();
-              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              const r = (
+                e.currentTarget as HTMLElement
+              ).getBoundingClientRect();
               openMenu(r.left, r.bottom + 4);
             }}
             onDoubleClick={(e) => e.stopPropagation()}
@@ -587,7 +592,7 @@ function SubtaskComposer({
   }, []);
   return (
     <div
-      className="flex h-9 items-center gap-space-4 pr-space-6"
+      className="gap-space-4 pr-space-6 flex h-9 items-center"
       style={{ paddingLeft: depth * INDENT + 6 }}
     >
       <Icon

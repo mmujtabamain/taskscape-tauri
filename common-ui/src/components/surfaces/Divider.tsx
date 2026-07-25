@@ -1,5 +1,5 @@
-import type { HTMLAttributes } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
+import type { HTMLAttributes } from 'react';
 
 export type DividerLevel = 1 | 2 | 3;
 
@@ -28,7 +28,12 @@ export function Divider({
   ...rest
 }: DividerProps) {
   if (orientation === 'vertical') {
-    return <div className={cn('w-px self-stretch', BG[level], className)} {...rest} />;
+    return (
+      <div
+        className={cn('w-px self-stretch', BG[level], className)}
+        {...rest}
+      />
+    );
   }
   return <div className={cn('border-t', BORDER[level], className)} {...rest} />;
 }

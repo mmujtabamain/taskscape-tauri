@@ -23,7 +23,8 @@ export function DraftInspector() {
   const projects = useProjectStore((s) => s.projects);
   const list = lists.find((l) => l.id === draftListId);
   const listName = list?.name ?? null;
-  const projectName = projects.find((p) => p.id === list?.project_id)?.name ?? null;
+  const projectName =
+    projects.find((p) => p.id === list?.project_id)?.name ?? null;
 
   const [title, setTitle] = useState('');
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -72,7 +73,12 @@ export function DraftInspector() {
               tone="muted"
               className="mt-2.5 flex items-center gap-1.5 text-[11.5px]"
             >
-              <Icon name="folder_open" size={13} weight={300} className="shrink-0" />
+              <Icon
+                name="folder_open"
+                size={13}
+                weight={300}
+                className="shrink-0"
+              />
               <Label tone="secondary" truncate>
                 {projectName ?? '—'}
               </Label>
@@ -91,7 +97,7 @@ export function DraftInspector() {
 
       <div className="p-4 pt-0">
         <SectionHeader label="Start with" />
-        <div className="flex gap-space-4">
+        <div className="gap-space-4 flex">
           <DashedButton
             onMouseDown={noBlur}
             onClick={() => void runDraftAction(title, 'note')}
@@ -110,8 +116,8 @@ export function DraftInspector() {
           </DashedButton>
         </div>
         <Label as="p" tone="muted" className="mt-3 text-[12px] leading-4">
-          Type a title, add a note, or take a screenshot — the task is created the
-          moment it has something in it.
+          Type a title, add a note, or take a screenshot — the task is created
+          the moment it has something in it.
         </Label>
       </div>
     </div>

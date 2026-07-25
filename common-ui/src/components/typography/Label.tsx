@@ -1,5 +1,5 @@
-import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
+import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 
 export type LabelTone =
   | 'primary'
@@ -54,7 +54,12 @@ export function Label<T extends ElementType = 'span'>({
   const Tag = (as ?? 'span') as ElementType;
   return (
     <Tag
-      className={cn(TONE[tone], weight && WEIGHT[weight], truncate && 'truncate', className)}
+      className={cn(
+        TONE[tone],
+        weight && WEIGHT[weight],
+        truncate && 'truncate',
+        className
+      )}
       {...rest}
     >
       {children}

@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
-import { Icon } from '@taskscape/common-ui/Icon';
 import { Label } from '@taskscape/common-ui/components/typography/Label';
+import { Icon } from '@taskscape/common-ui/Icon';
+import type { ReactNode } from 'react';
 
 export interface EmptyStateProps {
   icon?: string;
@@ -24,14 +24,23 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex flex-1 flex-col items-center justify-center gap-space-4 px-space-7 text-center',
+        'gap-space-4 px-space-7 flex flex-1 flex-col items-center justify-center text-center',
         className
       )}
     >
       {icon && (
-        <Icon name={icon} size={iconSize} className="text-content-3l dark:text-content-3d" />
+        <Icon
+          name={icon}
+          size={iconSize}
+          className="text-content-3l dark:text-content-3d"
+        />
       )}
-      <Label as="div" tone="secondary" weight="medium" className="font-display text-[15px]">
+      <Label
+        as="div"
+        tone="secondary"
+        weight="medium"
+        className="font-display text-[15px]"
+      >
         {title}
       </Label>
       {subtitle && (

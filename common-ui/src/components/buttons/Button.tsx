@@ -1,5 +1,5 @@
-import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
+import type { ButtonHTMLAttributes } from 'react';
 
 export type ButtonVariant = 'primary' | 'danger' | 'ghost';
 
@@ -19,6 +19,17 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /** Solid dialog / CTA button (promoted from Modal's BTN + BTN_VARIANT). */
-export function Button({ variant = 'ghost', className, type = 'button', ...rest }: ButtonProps) {
-  return <button type={type} className={cn(BASE, VARIANT[variant], className)} {...rest} />;
+export function Button({
+  variant = 'ghost',
+  className,
+  type = 'button',
+  ...rest
+}: ButtonProps) {
+  return (
+    <button
+      type={type}
+      className={cn(BASE, VARIANT[variant], className)}
+      {...rest}
+    />
+  );
 }

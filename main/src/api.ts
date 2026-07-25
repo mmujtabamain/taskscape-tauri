@@ -1,6 +1,6 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { Accel, HotkeyBinding } from '@taskscape/common-ui/hotkeys';
 import type { Attachment, LinkType } from '@taskscape/common-ui/types';
+import { invoke } from '@tauri-apps/api/core';
 
 export type { Attachment, HotkeyBinding, LinkType };
 

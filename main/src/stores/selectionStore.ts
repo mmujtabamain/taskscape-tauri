@@ -26,7 +26,12 @@ interface SelectionState {
   focus: (id: string | null) => void;
 
   /** A row was clicked: plain = preview + reset; ⌘ = toggle; ⇧ = range. */
-  rowClick: (paneId: string, id: string, mods: ClickMods, order: string[]) => void;
+  rowClick: (
+    paneId: string,
+    id: string,
+    mods: ClickMods,
+    order: string[]
+  ) => void;
   toggle: (paneId: string, id: string) => void;
   selectAll: (paneId: string, ids: string[]) => void;
   setPane: (paneId: string, ids: Set<string>, anchor: string | null) => void;
@@ -59,7 +64,10 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       // for a following ⇧-range).
       next = { ids: new Set(), anchor: id };
     }
-    set((s) => ({ selectedTaskId: id, byPane: { ...s.byPane, [paneId]: next } }));
+    set((s) => ({
+      selectedTaskId: id,
+      byPane: { ...s.byPane, [paneId]: next },
+    }));
   },
 
   toggle: (paneId, id) => {
@@ -107,7 +115,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
         else changed = true;
       }
       const selectedTaskId =
-        s.selectedTaskId && alive.has(s.selectedTaskId) ? s.selectedTaskId : null;
+        s.selectedTaskId && alive.has(s.selectedTaskId)
+          ? s.selectedTaskId
+          : null;
       if (selectedTaskId !== s.selectedTaskId) changed = true;
       return changed ? { byPane, selectedTaskId } : s;
     }),

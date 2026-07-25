@@ -1,3 +1,10 @@
+import { ATTACHMENT_MIME } from '@taskscape/common-ui/attachmentMime';
+import {
+  Divider,
+  Label,
+  SectionHeader,
+  ToolbarButton,
+} from '@taskscape/common-ui/components';
 import {
   attachmentSrc,
   fileKindFor,
@@ -5,7 +12,6 @@ import {
   splitFileName,
 } from '@taskscape/common-ui/fileKind';
 import { Icon } from '@taskscape/common-ui/Icon';
-import { ATTACHMENT_MIME } from '@taskscape/common-ui/attachmentMime';
 import { Spinner } from '@taskscape/common-ui/Spinner';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useEffect, useState } from 'react';
@@ -13,12 +19,6 @@ import { api, type Attachment, type Task } from '../../api';
 import { propagateAttachmentRename } from '../../lib/mentions';
 import { confirmModal, openModal, promptName } from '../../lib/modal';
 import { useContextMenu } from '../contextMenuContext';
-import {
-  Divider,
-  Label,
-  SectionHeader,
-  ToolbarButton,
-} from '@taskscape/common-ui/components';
 
 function referenceName(location: string): string {
   if (isRemote(location)) {
@@ -64,7 +64,10 @@ export function AttachmentSection({
   }, [task.attachments]);
 
   const addFile = async () => {
-    const picked = await open({ multiple: false, title: 'Choose a file to copy' });
+    const picked = await open({
+      multiple: false,
+      title: 'Choose a file to copy',
+    });
     if (typeof picked === 'string') {
       await api.addCopy(task.id, picked);
       onRefresh();
@@ -145,7 +148,13 @@ export function AttachmentSection({
         ...(isRemote(a.location)
           ? []
           : [{ id: 'reveal', label: 'Reveal in Finder', icon: 'folder_open' }]),
-        { id: 'remove', label: 'Remove', icon: 'delete', danger: true, dividerAbove: true },
+        {
+          id: 'remove',
+          label: 'Remove',
+          icon: 'delete',
+          danger: true,
+          dividerAbove: true,
+        },
       ],
       onPick: (id) => {
         if (id === 'rename') renameAttachment(a);
@@ -161,14 +170,22 @@ export function AttachmentSection({
       <SectionHeader
         label="Attachments"
         trailing={
-          <div className="flex items-center gap-space-1">
+          <div className="gap-space-1 flex items-center">
             <ToolbarButton
               onClick={addScreenshot}
               disabled={capturing}
-              title={capturing ? 'Capturing …' : 'Capture the full screen and attach it'}
+              title={
+                capturing
+                  ? 'Capturing …'
+                  : 'Capture the full screen and attach it'
+              }
               className="disabled:cursor-default disabled:hover:bg-transparent"
             >
-              {capturing ? <Spinner size={12} /> : <Icon name="screenshot_monitor" size={14} />}
+              {capturing ? (
+                <Spinner size={12} />
+              ) : (
+                <Icon name="screenshot_monitor" size={14} />
+              )}
               {capturing ? 'Capturing …' : 'Shot'}
             </ToolbarButton>
             <ToolbarButton icon="add_link" iconSize={14} onClick={addLink}>
@@ -182,7 +199,7 @@ export function AttachmentSection({
       />
 
       {task.attachments.length > 0 ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-space-4">
+        <div className="gap-space-4 grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))]">
           {task.attachments.map((a) => {
             const thumb = thumbs.get(a.id);
             return (
@@ -231,11 +248,11 @@ export function AttachmentSection({
           })}
         </div>
       ) : (
-        <div className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d flex h-20 w-full items-stretch gap-space-2 border border-dashed p-space-2">
+        <div className="rounded-control bg-surface-3l dark:bg-surface-3d border-edge-3l dark:border-edge-3d gap-space-2 p-space-2 flex h-20 w-full items-stretch border border-dashed">
           <button
             onClick={addFile}
             title="Copy a file into this task"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-space-2 text-[12.5px] font-semibold"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d gap-space-2 flex flex-1 flex-col items-center justify-center text-[12.5px] font-semibold"
           >
             <Icon name="note_add" size={18} />
             Copy a file
@@ -244,7 +261,7 @@ export function AttachmentSection({
           <button
             onClick={addLink}
             title="Link a file or URL without copying"
-            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d flex flex-1 flex-col items-center justify-center gap-space-2 text-[12.5px] font-semibold"
+            className="rounded-field text-content-3l dark:text-content-3d hover:bg-wash-1l dark:hover:bg-wash-1d hover:text-content-2l dark:hover:text-content-2d gap-space-2 flex flex-1 flex-col items-center justify-center text-[12.5px] font-semibold"
           >
             <Icon name="add_link" size={18} />
             Add a link

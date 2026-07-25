@@ -13,8 +13,8 @@ import {
   startNewTask,
 } from '../commands/tasks';
 import { focusOtherPane, splitTargetId } from '../commands/view';
-import { paneSelectAll, paneToggleSelect } from '../lib/paneSelection';
 import { overlayOpen } from '../lib/overlays';
+import { paneSelectAll, paneToggleSelect } from '../lib/paneSelection';
 import { scrollTaskIntoView } from '../lib/scroll';
 import { focusSearch } from '../lib/searchFocus';
 import {
@@ -47,14 +47,20 @@ export function useAppKeyboard(): void {
 
       const el = e.target as HTMLElement;
       const typing =
-        el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.isContentEditable;
       const hotkeyMap = useHotkeyStore.getState().map;
       const pressed = (id: string) => matchesEvent(hotkeyMap[id] ?? '', e);
       const layout = useLayoutStore.getState();
       const focusedListId = layout.focusedListId();
-      const { setPane, focus, paneSel, selectedTaskId } = useSelectionStore.getState();
-      const { taskById, childrenByParent, rootsByList } = useTaskStore.getState();
-      const selectedTask = selectedTaskId ? (taskById[selectedTaskId] ?? null) : null;
+      const { setPane, focus, paneSel, selectedTaskId } =
+        useSelectionStore.getState();
+      const { taskById, childrenByParent, rootsByList } =
+        useTaskStore.getState();
+      const selectedTask = selectedTaskId
+        ? (taskById[selectedTaskId] ?? null)
+        : null;
       const scrollTo = scrollTaskIntoView;
 
       if (pressed('search')) {
@@ -203,7 +209,11 @@ export function useAppKeyboard(): void {
           scrollTo(active);
         } else {
           const nidx =
-            idx < 0 ? (dir > 0 ? 0 : flat.length - 1) : (idx + dir + flat.length) % flat.length;
+            idx < 0
+              ? dir > 0
+                ? 0
+                : flat.length - 1
+              : (idx + dir + flat.length) % flat.length;
           const active = flat[nidx].id;
           setPane(listId, new Set(), active);
           focus(active);
@@ -243,7 +253,10 @@ export function useAppKeyboard(): void {
           if (parent) void actDropOnRow(t.id, parent, 'after');
         } else {
           // Indent: nest under the previous visible sibling.
-          const sibs = (t.parent_id ? childrenByParent[t.parent_id] : rootsByList[t.list_id]) ?? [];
+          const sibs =
+            (t.parent_id
+              ? childrenByParent[t.parent_id]
+              : rootsByList[t.list_id]) ?? [];
           const prev = sibs[sibs.findIndex((s) => s.id === t.id) - 1];
           if (prev) void actDropOnRow(t.id, prev, 'nest');
         }

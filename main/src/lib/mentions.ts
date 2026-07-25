@@ -1,5 +1,5 @@
-import { api } from '../api';
 import { renameMentionInHtml } from '@taskscape/common-ui/sanitizeHtml';
+import { api } from '../api';
 
 /** After an attachment is renamed, follow the change into the owning task's
  *  notes so every `@mention` chip shows the new name. */

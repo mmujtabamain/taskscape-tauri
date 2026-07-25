@@ -13,7 +13,11 @@ interface ListState {
   create: (projectId: string, name: string) => Promise<List>;
   rename: (id: string, name: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
-  reorder: (draggedId: string, targetId: string, before: boolean) => Promise<void>;
+  reorder: (
+    draggedId: string,
+    targetId: string,
+    before: boolean
+  ) => Promise<void>;
 }
 
 export const useListStore = create<ListState>((set, get) => ({

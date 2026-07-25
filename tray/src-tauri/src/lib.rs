@@ -89,7 +89,6 @@ fn quit_all(app: &AppHandle) {
     app.exit(0);
 }
 
-
 /// A process-global handle to the app, set once at setup so the AppKit
 /// notification callback below (a plain C function) can reach the mini window.
 fn get_app_handle() -> &'static OnceLock<AppHandle> {

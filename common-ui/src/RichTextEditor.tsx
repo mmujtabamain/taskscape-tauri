@@ -1,3 +1,8 @@
+import { Node, mergeAttributes, type Editor } from '@tiptap/core';
+import { CharacterCount } from '@tiptap/extension-character-count';
+import { Placeholder } from '@tiptap/extensions';
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
 import {
   forwardRef,
   useEffect,
@@ -6,16 +11,11 @@ import {
   useState,
 } from 'react';
 import { twMerge } from 'tailwind-merge';
-import { Node, mergeAttributes, type Editor } from '@tiptap/core';
-import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import { CharacterCount } from '@tiptap/extension-character-count';
-import { Placeholder } from '@tiptap/extensions';
+import { ATTACHMENT_MIME } from './attachmentMime';
 import { fileKindFor } from './fileKind';
 import { Icon } from './Icon';
 import { sanitizeNoteHtml } from './sanitizeHtml';
 import type { Attachment } from './types';
-import { ATTACHMENT_MIME } from './attachmentMime';
 
 export { ATTACHMENT_MIME };
 
@@ -198,8 +198,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
     // attachment autocomplete anchored at the caret.
     const refreshMention = (ed: Editor) => {
       const { selection } = ed.state;
-      if (!selection.empty || attachments.length === 0)
-        return setMention(null);
+      if (!selection.empty || attachments.length === 0) return setMention(null);
       const $from = selection.$from;
       // Represent inline atoms (mention chips) as a space so they act as a token
       // boundary — an `@…` run never spans across a chip.
@@ -469,7 +468,11 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
           .focus()
           .setTextSelection(from)
           .insertContent([
-            { type: 'text', text: url, marks: [{ type: 'link', attrs: { href: url } }] },
+            {
+              type: 'text',
+              text: url,
+              marks: [{ type: 'link', attrs: { href: url } }],
+            },
             { type: 'text', text: ' ' },
           ])
           .run();
@@ -539,7 +542,7 @@ export const RichTextEditor = forwardRef<RichTextHandle, Props>(
           className={
             floatingToolbar
               ? 'bg-edge-1l dark:bg-edge-1d mx-1 h-4 w-px'
-              : 'bg-edge-1l dark:bg-edge-1d ml-auto mr-1 h-4 w-px'
+              : 'bg-edge-1l dark:bg-edge-1d mr-1 ml-auto h-4 w-px'
           }
         />
         <span

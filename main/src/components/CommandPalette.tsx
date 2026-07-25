@@ -1,5 +1,3 @@
-import { parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
-import { Icon } from '@taskscape/common-ui/Icon';
 import {
   Backdrop,
   HotkeyHint,
@@ -8,6 +6,8 @@ import {
   Surface,
   TextInput,
 } from '@taskscape/common-ui/components';
+import { parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
+import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { setOverlay } from '../lib/overlays';
 
@@ -47,12 +47,14 @@ export function CommandPalette({
   const results = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return commands;
-    return commands
-      .map((c) => ({ c, i: c.label.toLowerCase().indexOf(needle) }))
-      .filter((x) => x.i >= 0)
-      // Earlier matches rank higher; stable within a rank.
-      .sort((a, b) => a.i - b.i)
-      .map((x) => x.c);
+    return (
+      commands
+        .map((c) => ({ c, i: c.label.toLowerCase().indexOf(needle) }))
+        .filter((x) => x.i >= 0)
+        // Earlier matches rank higher; stable within a rank.
+        .sort((a, b) => a.i - b.i)
+        .map((x) => x.c)
+    );
   }, [q, commands]);
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function CommandPalette({
         onMouseDown={(e) => e.stopPropagation()}
         className="flex max-h-[60vh] w-[min(560px,92vw)] flex-col overflow-hidden"
       >
-        <div className="border-edge-1l dark:border-edge-1d flex h-11 shrink-0 items-center gap-space-5 border-b px-space-6">
+        <div className="border-edge-1l dark:border-edge-1d gap-space-5 px-space-6 flex h-11 shrink-0 items-center border-b">
           <Icon
             name="bolt"
             size={18}
@@ -115,9 +117,16 @@ export function CommandPalette({
             }}
           />
         </div>
-        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-space-3">
+        <div
+          ref={listRef}
+          className="py-space-3 min-h-0 flex-1 overflow-y-auto"
+        >
           {results.length === 0 && (
-            <Label as="p" tone="muted" className="px-space-7 py-6 text-center text-[13px]">
+            <Label
+              as="p"
+              tone="muted"
+              className="px-space-7 py-6 text-center text-[13px]"
+            >
               No matching commands
             </Label>
           )}
@@ -141,11 +150,19 @@ export function CommandPalette({
                   onMouseMove={() => setActive(i)}
                   onClick={() => runAt(i)}
                   leading={
-                    <Icon name={cmd.icon ?? 'chevron_right'} size={16} weight={300} />
+                    <Icon
+                      name={cmd.icon ?? 'chevron_right'}
+                      size={16}
+                      weight={300}
+                    />
                   }
                   trailing={
                     cmd.accel && (
-                      <HotkeyHint hotkey={parseAccel(cmd.accel)} size="md" tone="inherit" />
+                      <HotkeyHint
+                        hotkey={parseAccel(cmd.accel)}
+                        size="md"
+                        tone="inherit"
+                      />
                     )
                   }
                 >

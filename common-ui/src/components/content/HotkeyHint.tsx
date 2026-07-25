@@ -1,7 +1,7 @@
-import type { HTMLAttributes } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { hotkeyTokens, type Hotkey } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
+import type { HTMLAttributes } from 'react';
 
 export type HotkeyHintSize = 'sm' | 'md';
 export type HotkeyHintTone = 'muted' | 'inherit';
@@ -19,8 +19,10 @@ const TONE: Record<HotkeyHintTone, string> = {
   inherit: '',
 };
 
-export interface HotkeyHintProps
-  extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
+export interface HotkeyHintProps extends Omit<
+  HTMLAttributes<HTMLElement>,
+  'children'
+> {
   /** The shortcut to show. `null` (an unbound or unparseable combo) renders
    *  nothing, so callers can pass `parseAccel(…)` straight through. */
   hotkey: Hotkey | null;
@@ -54,7 +56,12 @@ export function HotkeyHint({
     >
       {tokens.map((t, i) =>
         t.kind === 'icon' ? (
-          <Icon key={i} name={t.icon} size={ICON_PX[size]} weight={ICON_WEIGHT} />
+          <Icon
+            key={i}
+            name={t.icon}
+            size={ICON_PX[size]}
+            weight={ICON_WEIGHT}
+          />
         ) : (
           <span key={i}>{t.text}</span>
         )

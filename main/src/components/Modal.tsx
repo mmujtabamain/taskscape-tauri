@@ -1,5 +1,4 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { Icon } from '@taskscape/common-ui/Icon';
 import {
   Backdrop,
   Button,
@@ -9,10 +8,11 @@ import {
   Surface,
   TextInput,
 } from '@taskscape/common-ui/components';
+import { Icon } from '@taskscape/common-ui/Icon';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { setOverlay } from '../lib/overlays';
 import type { ModalButton, ModalProps, ModalResult } from '../lib/modal';
-import { suggestProjectName, suggestListName } from '../lib/nameSuggest';
+import { suggestListName, suggestProjectName } from '../lib/nameSuggest';
+import { setOverlay } from '../lib/overlays';
 import { useModalStore } from '../stores/modalStore';
 
 /** The default name the dice fills in, by pool. Empty when suggestion is off. */
@@ -41,7 +41,9 @@ export function ModalHost() {
     <Modal
       key={current.id}
       props={current.props}
-      onResolve={(result) => useModalStore.getState().answer(current.id, result)}
+      onResolve={(result) =>
+        useModalStore.getState().answer(current.id, result)
+      }
     />
   );
 }
@@ -155,16 +157,19 @@ function Modal({
         />
 
         {(props.message || props.input) && (
-          <div className="flex items-start gap-space-7 px-space-7 pt-space-4 pb-space-8">
+          <div className="gap-space-7 px-space-7 pt-space-4 pb-space-8 flex items-start">
             {props.icon && (
               <div
-                className={cn('rounded-control grid size-9 shrink-0 place-items-center', BADGE_TONE[tone])}
+                className={cn(
+                  'rounded-control grid size-9 shrink-0 place-items-center',
+                  BADGE_TONE[tone]
+                )}
               >
                 <Icon name={props.icon} size={20} />
               </div>
             )}
 
-            <div className="flex min-w-0 flex-1 flex-col gap-space-7">
+            <div className="gap-space-7 flex min-w-0 flex-1 flex-col">
               {props.message && (
                 <Label
                   as="p"
@@ -192,7 +197,7 @@ function Modal({
                     {props.input.suffix ? (
                       // Locked-extension field: the name grows to fit and the greyed
                       // extension stays glued to its right; `.` is stripped as typed.
-                      <div className="rounded-field bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d flex h-9 w-full items-center overflow-hidden px-space-6 text-[13px] focus-within:ring-2">
+                      <div className="rounded-field bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d px-space-6 flex h-9 w-full items-center overflow-hidden text-[13px] focus-within:ring-2">
                         <span className="relative inline-flex max-w-full min-w-[1ch] flex-none">
                           <span
                             aria-hidden
@@ -234,7 +239,10 @@ function Modal({
                             className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d absolute inset-0 w-full bg-transparent text-[13px] outline-none"
                           />
                         </span>
-                        <Label tone="muted" className="flex-none whitespace-pre select-none">
+                        <Label
+                          tone="muted"
+                          className="flex-none whitespace-pre select-none"
+                        >
                           {props.input.suffix}
                         </Label>
                       </div>
@@ -252,7 +260,7 @@ function Modal({
                             e.currentTarget.select();
                         }}
                         className={cn(
-                          'h-9 w-full pl-space-6',
+                          'pl-space-6 h-9 w-full',
                           props.input.suggest ? 'pr-9' : 'pr-space-6'
                         )}
                       />
@@ -276,7 +284,7 @@ function Modal({
           </div>
         )}
 
-        <div className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d flex items-center justify-end gap-space-5 border-t px-space-5 py-space-6">
+        <div className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d gap-space-5 px-space-5 py-space-6 flex items-center justify-end border-t">
           {props.buttons.map((b, i) => (
             <Button
               key={b.id}

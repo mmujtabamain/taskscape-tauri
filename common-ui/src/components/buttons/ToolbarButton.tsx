@@ -1,6 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 export type ToolbarButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 /** `ghost`/`accent`/`danger` share IconButton's vocabulary — same names, same
@@ -23,7 +23,8 @@ const VARIANT: Record<ToolbarButtonVariant, string> = {
   // users color by state (idle / attached / failed), so a resting or hover tone
   // here would fight them.
   well: 'hover:bg-surface-1l dark:hover:bg-surface-1d disabled:cursor-default disabled:hover:bg-transparent',
-  accent: 'text-accent-500l dark:text-accent-500d hover:bg-wash-1l dark:hover:bg-wash-1d',
+  accent:
+    'text-accent-500l dark:text-accent-500d hover:bg-wash-1l dark:hover:bg-wash-1d',
   danger:
     'text-content-3l dark:text-content-3d hover:bg-danger-100l dark:hover:bg-danger-100d hover:text-danger-500l dark:hover:text-danger-500d',
 };
@@ -56,14 +57,16 @@ export function ToolbarButton({
     <button
       type={type}
       className={cn(
-        'flex items-center gap-space-3 rounded-field font-semibold disabled:pointer-events-none disabled:opacity-40',
+        'gap-space-3 rounded-field flex items-center font-semibold disabled:pointer-events-none disabled:opacity-40',
         SIZE[size],
         VARIANT[variant],
         className
       )}
       {...rest}
     >
-      {icon && <Icon name={icon} size={iconSize} weight={iconWeight} filled={filled} />}
+      {icon && (
+        <Icon name={icon} size={iconSize} weight={iconWeight} filled={filled} />
+      )}
       {children}
     </button>
   );

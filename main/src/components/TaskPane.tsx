@@ -1,6 +1,4 @@
 import { cn } from '@taskscape/common-ui/cn';
-import { formatAccel } from '@taskscape/common-ui/hotkeys';
-import { Icon } from '@taskscape/common-ui/Icon';
 import {
   Divider,
   EmptyState,
@@ -11,10 +9,19 @@ import {
   TextInput,
   ToolbarButton,
 } from '@taskscape/common-ui/components';
+import { formatAccel } from '@taskscape/common-ui/hotkeys';
+import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type List, type Task } from '../api';
-import { registerSearchFocus } from '../lib/searchFocus';
+import {
+  bulkCopy,
+  bulkDelete,
+  bulkMove,
+  bulkSetDone,
+  startNewTask,
+} from '../commands/tasks';
 import { scrollTaskIntoView } from '../lib/scroll';
+import { registerSearchFocus } from '../lib/searchFocus';
 import {
   dropOnRoot as actDropOnRoot,
   dropSetOnRoot as actDropSetOnRoot,
@@ -35,13 +42,6 @@ import {
   isVisibleInPane,
   orderForPane,
 } from '../stores/visibility';
-import {
-  bulkCopy,
-  bulkDelete,
-  bulkMove,
-  bulkSetDone,
-  startNewTask,
-} from '../commands/tasks';
 import { useContextMenu } from './contextMenuContext';
 import { PaneContext, usePaneId } from './paneContext';
 import { TaskRow } from './TaskRow';
@@ -162,13 +162,25 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
 
   // Direct match count for the badge (memo-cheap; recomputed per keystroke).
   const matchCount = searching
-    ? directMatches(query, paneSearch!.scope, paneSearch!.fields, list.id, activeProjectId).size
+    ? directMatches(
+        query,
+        paneSearch!.scope,
+        paneSearch!.fields,
+        list.id,
+        activeProjectId
+      ).size
     : 0;
 
   // Enter / ⇧Enter cycle the matches in visual order, scrolling + previewing each.
   const cycleMatch = (dir: 1 | -1) => {
     const ps = useSearchStore.getState().get(list.id);
-    const direct = directMatches(ps.query, ps.scope, ps.fields, list.id, activeProjectId);
+    const direct = directMatches(
+      ps.query,
+      ps.scope,
+      ps.fields,
+      list.id,
+      activeProjectId
+    );
     if (direct.size === 0) return;
     const ordered = flattenVisible(list.id)
       .map((t) => t.id)
@@ -199,7 +211,9 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
             value={query}
             placeholder={`Search ${list.name}`}
             onFocus={focusPane}
-            onChange={(e) => useSearchStore.getState().setQuery(list.id, e.target.value)}
+            onChange={(e) =>
+              useSearchStore.getState().setQuery(list.id, e.target.value)
+            }
             onKeyDown={(e) => {
               e.stopPropagation();
               if (e.key === 'Escape') {
@@ -266,7 +280,11 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
             }
           }}
           onDragLeave={(e) => {
-            if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node))
+            if (
+              !(e.currentTarget as HTMLElement).contains(
+                e.relatedTarget as Node
+              )
+            )
               setRootDropOver(false);
           }}
           onDrop={(e) => {
@@ -284,14 +302,16 @@ export function TaskPane({ list, isSplit }: { list: List; isSplit: boolean }) {
             ))}
             {rootDropOver && draggingId && (
               <div className="rounded-field bg-accent-500l dark:bg-accent-500d relative mx-3 mt-1 h-0.5">
-                <span className="bg-accent-500l dark:bg-accent-500d absolute top-1/2 -left-space-2 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
+                <span className="bg-accent-500l dark:bg-accent-500d -left-space-2 absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full" />
               </div>
             )}
             {visibleRoots.length === 0 && (
               <EmptyState
                 icon={searching ? 'search_off' : 'landscape'}
                 iconSize={30}
-                title={searching ? `No matches in ${list.name}` : 'Nothing here yet'}
+                title={
+                  searching ? `No matches in ${list.name}` : 'Nothing here yet'
+                }
                 subtitle={
                   searching
                     ? 'Try a different search or scope'
@@ -333,11 +353,32 @@ function ScopeFields() {
       y: r.bottom + 6,
       items: [
         { id: 'scope:list', label: 'This list', icon: check(scope === 'list') },
-        { id: 'scope:project', label: 'Whole project', icon: check(scope === 'project') },
-        { id: 'scope:all', label: 'All projects', icon: check(scope === 'all') },
-        { id: 'fields:both', label: 'Title & notes', icon: check(fields === 'both'), dividerAbove: true },
-        { id: 'fields:title', label: 'Title only', icon: check(fields === 'title') },
-        { id: 'fields:notes', label: 'Notes only', icon: check(fields === 'notes') },
+        {
+          id: 'scope:project',
+          label: 'Whole project',
+          icon: check(scope === 'project'),
+        },
+        {
+          id: 'scope:all',
+          label: 'All projects',
+          icon: check(scope === 'all'),
+        },
+        {
+          id: 'fields:both',
+          label: 'Title & notes',
+          icon: check(fields === 'both'),
+          dividerAbove: true,
+        },
+        {
+          id: 'fields:title',
+          label: 'Title only',
+          icon: check(fields === 'title'),
+        },
+        {
+          id: 'fields:notes',
+          label: 'Notes only',
+          icon: check(fields === 'notes'),
+        },
       ],
       onPick: (id) => {
         if (id.startsWith('scope:'))
@@ -379,7 +420,7 @@ function BulkBar({ count }: { count: number }) {
     });
   };
   return (
-    <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d flex h-9 shrink-0 items-center gap-space-2 border-t px-space-6">
+    <div className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d gap-space-2 px-space-6 flex h-9 shrink-0 items-center border-t">
       <Label
         tone="primary"
         weight="semibold"
@@ -464,14 +505,14 @@ function StatsBar({
       as="div"
       tone="muted"
       weight="semibold"
-      className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d flex h-9 shrink-0 items-center gap-space-5 border-t px-space-7 text-[11px] tracking-[0.08em] uppercase tabular-nums"
+      className="border-edge-2l dark:border-edge-2d bg-surface-2l dark:bg-surface-2d gap-space-5 px-space-7 flex h-9 shrink-0 items-center border-t text-[11px] tracking-[0.08em] uppercase tabular-nums"
     >
       <ViewControl />
       <Divider orientation="vertical" className="h-3" />
       <span>
         {done}/{total} done
       </span>
-      <div className="ml-auto flex items-center gap-space-4">
+      <div className="gap-space-4 ml-auto flex items-center">
         <ProgressBar value={total ? done / total : 0} />
         <Label tone="secondary" className="w-8 text-right">
           {pct}%
@@ -497,14 +538,18 @@ function ViewControl() {
       onClick={toggle}
       title="Sort & filter"
       className={cn(
-        'rounded-field flex h-5.5 items-center gap-space-2 px-space-4 text-[11px] font-semibold tracking-normal normal-case',
+        'rounded-field gap-space-2 px-space-4 flex h-5.5 items-center text-[11px] font-semibold tracking-normal normal-case',
         active
           ? 'text-accent-500l dark:text-accent-500d'
           : 'text-content-3l dark:text-content-3d hover:text-content-1l dark:hover:text-content-1d'
       )}
     >
       <Icon name="tune" size={14} weight={300} />
-      {active && <span className="text-[11px] tracking-normal normal-case">Filtered</span>}
+      {active && (
+        <span className="text-[11px] tracking-normal normal-case">
+          Filtered
+        </span>
+      )}
     </button>
   );
 }

@@ -3,7 +3,11 @@ import {
   TextInput,
   ToolbarButton,
 } from '@taskscape/common-ui/components';
-import { formatAccel, parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
+import {
+  formatAccel,
+  parseAccel,
+  type Accel,
+} from '@taskscape/common-ui/hotkeys';
 import { type RefObject } from 'react';
 
 /** The capture bar's title field plus the (conditional) Clear affordance. */
@@ -45,7 +49,7 @@ export function TitleRow({
           iconSize={16}
           onClick={onClear}
           tabIndex={-1}
-          className="shrink-0 gap-0 text-[11px] text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d"
+          className="text-content-2l hover:text-content-1l dark:text-content-2d dark:hover:text-content-1d shrink-0 gap-0 text-[11px]"
           title={
             clearAccel
               ? `Clear the draft (${formatAccel(clearAccel)})`

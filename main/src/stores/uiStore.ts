@@ -71,7 +71,8 @@ export const useUiStore = create<UiState>((set) => ({
   draftListId: null,
 
   setComposeFor: (id) => set({ composeFor: id }),
-  requestTitleEdit: (id) => set((s) => ({ titleEditReq: bump(s.titleEditReq, id) })),
+  requestTitleEdit: (id) =>
+    set((s) => ({ titleEditReq: bump(s.titleEditReq, id) })),
   clearTitleEditReq: () => set({ titleEditReq: null }),
   requestAddNote: (id) => set((s) => ({ addNoteReq: bump(s.addNoteReq, id) })),
   clearAddNoteReq: () => set({ addNoteReq: null }),
@@ -80,7 +81,9 @@ export const useUiStore = create<UiState>((set) => ({
   endDrag: () => set({ draggingId: null, dropTarget: null }),
   setPaletteOpen: (open) => set({ paletteOpen: open }),
   // Trash and the filter panel share the preview slot — opening one closes the other.
-  setTrashOpen: (open) => set(open ? { trashOpen: true, filterOpen: false } : { trashOpen: false }),
-  setFilterOpen: (open) => set(open ? { filterOpen: true, trashOpen: false } : { filterOpen: false }),
+  setTrashOpen: (open) =>
+    set(open ? { trashOpen: true, filterOpen: false } : { trashOpen: false }),
+  setFilterOpen: (open) =>
+    set(open ? { filterOpen: true, trashOpen: false } : { filterOpen: false }),
   setDraftListId: (id) => set({ draftListId: id }),
 }));

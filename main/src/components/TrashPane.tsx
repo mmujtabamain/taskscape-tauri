@@ -30,7 +30,8 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
 
   const listName = (id: string) => lists.find((l) => l.id === id)?.name;
 
-  const restoreAll = () => useTrashStore.getState().restore(roots.map((t) => t.id));
+  const restoreAll = () =>
+    useTrashStore.getState().restore(roots.map((t) => t.id));
   const emptyTrash = async () => {
     const ok = await confirmModal({
       danger: true,
@@ -59,7 +60,7 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
       />
 
       {roots.length > 0 && (
-        <div className="border-edge-1l dark:border-edge-1d flex shrink-0 items-center gap-space-3 border-b px-space-6 py-space-5">
+        <div className="border-edge-1l dark:border-edge-1d gap-space-3 px-space-6 py-space-5 flex shrink-0 items-center border-b">
           <ToolbarButton icon="restore" iconSize={14} onClick={restoreAll}>
             Restore all
           </ToolbarButton>
@@ -75,7 +76,7 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-space-5">
+      <div className="p-space-5 min-h-0 flex-1 overflow-y-auto">
         {roots.length === 0 && (
           <EmptyState
             icon="delete"
@@ -87,7 +88,7 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
         {roots.map((t) => (
           <div
             key={t.id}
-            className="group/trash rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d flex h-9 items-center gap-space-5 px-space-5"
+            className="group/trash rounded-field hover:bg-wash-1l dark:hover:bg-wash-1d gap-space-5 px-space-5 flex h-9 items-center"
           >
             <div className="min-w-0 flex-1">
               <Label as="div" tone="primary" truncate className="text-[13.5px]">

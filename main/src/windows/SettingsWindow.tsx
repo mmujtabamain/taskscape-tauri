@@ -1,6 +1,3 @@
-import { emit } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@taskscape/common-ui/Icon';
 import {
   IconButton,
@@ -9,6 +6,9 @@ import {
   Segmented,
   Toggle,
 } from '@taskscape/common-ui/components';
+import { emit } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { setTheme, type ThemePref } from '../lib/theme';
 import { ShortcutsPane } from './ShortcutsPane';

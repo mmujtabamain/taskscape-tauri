@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
-import { applyAnchor, hideCard } from '../lib/anchor';
 import { api } from '../api';
+import { applyAnchor, hideCard } from '../lib/anchor';
 import { refreshTheme } from '../lib/theme';
 import type { CaptureDraft } from './useCaptureDraft';
 
@@ -9,7 +9,10 @@ import type { CaptureDraft } from './useCaptureDraft';
  *  global ⌘Enter forward (`capture-enter`), and the `screenshot-*` progress
  *  events. Every callback here is a stable `useEvent`, so the listeners register
  *  once and always see the latest state. */
-export function useCaptureBarEvents(draft: CaptureDraft, onReveal: () => void): void {
+export function useCaptureBarEvents(
+  draft: CaptureDraft,
+  onReveal: () => void
+): void {
   const { focusDraft, save } = draft;
   const { pending, captured, cancelled, error } = draft.screenshotEvents;
   useEffect(() => {
@@ -28,7 +31,8 @@ export function useCaptureBarEvents(draft: CaptureDraft, onReveal: () => void): 
       // ⌘Enter while the bar is open (global; can't reach the webview, so Rust
       // forwards it): submit when the notes editor is focused, else dismiss.
       listen('capture-enter', () => {
-        if ((document.activeElement as HTMLElement | null)?.isContentEditable) save();
+        if ((document.activeElement as HTMLElement | null)?.isContentEditable)
+          save();
         else api.hideMini();
       }),
       // Capture lifecycle: a capture is in flight, landed, was cancelled, or failed.

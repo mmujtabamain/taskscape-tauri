@@ -6,8 +6,7 @@ import type { Task } from '../api';
 import { effSort } from './derive';
 import { useLayoutStore } from './layoutStore';
 import { useProjectStore } from './projectStore';
-import { matchSet } from './searchStore';
-import { useSearchStore } from './searchStore';
+import { matchSet, useSearchStore } from './searchStore';
 import { useSettingsStore } from './settingsStore';
 import { useTaskStore } from './taskStore';
 import {
@@ -129,7 +128,10 @@ export function isVisibleInPane(task: Task, paneId: string): boolean {
   return !task.done || hasPendingDesc.has(task.id);
 }
 
-function comparator(sort: SortMode, dir: SortDir): (a: Task, b: Task) => number {
+function comparator(
+  sort: SortMode,
+  dir: SortDir
+): (a: Task, b: Task) => number {
   const base: (a: Task, b: Task) => number = (() => {
     switch (sort) {
       case 'created':

@@ -7,6 +7,7 @@ export const PaneContext = createContext<string | null>(null);
 
 export function usePaneId(): string {
   const id = useContext(PaneContext);
-  if (id == null) throw new Error('usePaneId must be used within a PaneContext');
+  if (id == null)
+    throw new Error('usePaneId must be used within a PaneContext');
   return id;
 }

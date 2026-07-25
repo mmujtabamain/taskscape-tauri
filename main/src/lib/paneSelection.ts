@@ -9,7 +9,11 @@ import { flattenVisible } from '../stores/visibility';
 const visualOrder = (listId: string) => flattenVisible(listId).map((t) => t.id);
 
 /** A row was clicked: focus the pane, then apply plain / ⌘ / ⇧ semantics. */
-export function paneRowClick(listId: string, id: string, mods: ClickMods): void {
+export function paneRowClick(
+  listId: string,
+  id: string,
+  mods: ClickMods
+): void {
   useLayoutStore.getState().setPaneFocus(listId);
   useSelectionStore.getState().rowClick(listId, id, mods, visualOrder(listId));
 }

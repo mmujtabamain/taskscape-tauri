@@ -143,7 +143,11 @@ pub fn show_boot_box(window: &tauri::WebviewWindow, dark: bool) {
         use objc2::{msg_send, runtime::AnyObject};
         use objc2_core_foundation::{CGPoint, CGRect, CGSize};
 
-        let (r, g, b, a) = if dark { BOOT_EDGE_DARK } else { BOOT_EDGE_LIGHT };
+        let (r, g, b, a) = if dark {
+            BOOT_EDGE_DARK
+        } else {
+            BOOT_EDGE_LIGHT
+        };
         let Ok(ns_window) = window.ns_window() else {
             return;
         };

@@ -1,15 +1,10 @@
-import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '@taskscape/common-ui/cn';
 import { Icon } from '@taskscape/common-ui/Icon';
+import type { ButtonHTMLAttributes } from 'react';
 
 export type IconButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 export type IconButtonVariant =
-  | 'ghost'
-  | 'ghostStrong'
-  | 'plain'
-  | 'accent'
-  | 'danger'
-  | 'onMedia';
+  'ghost' | 'ghostStrong' | 'plain' | 'accent' | 'danger' | 'onMedia';
 
 const SIZE: Record<IconButtonSize, string> = {
   sm: 'h-5 w-5',
@@ -17,7 +12,12 @@ const SIZE: Record<IconButtonSize, string> = {
   lg: 'h-7 w-7',
   xl: 'h-8 w-8',
 };
-const ICON_PX: Record<IconButtonSize, number> = { sm: 16, md: 18, lg: 18, xl: 20 };
+const ICON_PX: Record<IconButtonSize, number> = {
+  sm: 16,
+  md: 18,
+  lg: 18,
+  xl: 20,
+};
 
 const NEUTRAL = 'text-content-3l dark:text-content-3d';
 const NEUTRAL_HOVER = 'hover:text-content-1l dark:hover:text-content-1d';
@@ -77,7 +77,12 @@ export function IconButton({
       )}
       {...rest}
     >
-      <Icon name={icon} size={iconSize ?? ICON_PX[size]} filled={filled} weight={iconWeight} />
+      <Icon
+        name={icon}
+        size={iconSize ?? ICON_PX[size]}
+        filled={filled}
+        weight={iconWeight}
+      />
     </button>
   );
 }

@@ -21,14 +21,17 @@ export function PreviewPanel() {
   const draftListId = useUiStore((s) => s.draftListId);
   const focusedListId = useLayoutStore((s) => s.focusedListId());
   const focusSelIds =
-    useSelectionStore((s) => (focusedListId ? s.byPane[focusedListId]?.ids : undefined)) ??
-    EMPTY_IDS;
+    useSelectionStore((s) =>
+      focusedListId ? s.byPane[focusedListId]?.ids : undefined
+    ) ?? EMPTY_IDS;
 
   // The focused pane's selection in visual order (falling back to any picked ids
   // that no longer flatten into view) — a multi-selection shows the bulk panel.
   const selectionTasks = focusedListId
     ? (() => {
-        const inOrder = flattenVisible(focusedListId).filter((t) => focusSelIds.has(t.id));
+        const inOrder = flattenVisible(focusedListId).filter((t) =>
+          focusSelIds.has(t.id)
+        );
         const seen = new Set(inOrder.map((t) => t.id));
         for (const id of focusSelIds)
           if (!seen.has(id) && taskById[id]) inOrder.push(taskById[id]);

@@ -52,7 +52,8 @@ export async function deleteProject(project: Project): Promise<void> {
  *  single-task preview. */
 export function selectProject(id: string): void {
   useProjectStore.getState().setActive(id);
-  const first = useListStore.getState().lists.find((l) => l.project_id === id) ?? null;
+  const first =
+    useListStore.getState().lists.find((l) => l.project_id === id) ?? null;
   useLayoutStore.getState().resetForProject(first?.id ?? null);
   useSelectionStore.getState().focus(null);
 }
