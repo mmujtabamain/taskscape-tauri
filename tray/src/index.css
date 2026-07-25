@@ -25,11 +25,12 @@ body,
   overflow: hidden;
 }
 
-/* The window is deliberately taller than the collapsed card so the notes have
-   room to expand. `#root` fills the window and pins the card to one edge: the
-   top by default (notes grow downward), or the bottom when Rust reports the bar
-   was summoned near the screen's bottom edge (`.anchor-bottom`, notes grow
-   upward). Either way the card lands at the cursor rather than floating above it. */
+/* The window tracks the card's height (see hooks/useBarAutoResize.ts), so these
+   two normally match. `#root` pins the card to one window edge — the top by
+   default (notes grow downward), or the bottom when Rust reports the bar was
+   summoned near the screen's bottom edge (`.anchor-bottom`, notes grow upward)
+   — which decides which end stays put on the frame between the card growing and
+   the window resize landing, and matches the edge Rust holds still. */
 #root {
   height: 100vh;
   display: flex;

@@ -17,6 +17,9 @@ export const api = {
   // Fire-and-forget: the capture runs in the background and reports progress via
   // the `screenshot-pending` / `screenshot-captured` / `screenshot-error` events.
   captureAndAttach: () => invoke<void>('capture_and_attach'),
+  // Fit the window to the card (logical px). A window taller than what's painted
+  // swallows clicks in its transparent part instead of passing them through.
+  setBarHeight: (height: number) => invoke<void>('set_bar_height', { height }),
   submitCapture: (args: {
     title: string;
     notes?: string | null;

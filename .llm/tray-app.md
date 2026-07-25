@@ -10,7 +10,7 @@ The always-on agent. No dock icon; its only window is a small, frameless, **opaq
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `src-tauri/src/lib.rs`                | **All the interesting logic.** Hotkey, window mechanics, Tauri commands, tray menu, HTTP server wiring.                   |
 | `src-tauri/src/main.rs`               | One-line entry point → `taskscape_tray_lib::run()`.                                                                       |
-| `src-tauri/tauri.conf.json`           | Window config (480×180 — sized for the notes panel expanded, frameless, `transparent: true`, always-on-top, hidden at start). `macOSPrivateApi: true` is required for the transparent backing, which now only lets the opaque card's rounded corners render — there is no vibrancy. |
+| `src-tauri/tauri.conf.json`           | Window config (480 wide; the height is only a starting value — the window is resized to the card, see [Fitting the window to the card](#fitting-the-window-to-the-card) — plus frameless, `transparent: true`, always-on-top, hidden at start). `macOSPrivateApi: true` is required for the transparent backing, which now only lets the opaque card's rounded corners render — there is no vibrancy. |
 | `src-tauri/capabilities/default.json` | Permissions for the `main` window.                                                                                        |
 | `src/App.tsx`                         | The mini bar UI (React). Title + notes fields, and a footer with the target (project / list, opens main) on the left and, on the right, a **Clear** button (⌘⇧⌫, shown only when the draft has content) + the screenshot **ghost button** (spinner while capturing, shot count, ⌘⇧⏎ hint). Holds the draft state, which persists across dismissal. |
 | `src/api.ts`                          | Thin typed wrappers over `invoke(...)` for each Tauri command.                                                            |
@@ -35,6 +35,14 @@ While hidden, the window is **moved off-screen to `PARK` (-10000,-10000)** rathe
 ### Anchoring on screen
 
 `cursor_anchor` places the bar just down-and-right of the cursor. If that would push the frame past the **right or bottom edge** of the monitor the cursor is on, it **flips to the opposite side** of the cursor; a final clamp to that monitor's **work area** (menu bar / dock excluded) keeps the whole frame on screen even near a corner or on a small display. The monitor is resolved from the cursor position (`monitor_from_point`), so multi-display setups anchor to the right screen.
+
+The **vertical** flip is decided against `MAX_BAR_HEIGHT` (the card with its notes expanded), not the height being summoned: near the screen's bottom there's room for the collapsed bar below the cursor but not for the notes it may grow into, and the growth direction is fixed for the whole summon. The flip also picks the summon's `VAnchor` — the window edge the resize below holds still.
+
+### Fitting the window to the card
+
+The window is **exactly as tall as the card**, because a transparent window is not a click-through one: any part of the frame the card doesn't paint would swallow clicks meant for the app underneath. `useBarAutoResize` puts a `ResizeObserver` on the card and reports its height (logical px) to `set_bar_height`, which resizes the window and keeps the summon's anchored edge in place — a top-anchored bar grows downward, a bottom-anchored one upward — re-clamping to the display so an expanding card can't walk off the bottom. So the card is `shrink-0` (the window's current height must never squash the height being measured), and Rust tracks the height it last asked for rather than reading the window back, since macOS applies `setContentSize:` asynchronously.
+
+The height in `tauri.conf.json` is only what the window starts at, before the webview's first measurement lands.
 
 ### Dismiss on click-away, but not on a Space switch
 
@@ -108,6 +116,7 @@ Registered in `invoke_handler![...]`, called from `src/api.ts`:
 | `open_main`          | Focus/launch `taskscape-main` **first**, then dismiss the bar — so there's no gap where neither window is on screen (async). |
 | `capture_and_attach` | Kick off a background screenshot (`spawn_capture`) and return immediately; progress is reported via the `screenshot-*` events. Each trigger adds another shot — it is **not** a toggle. |
 | `submit_capture`     | Create the task in the target list, attach **all** captured screenshots (`screenshot_paths: Vec<String>`) plus notes, POST `/refresh` to main, dismiss. |
+| `set_bar_height`     | Resize the window to the card's measured height, holding the summon's anchored edge — see [Fitting the window to the card](#fitting-the-window-to-the-card). |
 
 `target_list()` resolves where captures go: last active list (setting `last_active_list`, written by the main app) → first list → a freshly created `Inbox`.
 
@@ -161,8 +170,8 @@ The frontend `listen`s for these (emitted from `lib.rs`):
   cursor on mouse-move). Done in CSS, not `NSCursor` — the tray is a
   non-activating accessory, where native cursor hiding has no effect.
 - **Notes are hidden until Tab.** The card sizes to its content and the window
-  stays a fixed 480×180, so the collapsed card simply leaves the lower part of the
-  (transparent) window empty. Tab from the title sets `notesOpen`, which animates
+  follows it (see [Fitting the window to the card](#fitting-the-window-to-the-card)).
+  Tab from the title sets `notesOpen`, which animates
   the panel's `grid-template-rows` from `0fr` to `1fr` (expands to the editor's
   natural height without measuring it) and then focuses the editor. While
   collapsed the panel is `inert`, so nothing inside it is tabbable. It re-collapses

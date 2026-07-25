@@ -16,7 +16,7 @@
         "label": "main",
         "title": "Taskscape Capture",
         "width": 480,
-        "height": 300,
+        "height": 116,
         "resizable": false,
         "decorations": false,
         "transparent": true,

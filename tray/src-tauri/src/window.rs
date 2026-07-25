@@ -1,20 +1,29 @@
 use std::{
-    sync::{Mutex, OnceLock},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Mutex, OnceLock,
+    },
     time::{Duration, Instant},
 };
 
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
 #[cfg(target_os = "macos")]
 use crate::setup::{allow_over_fullscreen, order_front_regardless};
 use crate::{
     capture::{region_mode, spawn_capture, spawn_capture_with, CaptureUi},
-    focus_or_launch_main_async,
+    err, focus_or_launch_main_async,
 };
 
 /// Somewhere no display can reach — the window "rests" here while hidden so that
 /// a one-frame show-before-move never flashes at a stale on-screen position.
 const PARK: (i32, i32) = (-10_000, -10_000);
+
+/// The tallest the card can grow (logical px), i.e. notes expanded to the
+/// editor's `max-h-40` cap. The window itself is fitted to the card, so this is
+/// only used to pick the summon anchor: the growth direction has to hold for the
+/// expanded card, not just the collapsed one it's summoned as.
+const MAX_BAR_HEIGHT: f64 = 300.0;
 
 /// Reveal the mini window at the cursor, focused and pinned onto the current
 /// (possibly full-screen) Space.
@@ -28,6 +37,10 @@ fn show_mini(app: &AppHandle, window: &tauri::WebviewWindow) {
         }
         None => VAnchor::Top,
     };
+    // Remember it: `set_bar_height` holds this edge still as the card resizes.
+    if let Ok(mut guard) = current_anchor().lock() {
+        *guard = anchor;
+    }
     // Re-assert the Space-joining behavior right before showing: it must be in
     // effect at the moment we reveal/focus, or macOS shows the window on the
     // desktop Space instead of the active full-screen one.
@@ -84,11 +97,10 @@ pub fn dismiss(window: &tauri::WebviewWindow) {
     let _ = window.set_position(PhysicalPosition::new(PARK.0, PARK.1));
 }
 
-/// Which edge of the (taller-than-the-card) window the card is pinned to for a
-/// given reveal. `Top` lets it grow downward into the empty space below; `Bottom`
-/// pins it to the window's bottom so it grows upward into the space above —
-/// chosen so the card lands at the cursor whether it was summoned near the top or
-/// the bottom of the screen.
+/// Which edge of the window stays put for a given reveal as the card resizes.
+/// `Top` lets the card grow downward, `Bottom` upward — chosen so it keeps
+/// landing at the cursor whether it was summoned near the top or the bottom of
+/// the screen.
 #[derive(Clone, Copy)]
 enum VAnchor {
     Top,
@@ -101,6 +113,55 @@ impl VAnchor {
             VAnchor::Top => "top",
             VAnchor::Bottom => "bottom",
         }
+    }
+}
+
+/// The anchor the current summon chose — the window edge [`set_bar_height`]
+/// keeps still while the card grows and shrinks.
+fn current_anchor() -> &'static Mutex<VAnchor> {
+    static ANCHOR: OnceLock<Mutex<VAnchor>> = OnceLock::new();
+    ANCHOR.get_or_init(|| Mutex::new(VAnchor::Top))
+}
+
+/// The display a bar frame is being placed on: the box its frame is kept inside,
+/// plus that display's scale factor (all physical pixels). The bar is a
+/// pop-up-menu-level panel, so it may draw over the Dock like a context menu —
+/// left / right / bottom clamp to the physical display — but never over the menu
+/// bar, so the top clamps to the work area.
+struct Display {
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
+    scale: f64,
+}
+
+impl Display {
+    /// The display containing (`x`, `y`), falling back to the primary.
+    fn at(window: &tauri::WebviewWindow, x: f64, y: f64) -> Option<Self> {
+        let monitor = window
+            .monitor_from_point(x, y)
+            .ok()
+            .flatten()
+            .or_else(|| window.primary_monitor().ok().flatten())?;
+        let pos = monitor.position();
+        let size = monitor.size();
+        let area = monitor.work_area();
+        Some(Self {
+            left: pos.x as f64,
+            top: area.position.y as f64,
+            right: pos.x as f64 + size.width as f64,
+            bottom: pos.y as f64 + size.height as f64,
+            scale: monitor.scale_factor(),
+        })
+    }
+
+    /// Keep a `w`×`h` frame at (`x`, `y`) fully on this display.
+    fn clamp(&self, x: f64, y: f64, w: f64, h: f64) -> (f64, f64) {
+        (
+            x.clamp(self.left, (self.right - w).max(self.left)),
+            y.clamp(self.top, (self.bottom - h).max(self.top)),
+        )
     }
 }
 
@@ -121,36 +182,23 @@ fn cursor_anchor(
     let cursor = app.cursor_position().ok()?;
     let size = window.outer_size().ok()?;
     let (w, h) = (size.width as f64, size.height as f64);
-
-    let monitor = window
-        .monitor_from_point(cursor.x, cursor.y)
-        .ok()
-        .flatten()
-        .or_else(|| window.primary_monitor().ok().flatten())?;
-    // The bar is a pop-up-menu-level panel, so it may draw over the Dock like a
-    // context menu — but never over the menu bar. So its left / right / bottom
-    // edges clamp to the full display, while its top clamps to the work area
-    // (which starts below the menu bar). This also lets it overlap a Dock parked
-    // on the left or right, not just the bottom.
-    let full_pos = monitor.position();
-    let full_size = monitor.size();
-    let area = monitor.work_area();
-    let left = full_pos.x as f64;
-    let top = area.position.y as f64;
-    let right = full_pos.x as f64 + full_size.width as f64;
-    let bottom = full_pos.y as f64 + full_size.height as f64;
+    let display = Display::at(window, cursor.x, cursor.y)?;
 
     // Default down-and-right of the cursor; flip to the other side when that
     // side would spill off the right / bottom edge. A vertical flip means the
     // cursor is near the bottom, so the card anchors to the window's bottom and
     // grows upward instead of downward.
     let mut x = cursor.x - OFF_X;
-    if x + w > right {
+    if x + w > display.right {
         x = cursor.x + OFF_X - w;
     }
     let mut y = cursor.y - OFF_Y;
     let mut anchor = VAnchor::Top;
-    if y + h > bottom {
+    // Flip against the *expanded* card, not the (usually collapsed) one being
+    // summoned: near the screen's bottom there's room for the collapsed bar
+    // below the cursor but not for the notes it may grow, and the growth
+    // direction is fixed for the whole summon.
+    if y + MAX_BAR_HEIGHT * display.scale > display.bottom {
         y = cursor.y + OFF_Y - h;
         anchor = VAnchor::Bottom;
     }
@@ -158,10 +206,66 @@ fn cursor_anchor(
     // Whatever the flip chose, never let the frame leave the display — the top
     // clamps below the menu bar, the other edges to the physical bounds (covers
     // the top/left edges and monitors smaller than the bar).
-    x = x.clamp(left, (right - w).max(left));
-    y = y.clamp(top, (bottom - h).max(top));
+    let (x, y) = display.clamp(x, y, w, h);
 
     Some((PhysicalPosition::new(x as i32, y as i32), anchor))
+}
+
+/// The window height (physical px) we last asked for. macOS applies `set_size`
+/// asynchronously, so reading the window back right after a resize can still
+/// report the old height — which would make the next resize move the anchored
+/// edge by the wrong amount. `0` means "not measured yet".
+fn applied_height() -> &'static AtomicU32 {
+    static HEIGHT: OnceLock<AtomicU32> = OnceLock::new();
+    HEIGHT.get_or_init(|| AtomicU32::new(0))
+}
+
+/// Fit the window to the card. The webview reports the card's height (logical
+/// px) whenever it changes — the notes opening, the editor growing with the text
+/// — because the window is transparent but not click-through: any part of it the
+/// card doesn't cover would swallow clicks meant for the app underneath.
+///
+/// The summon's anchored edge stays put, so a top-anchored bar grows downward
+/// and a bottom-anchored one upward, and the card never crawls off the cursor.
+#[tauri::command]
+pub fn set_bar_height(window: tauri::WebviewWindow, height: f64) -> Result<(), String> {
+    if !height.is_finite() || height < 1.0 {
+        return Ok(());
+    }
+    let scale = window.scale_factor().map_err(err)?;
+    let size = window.inner_size().map_err(err)?;
+    let target = (height * scale).round() as u32;
+
+    let prev = match applied_height().swap(target, Ordering::AcqRel) {
+        0 => size.height,
+        h => h,
+    };
+    if target == prev {
+        return Ok(());
+    }
+
+    // While hidden the window rests at PARK; leave it there and just resize.
+    if window.is_visible().unwrap_or(false) {
+        if let Ok(pos) = window.outer_position() {
+            let anchor = current_anchor().lock().map_or(VAnchor::Top, |g| *g);
+            let x = pos.x as f64;
+            let mut y = pos.y as f64;
+            if matches!(anchor, VAnchor::Bottom) {
+                y -= target as f64 - prev as f64;
+            }
+            let (x, y) = match Display::at(&window, x, y) {
+                Some(display) => display.clamp(x, y, size.width as f64, target as f64),
+                None => (x, y),
+            };
+            // Move first: `setContentSize:` holds the window's top-left, so
+            // placing the new top edge before the resize lands the anchored edge
+            // in one step (both are queued on the main thread, in order).
+            let _ = window.set_position(PhysicalPosition::new(x as i32, y as i32));
+        }
+    }
+    window
+        .set_size(PhysicalSize::new(size.width, target))
+        .map_err(err)
 }
 
 /// Open the main window, then dismiss the bar *after* main is up so there's no

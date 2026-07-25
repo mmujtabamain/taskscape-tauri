@@ -156,6 +156,7 @@ pub fn run() {
             open_main,
             capture_and_attach,
             submit_capture,
+            set_bar_height,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

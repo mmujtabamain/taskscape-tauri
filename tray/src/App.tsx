@@ -1,9 +1,10 @@
 import { Divider } from '@taskscape/common-ui/components';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { api } from './api';
 import { Footer } from './components/Footer';
 import { NotesSection } from './components/NotesSection';
 import { TitleRow } from './components/TitleRow';
+import { useBarAutoResize } from './hooks/useBarAutoResize';
 import { useCaptureBarEvents } from './hooks/useCaptureBarEvents';
 import { useCaptureDraft } from './hooks/useCaptureDraft';
 import { useCaptureTarget } from './hooks/useCaptureTarget';
@@ -18,6 +19,7 @@ function App() {
   const draft = useCaptureDraft();
   const { target, refresh: refreshTarget } = useCaptureTarget();
   const { hotkeyMap, reload: reloadHotkeys } = useHotkeyMap();
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // On reveal, refresh the target name and pick up hotkey changes made while the
   // bar was hidden (theme + focus are handled inside the events hook).
@@ -28,6 +30,7 @@ function App() {
 
   useCaptureBarEvents(draft, onReveal);
   useCursorAutohide();
+  useBarAutoResize(cardRef);
 
   const clearAccel = hotkeyMap['clear_draft'] ?? '';
   const screenshotAccel = hotkeyMap['screenshot_capture'] ?? '';
@@ -49,11 +52,13 @@ function App() {
   };
 
   return (
-    // The window is taller than the collapsed card; the card sizes to its own
-    // content and the rest of the (transparent) window shows through.
+    // The card sizes to its own content and the window is resized to match it
+    // (useBarAutoResize) — `shrink-0` keeps the window's current height from
+    // squashing it, so what's measured is the height it actually wants.
     <div
+      ref={cardRef}
       data-tauri-drag-region
-      className="rounded-panel border-edge-2l bg-surface-2l text-content-1l dark:border-edge-2d dark:bg-surface-2d dark:text-content-1d flex w-screen flex-col overflow-hidden border"
+      className="rounded-panel border-edge-2l bg-surface-2l text-content-1l dark:border-edge-2d dark:bg-surface-2d dark:text-content-1d flex w-screen shrink-0 flex-col overflow-hidden border"
       onKeyDown={onKeyDown}
     >
       <TitleRow
