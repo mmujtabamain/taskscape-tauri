@@ -12,6 +12,9 @@
     "build": "scripts/make-app.sh",
     "clean": "scripts/clean.sh",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "npm run format:ts && npm run format:rust",
+    "format:ts": "npm run format --workspaces --if-present",
+    "format:rust": "cargo fmt --manifest-path common/Cargo.toml && cargo fmt --manifest-path main/src-tauri/Cargo.toml && cargo fmt --manifest-path tray/src-tauri/Cargo.toml"
   }
 }
