@@ -4,6 +4,10 @@ export interface ModalButton {
   id: string;
   label: string;
   variant?: 'primary' | 'danger' | 'ghost';
+  /** Move this button to the row's left edge, away from the accept/cancel pair —
+   *  for a third way out that isn't either of them ("Import from JSON…"). It
+   *  never becomes the default, whatever its position in the array. */
+  align?: 'start';
 }
 
 export interface ModalInput {
@@ -76,8 +80,13 @@ export async function promptNewList(): Promise<
     title: 'New list',
     input: { suggest: 'list' },
     buttons: [
+      {
+        id: 'import',
+        label: 'Import from JSON…',
+        variant: 'ghost',
+        align: 'start',
+      },
       { id: 'cancel', label: 'Cancel', variant: 'ghost' },
-      { id: 'import', label: 'Import from JSON…', variant: 'ghost' },
       { id: 'create', label: 'Create', variant: 'primary' },
     ],
   });

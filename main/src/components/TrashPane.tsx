@@ -3,11 +3,13 @@ import {
   EmptyState,
   IconButton,
   Label,
-  PanelHeader,
+  TitleBar,
   ToolbarButton,
 } from '@taskscape/common-ui/components';
 import { useEffect } from 'react';
 import { confirmModal } from '../lib/modal';
+import { DialogControls } from './WindowControls';
+import { controlsSide } from './windowChrome';
 import { useListStore } from '../stores/listStore';
 import { useTrashStore } from '../stores/trashStore';
 import { relativeTime } from '../time';
@@ -44,10 +46,8 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="bg-surface-1l dark:bg-surface-1d flex h-full w-full flex-col">
-      <PanelHeader
+      <TitleBar
         title="Trash"
-        onClose={onClose}
-        closeTitle="Close Trash"
         border="edge-1"
         leading={
           <Icon
@@ -57,6 +57,10 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
             className="text-content-2l dark:text-content-2d shrink-0"
           />
         }
+        controls={
+          <DialogControls onClose={onClose} closeTitle="Close Trash" />
+        }
+        controlsSide={controlsSide}
       />
 
       {roots.length > 0 && (

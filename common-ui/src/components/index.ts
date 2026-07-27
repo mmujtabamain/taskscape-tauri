@@ -13,15 +13,17 @@ export * from './content/Keycap';
 export * from './content/ProgressBar';
 
 export * from './surfaces/Backdrop';
+export * from './surfaces/Dialog';
 export * from './surfaces/Divider';
-export * from './surfaces/PanelHeader';
 export * from './surfaces/Surface';
+export * from './surfaces/TitleBar';
 
 export * from './menus/MenuItem';
 export * from './menus/Segmented';
 
 export * from './inputs/Checkbox';
 export * from './inputs/InputWell';
+export * from './inputs/SuffixInput';
 export * from './inputs/TextInput';
 export * from './inputs/Toggle';
 

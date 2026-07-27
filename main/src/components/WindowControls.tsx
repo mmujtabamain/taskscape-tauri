@@ -7,6 +7,120 @@ import { GLYPHS, INNER, OUTER, useWindowFocused } from './windowChrome';
 
 export type WindowControl = 'close' | 'minimize' | 'fullscreen';
 
+const ORDER: readonly WindowControl[] = ['close', 'minimize', 'fullscreen'];
+
+const LIGHTS: Record<
+  WindowControl,
+  {
+    ring: string;
+    fill: string;
+    glyph: string;
+    glyphColor: string;
+    label: string;
+  }
+> = {
+  close: {
+    ring: '#e24b41',
+    fill: '#ed6a5f',
+    glyph: 'close',
+    glyphColor: '#460804',
+    label: 'Close',
+  },
+  minimize: {
+    ring: '#e1a73e',
+    fill: '#f6be50',
+    glyph: 'minimize',
+    glyphColor: '#90591d',
+    label: 'Minimize',
+  },
+  fullscreen: {
+    ring: '#2dac2f',
+    fill: '#61c555',
+    glyph: 'fullscreen',
+    glyphColor: '#2a6218',
+    label: 'Full Screen',
+  },
+};
+
+/** One macOS disc. Unlit — the window is blurred, or the control is `inert` —
+ *  it's a gray ring+disc with no glyph on hover, the way AppKit renders a
+ *  control a window doesn't support. Needs a `group` ancestor for the glyph. */
+function Light({
+  id,
+  focused,
+  inert = false,
+  title,
+  onClick,
+}: {
+  id: WindowControl;
+  focused: boolean;
+  inert?: boolean;
+  title?: string;
+  onClick?: () => void;
+}) {
+  const light = LIGHTS[id];
+  const lit = focused && !inert;
+  return (
+    <button
+      onClick={onClick}
+      disabled={inert}
+      title={title ?? light.label}
+      className="block size-4"
+    >
+      <svg
+        viewBox="0 0 85.4 85.4"
+        className="size-full"
+        clipRule="evenodd"
+        fillRule="evenodd"
+      >
+        <path d={OUTER} fill={lit ? light.ring : 'var(--tl-inactive-ring)'} />
+        <path d={INNER} fill={lit ? light.fill : 'var(--tl-inactive-fill)'} />
+        {lit && (
+          <g
+            fill={light.glyphColor}
+            transform="translate(42.7 42.7) scale(1.12) translate(-42.7 -42.7)"
+            className="opacity-0 group-hover:opacity-100"
+          >
+            {GLYPHS[light.glyph]}
+          </g>
+        )}
+      </svg>
+    </button>
+  );
+}
+
+/** The macOS cluster, red first. A control with no handler renders inert, which
+ *  covers both a window that doesn't support it and a dialog that has nothing to
+ *  minimize — the discs are there so the cluster reads as chrome either way. */
+function MacLights({
+  focused,
+  act,
+  closeTitle,
+}: {
+  focused: boolean;
+  act: Partial<Record<WindowControl, () => void>>;
+  closeTitle?: string;
+}) {
+  return (
+    <div className="group flex items-center gap-2 pr-3 pl-5" data-no-drag>
+      {ORDER.map((id) => (
+        <Light
+          key={id}
+          id={id}
+          focused={focused}
+          inert={!act[id]}
+          title={id === 'close' ? closeTitle : undefined}
+          onClick={act[id]}
+        />
+      ))}
+    </div>
+  );
+}
+
+const WIN_BUTTON =
+  'flex h-full w-[46px] items-center justify-center text-content-2l dark:text-content-2d';
+const WIN_CLOSE = 'hover:bg-[#e81123] hover:text-white';
+
 export interface WindowControlsProps {
   /** Controls this window doesn't support. macOS draws them as inert gray discs
    *  (no glyph on hover), the way AppKit renders a utility window; Windows omits
@@ -21,80 +135,15 @@ function MacControls({ disabled = [] }: WindowControlsProps) {
   const focused = useWindowFocused();
   const win = getCurrentWindow();
 
-  const lights: Array<{
-    id: WindowControl;
-    ring: string;
-    fill: string;
-    glyph: string;
-    glyphColor: string;
-    label: string;
-    act: () => void;
-  }> = [
-    {
-      id: 'close',
-      ring: '#e24b41',
-      fill: '#ed6a5f',
-      glyph: 'close',
-      glyphColor: '#460804',
-      label: 'Close',
-      act: () => void win.close(),
-    },
-    {
-      id: 'minimize',
-      ring: '#e1a73e',
-      fill: '#f6be50',
-      glyph: 'minimize',
-      glyphColor: '#90591d',
-      label: 'Minimize',
-      act: () => void win.minimize(),
-    },
-    {
-      id: 'fullscreen',
-      ring: '#2dac2f',
-      fill: '#61c555',
-      glyph: 'fullscreen',
-      glyphColor: '#2a6218',
-      label: 'Full Screen',
-      act: () => void win.isFullscreen().then((f) => win.setFullscreen(!f)),
-    },
-  ];
+  const act: Partial<Record<WindowControl, () => void>> = {
+    close: () => void win.close(),
+    minimize: () => void win.minimize(),
+    fullscreen: () =>
+      void win.isFullscreen().then((f) => win.setFullscreen(!f)),
+  };
+  for (const id of disabled) delete act[id];
 
-  return (
-    <div className="group flex items-center gap-2 pr-3 pl-5" data-no-drag>
-      {lights.map((l) => {
-        const inert = disabled.includes(l.id);
-        const lit = focused && !inert;
-        return (
-          <button
-            key={l.label}
-            onClick={l.act}
-            disabled={inert}
-            title={l.label}
-            className="block size-4"
-          >
-            <svg
-              viewBox="0 0 85.4 85.4"
-              className="size-full"
-              clipRule="evenodd"
-              fillRule="evenodd"
-            >
-              <path d={OUTER} fill={lit ? l.ring : 'var(--tl-inactive-ring)'} />
-              <path d={INNER} fill={lit ? l.fill : 'var(--tl-inactive-fill)'} />
-              {lit && (
-                <g
-                  fill={l.glyphColor}
-                  transform="translate(42.7 42.7) scale(1.12) translate(-42.7 -42.7)"
-                  className="opacity-0 group-hover:opacity-100"
-                >
-                  {GLYPHS[l.glyph]}
-                </g>
-              )}
-            </svg>
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <MacLights focused={focused} act={act} />;
 }
 
 function WinControls({ disabled = [] }: WindowControlsProps) {
@@ -111,13 +160,11 @@ function WinControls({ disabled = [] }: WindowControlsProps) {
     return () => unlisten?.();
   }, [win]);
 
-  const base =
-    'flex h-full w-[46px] items-center justify-center text-content-2l dark:text-content-2d';
   return (
     <div className="flex h-full items-stretch" data-no-drag>
       {!disabled.includes('minimize') && (
         <button
-          className={cn(base, 'hover:bg-wash-2l dark:hover:bg-wash-2d')}
+          className={cn(WIN_BUTTON, 'hover:bg-wash-2l dark:hover:bg-wash-2d')}
           onClick={() => win.minimize()}
           title="Minimize"
         >
@@ -126,7 +173,7 @@ function WinControls({ disabled = [] }: WindowControlsProps) {
       )}
       {!disabled.includes('fullscreen') && (
         <button
-          className={cn(base, 'hover:bg-wash-2l dark:hover:bg-wash-2d')}
+          className={cn(WIN_BUTTON, 'hover:bg-wash-2l dark:hover:bg-wash-2d')}
           onClick={() => win.toggleMaximize()}
           title={maximized ? 'Restore' : 'Maximize'}
         >
@@ -134,7 +181,7 @@ function WinControls({ disabled = [] }: WindowControlsProps) {
         </button>
       )}
       <button
-        className={cn(base, 'hover:bg-[#e81123] hover:text-white')}
+        className={cn(WIN_BUTTON, WIN_CLOSE)}
         onClick={() => win.close()}
         title="Close"
       >
@@ -149,5 +196,43 @@ export function WindowControls({ disabled }: WindowControlsProps = {}) {
     <MacControls disabled={disabled} />
   ) : (
     <WinControls disabled={disabled} />
+  );
+}
+
+export interface DialogControlsProps {
+  onClose: () => void;
+  closeTitle?: string;
+}
+
+/** Chrome for something modal *inside* a window — a dialog or a panel. macOS
+ *  gets the full cluster with only the red disc live: nothing behind it can be
+ *  minimized or zoomed, but a lone dot reads as a status light rather than
+ *  chrome. It dims with the window like the real thing. Windows draws its single
+ *  close button. */
+export function DialogControls({
+  onClose,
+  closeTitle = 'Close',
+}: DialogControlsProps) {
+  const focused = useWindowFocused();
+
+  if (!isMac)
+    return (
+      <div className="flex h-full items-stretch" data-no-drag>
+        <button
+          className={cn(WIN_BUTTON, WIN_CLOSE)}
+          onClick={onClose}
+          title={closeTitle}
+        >
+          <Icon name="close" size={20} />
+        </button>
+      </div>
+    );
+
+  return (
+    <MacLights
+      focused={focused}
+      act={{ close: onClose }}
+      closeTitle={closeTitle}
+    />
   );
 }

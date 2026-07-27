@@ -1,15 +1,20 @@
-import { cn } from '@taskscape/common-ui/cn';
 import {
-  Backdrop,
   Button,
+  Dialog,
   IconButton,
+  InputWell,
   Label,
-  PanelHeader,
-  Surface,
+  SuffixInput,
   TextInput,
 } from '@taskscape/common-ui/components';
-import { Icon } from '@taskscape/common-ui/Icon';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FocusEvent,
+} from 'react';
 import type { ModalButton, ModalProps, ModalResult } from '../lib/modal';
 import { suggestListName, suggestProjectName } from '../lib/nameSuggest';
 import { setOverlay } from '../lib/overlays';
@@ -21,15 +26,6 @@ function suggestFor(kind: 'project' | 'list' | undefined): string {
   if (kind === 'list') return suggestListName();
   return '';
 }
-
-// The tone-tinted icon badge anchors the body — a soft fill that carries the
-// dialog's intent.
-const BADGE_TONE = {
-  default:
-    'bg-selection-1l dark:bg-selection-1d text-accent-500l dark:text-accent-500d',
-  danger:
-    'bg-danger-100l dark:bg-danger-100d text-danger-500l dark:text-danger-500d',
-};
 
 /** Renders the one modal currently on screen, if any (see modalStore). A modal
  *  sits above every in-window overlay — including the attachment lightbox it can
@@ -57,6 +53,7 @@ function Modal({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const resolvedRef = useRef(false);
+  const inputId = useId();
 
   const [value, setValue] = useState(() =>
     props.input
@@ -68,6 +65,13 @@ function Modal({
   // (unshown) suggestFor() would leak in and the applied name wouldn't match
   // the field.
   const valueRef = useRef(value);
+
+  // The right-hand group is the accept/cancel pair; its last button is what
+  // Enter presses, so an alternate action can sit anywhere in the array without
+  // becoming the default.
+  const alt = props.buttons.filter((b) => b.align === 'start');
+  const main = props.buttons.filter((b) => b.align !== 'start');
+  const defaultId = main[main.length - 1]?.id;
 
   const resolve = useCallback(
     (buttonId: string | null) => {
@@ -126,176 +130,96 @@ function Modal({
         resolve(null);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const last = props.buttons[props.buttons.length - 1];
-        if (last) press(last, true);
+        const btn = props.buttons.find((b) => b.id === defaultId);
+        if (btn) press(btn, true);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [press, props, resolve]);
+  }, [defaultId, press, props, resolve]);
 
-  const tone = props.tone === 'danger' ? 'danger' : 'default';
+  const button = (b: ModalButton) => (
+    <Button
+      key={b.id}
+      variant={b.variant ?? 'ghost'}
+      onClick={() => press(b, b.id === defaultId)}
+    >
+      {b.label}
+    </Button>
+  );
+
+  const selectAll = (e: FocusEvent<HTMLInputElement>) => {
+    if (props.input?.initialValue) e.currentTarget.select();
+  };
 
   return (
-    <Backdrop
-      dim="30"
-      className="flex items-center justify-center"
-      onMouseDown={() => resolve(null)}
+    <Dialog
+      icon={props.icon}
+      tone={props.tone === 'danger' ? 'danger' : 'default'}
+      title={props.title}
+      message={props.message}
+      onDismiss={() => resolve(null)}
+      actions={main.map(button)}
+      altActions={alt.map(button)}
     >
-      <Surface
-        elevation="lift"
-        surface={2}
-        radius="control"
-        onMouseDown={(e) => e.stopPropagation()}
-        className="w-[min(400px,92vw)] overflow-hidden"
-      >
-        <PanelHeader
-          title={props.title}
-          onClose={() => resolve(null)}
-          border="none"
-          className="pr-space-4 pl-space-7"
-        />
-
-        {(props.message || props.input) && (
-          <div className="gap-space-7 px-space-7 pt-space-4 pb-space-8 flex items-start">
-            {props.icon && (
-              <div
-                className={cn(
-                  'rounded-control grid size-9 shrink-0 place-items-center',
-                  BADGE_TONE[tone]
-                )}
-              >
-                <Icon name={props.icon} size={20} />
-              </div>
-            )}
-
-            <div className="gap-space-7 flex min-w-0 flex-1 flex-col">
-              {props.message && (
-                <Label
-                  as="p"
-                  tone="secondary"
-                  className="text-[13px] leading-5 font-[450] text-pretty"
-                >
-                  {props.message}
-                </Label>
-              )}
-
-              {props.input && (
-                <div>
-                  {props.input.label && (
-                    <Label
-                      as="label"
-                      htmlFor="modal-input"
-                      tone="secondary"
-                      weight="medium"
-                      className="mb-space-4 block text-[12px]"
-                    >
-                      {props.input.label}
-                    </Label>
-                  )}
-                  <div className="relative">
-                    {props.input.suffix ? (
-                      // Locked-extension field: the name grows to fit and the greyed
-                      // extension stays glued to its right; `.` is stripped as typed.
-                      <div className="rounded-field bg-surface-0l dark:bg-surface-0d focus-within:ring-focus-1l dark:focus-within:ring-focus-1d px-space-6 flex h-9 w-full items-center overflow-hidden text-[13px] focus-within:ring-2">
-                        <span className="relative inline-flex max-w-full min-w-[1ch] flex-none">
-                          <span
-                            aria-hidden
-                            className="invisible overflow-hidden whitespace-pre"
-                          >
-                            {value || props.input.placeholder || '​'}
-                          </span>
-                          <input
-                            id="modal-input"
-                            ref={inputRef}
-                            autoFocus
-                            value={value}
-                            spellCheck={false}
-                            placeholder={props.input.placeholder}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              // Block new periods so the locked extension can't be
-                              // redefined; dots already in the base are left alone.
-                              if (e.key === '.') e.preventDefault();
-                            }}
-                            onPaste={(e) => {
-                              const text = e.clipboardData.getData('text');
-                              if (!text.includes('.')) return;
-                              e.preventDefault();
-                              const el = e.currentTarget;
-                              const start =
-                                el.selectionStart ?? el.value.length;
-                              const end = el.selectionEnd ?? el.value.length;
-                              setInputValue(
-                                el.value.slice(0, start) +
-                                  text.replace(/\./g, '') +
-                                  el.value.slice(end)
-                              );
-                            }}
-                            onFocus={(e) => {
-                              if (props.input?.initialValue)
-                                e.currentTarget.select();
-                            }}
-                            className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d absolute inset-0 w-full bg-transparent text-[13px] outline-none"
-                          />
-                        </span>
-                        <Label
-                          tone="muted"
-                          className="flex-none whitespace-pre select-none"
-                        >
-                          {props.input.suffix}
-                        </Label>
-                      </div>
-                    ) : (
-                      <TextInput
-                        id="modal-input"
-                        ref={inputRef}
-                        autoFocus
-                        value={value}
-                        spellCheck={false}
-                        placeholder={props.input.placeholder}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onFocus={(e) => {
-                          if (props.input?.initialValue)
-                            e.currentTarget.select();
-                        }}
-                        className={cn(
-                          'pl-space-6 h-9 w-full',
-                          props.input.suggest ? 'pr-9' : 'pr-space-6'
-                        )}
-                      />
-                    )}
-                    {props.input.suggest && (
-                      <IconButton
-                        icon="casino"
-                        iconSize={16}
-                        variant="ghostStrong"
-                        tabIndex={-1}
-                        aria-label="Suggest another name"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={rollSuggestion}
-                        className="absolute top-1/2 right-1.5 -translate-y-1/2"
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="border-edge-2l dark:border-edge-2d bg-surface-1l dark:bg-surface-1d gap-space-5 px-space-5 py-space-6 flex items-center justify-end border-t">
-          {props.buttons.map((b, i) => (
-            <Button
-              key={b.id}
-              variant={b.variant ?? 'ghost'}
-              onClick={() => press(b, i === props.buttons.length - 1)}
+      {props.input && (
+        <div className="gap-space-4 flex flex-col">
+          {props.input.label && (
+            <Label
+              as="label"
+              htmlFor={inputId}
+              tone="secondary"
+              weight="medium"
+              className="text-[12px]"
             >
-              {b.label}
-            </Button>
-          ))}
+              {props.input.label}
+            </Label>
+          )}
+
+          {props.input.suffix ? (
+            <SuffixInput
+              id={inputId}
+              ref={inputRef}
+              autoFocus
+              value={value}
+              suffix={props.input.suffix}
+              placeholder={props.input.placeholder}
+              onValueChange={setInputValue}
+              onFocus={selectAll}
+            />
+          ) : (
+            <InputWell
+              className="h-9"
+              trailing={
+                props.input.suggest && (
+                  <IconButton
+                    icon="casino"
+                    size="lg"
+                    iconSize={16}
+                    variant="ghostStrong"
+                    tabIndex={-1}
+                    aria-label="Suggest another name"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={rollSuggestion}
+                  />
+                )
+              }
+            >
+              <TextInput
+                bare
+                id={inputId}
+                ref={inputRef}
+                autoFocus
+                value={value}
+                spellCheck={false}
+                placeholder={props.input.placeholder}
+                onChange={(e) => setInputValue(e.target.value)}
+                onFocus={selectAll}
+              />
+            </InputWell>
+          )}
         </div>
-      </Surface>
-    </Backdrop>
+      )}
+    </Dialog>
   );
 }

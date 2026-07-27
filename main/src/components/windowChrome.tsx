@@ -1,5 +1,13 @@
+import type { TitleBarControlsSide } from '@taskscape/common-ui/components';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useState } from 'react';
+import { isMac } from '../lib/platform';
+
+/** The edge every bar in this app hands to `TitleBar` as `controlsSide`, so
+ *  window chrome and dialog chrome land on the same side. */
+export const controlsSide: TitleBarControlsSide = isMac
+  ? 'leading'
+  : 'trailing';
 
 /** Tracks whether this window currently holds focus — used to gray out the
  *  macOS traffic-light discs when the window blurs, matching native chrome. */
