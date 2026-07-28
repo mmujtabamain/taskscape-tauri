@@ -9,8 +9,8 @@ import { SettingsWindow } from './windows/SettingsWindow';
 // The Settings window is built fresh with an init script that sets
 // `window.__PANEL__` before this bundle loads (see `panel_init_script` in Rust),
 // so it knows which surface it is synchronously. Settings is the only panel
-// window left — modals and the filter panel now render in-app in the main
-// window (see components/Modal.tsx and components/preview/FilterPanel.tsx).
+// window left — sheets and the filter panel now render in-app in the main
+// window (see components/SheetHost.tsx and components/preview/FilterPanel.tsx).
 interface PanelData {
   kind: 'settings';
 }

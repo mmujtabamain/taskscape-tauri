@@ -7,7 +7,7 @@ import {
   ToolbarButton,
 } from '@taskscape/common-ui/components';
 import { useEffect } from 'react';
-import { confirmModal } from '../lib/modal';
+import { askConfirm } from '../lib/sheet';
 import { DialogControls } from './WindowControls';
 import { controlsSide } from './windowChrome';
 import { useListStore } from '../stores/listStore';
@@ -35,11 +35,12 @@ export function TrashPane({ onClose }: { onClose: () => void }) {
   const restoreAll = () =>
     useTrashStore.getState().restore(roots.map((t) => t.id));
   const emptyTrash = async () => {
-    const ok = await confirmModal({
-      danger: true,
-      title: 'Empty Trash?',
-      message: `${items.length} task${items.length === 1 ? '' : 's'} will be permanently deleted. This cannot be undone.`,
-      confirmLabel: 'Empty Trash',
+    const ok = await askConfirm({
+      glyph: 'delete_forever',
+      tone: 'danger',
+      headline: 'Empty Trash?',
+      detail: `${items.length} task${items.length === 1 ? '' : 's'} deleted for good. No undo.`,
+      accept: 'Empty Trash',
     });
     if (ok) await useTrashStore.getState().empty();
   };

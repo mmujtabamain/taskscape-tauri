@@ -1,9 +1,9 @@
 // Task-level commands: the lifecycle and bulk flows that used to live inline in
 // App (draft new-task, delete-with-confirm + undo toast, bulk ops, keyboard
 // reorder). The pure mutation math stays in stores/actions.ts; this layer adds
-// the modal/toast/UI orchestration around it.
+// the sheet/toast/UI orchestration around it.
 import { api, type Task, type TaskPatch } from '../api';
-import { confirmModal } from '../lib/modal';
+import { askConfirm } from '../lib/sheet';
 import { collapseToRoots } from '../lib/selection';
 import {
   createSubtask as actCreateSubtask,
@@ -66,14 +66,16 @@ export function updateTask(id: string, patch: TaskPatch): Promise<void> {
 
 export async function requestDeleteTask(task: Task): Promise<void> {
   const subs = subtreeSize(task.id);
-  const ok = await confirmModal({
-    danger: true,
-    title: 'Move task to Trash?',
-    message:
+  // Trash is reversible, so this stays on the accent tone — the danger rail is
+  // reserved for the deletions nothing brings back.
+  const ok = await askConfirm({
+    glyph: 'delete',
+    headline: 'Move to Trash?',
+    detail:
       `“${task.title}”` +
       (subs > 0 ? ` and its ${subs} subtask${subs === 1 ? '' : 's'}` : '') +
-      ' will be moved to the Trash. You can restore it (⌘Z).',
-    confirmLabel: 'Delete',
+      ' — ⌘Z puts it back.',
+    accept: 'Move',
   });
   if (!ok) return;
   await deleteTasks([task.id]);
@@ -106,11 +108,11 @@ export async function bulkDelete(listId: string): Promise<void> {
   const roots = collapseToRoots(ids, parentOf);
   if (roots.length === 0) return;
   const total = roots.reduce((n, id) => n + 1 + subtreeSize(id), 0);
-  const ok = await confirmModal({
-    danger: true,
-    title: `Move ${roots.length} task${roots.length === 1 ? '' : 's'} to Trash?`,
-    message: `${total} task${total === 1 ? '' : 's'} (including subtasks) will be moved to the Trash. You can restore them (⌘Z).`,
-    confirmLabel: 'Delete',
+  const ok = await askConfirm({
+    glyph: 'delete',
+    headline: `Move ${roots.length} task${roots.length === 1 ? '' : 's'} to Trash?`,
+    detail: `${total} task${total === 1 ? '' : 's'} including subtasks — ⌘Z puts them back.`,
+    accept: 'Move',
   });
   if (!ok) return;
   await deleteSelection(ids);

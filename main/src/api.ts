@@ -159,7 +159,7 @@ export const api = {
 
   // windows (settings, overlay) — each built fresh on open (props passed in at
   // build time) and destroyed on close; results/edits flow back as events.
-  // (Modals aren't windows: they render in-app; see components/Modal.tsx.)
+  // (Sheets aren't windows: they render in-app; see components/SheetHost.tsx.)
   presentWindow: (width: number, height: number) =>
     invoke<void>('present_window', { width, height }),
   openSettings: () => invoke<void>('open_settings'),

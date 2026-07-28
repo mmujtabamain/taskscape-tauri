@@ -18,7 +18,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
 }
 
-/** Solid dialog / CTA button (promoted from Modal's BTN + BTN_VARIANT). */
+/** Solid CTA button — panels and toolbars. A sheet's accept action uses
+ *  `<KeyAction>` instead, which wears its shortcut. */
 export function Button({
   variant = 'ghost',
   className,

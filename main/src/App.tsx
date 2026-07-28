@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { buildCommands } from './commands/palette';
 import { CommandPalette } from './components/CommandPalette';
 import { ContextMenuProvider } from './components/ContextMenu';
-import { ModalHost } from './components/Modal';
 import { FilterPanel } from './components/preview/FilterPanel';
 import { PreviewPanel } from './components/preview/PreviewPanel';
+import { SheetHost } from './components/SheetHost';
 import { TaskPane } from './components/TaskPane';
 import { TitleBar } from './components/TitleBar';
 import { Toast } from './components/Toast';
@@ -141,7 +141,7 @@ function App() {
           onClose={() => useUiStore.getState().setPaletteOpen(false)}
         />
       )}
-      <ModalHost />
+      <SheetHost />
       <Toast />
     </ContextMenuProvider>
   );

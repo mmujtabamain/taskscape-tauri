@@ -4,6 +4,7 @@
 export * from './buttons/Button';
 export * from './buttons/DashedButton';
 export * from './buttons/IconButton';
+export * from './buttons/KeyAction';
 export * from './buttons/ToolbarButton';
 
 export * from './content/Badge';
@@ -13,8 +14,9 @@ export * from './content/Keycap';
 export * from './content/ProgressBar';
 
 export * from './surfaces/Backdrop';
-export * from './surfaces/Dialog';
 export * from './surfaces/Divider';
+export * from './surfaces/Overlay';
+export * from './surfaces/Sheet';
 export * from './surfaces/Surface';
 export * from './surfaces/TitleBar';
 

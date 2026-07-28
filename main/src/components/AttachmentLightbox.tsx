@@ -1,9 +1,9 @@
 import { Icon } from '@taskscape/common-ui/Icon';
 import {
-  Backdrop,
   Button,
   IconButton,
   Label,
+  Overlay,
 } from '@taskscape/common-ui/components';
 import {
   attachmentSrc,
@@ -15,8 +15,7 @@ import {
 import { useEffect, useState } from 'react';
 import { api, type Attachment } from '../api';
 import { propagateAttachmentRename } from '../lib/mentions';
-import { confirmModal, promptName } from '../lib/modal';
-import { setOverlay } from '../lib/overlays';
+import { askConfirm, askText } from '../lib/sheet';
 import { SelectableText } from './SelectableText';
 
 const TEXT_PREVIEW_CAP = 262144;
@@ -106,15 +105,11 @@ export function AttachmentLightbox({
     if (count > 1) onIndex((index + delta + count) % count);
   };
 
-  // Own the window's arrow/Escape keys while open (capture phase so the app's
-  // task-navigation handler never also fires), and defer selection-clearing.
+  // Own the window's arrow keys while open (capture phase so the app's
+  // task-navigation handler never also fires). Escape comes from <Overlay>.
   useEffect(() => {
-    setOverlay(true);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      } else if (e.key === 'ArrowRight') {
+      if (e.key === 'ArrowRight') {
         e.stopPropagation();
         step(1);
       } else if (e.key === 'ArrowLeft') {
@@ -123,10 +118,7 @@ export function AttachmentLightbox({
       }
     };
     window.addEventListener('keydown', onKey, true);
-    return () => {
-      setOverlay(false);
-      window.removeEventListener('keydown', onKey, true);
-    };
+    return () => window.removeEventListener('keydown', onKey, true);
   });
 
   useEffect(() => {
@@ -167,11 +159,12 @@ export function AttachmentLightbox({
   if (!attachment || !kind) return null;
 
   const remove = async () => {
-    const ok = await confirmModal({
-      danger: true,
-      title: 'Remove attachment?',
-      message: attachment.name,
-      confirmLabel: 'Remove',
+    const ok = await askConfirm({
+      glyph: 'delete_forever',
+      tone: 'danger',
+      headline: 'Remove attachment?',
+      detail: `“${attachment.name}” — attachments skip the Trash.`,
+      accept: 'Remove',
     });
     if (!ok) return;
     await api.deleteAttachment(attachment.id);
@@ -180,15 +173,15 @@ export function AttachmentLightbox({
 
   const rename = async () => {
     const { base, ext } = splitFileName(attachment.name);
-    const name = await promptName({
-      title: 'Rename attachment',
-      icon: 'drive_file_rename_outline',
-      message: remote
-        ? 'Renames the reference label; the linked file is untouched.'
+    const name = await askText({
+      glyph: 'drive_file_rename_outline',
+      headline: 'Rename attachment',
+      detail: remote
+        ? 'Renames the label only — the linked file is untouched.'
         : 'The stored file is renamed to match.',
-      initialValue: base,
-      suffix: ext ? `.${ext}` : undefined,
-      confirmLabel: 'Rename',
+      value: base,
+      tail: ext ? `.${ext}` : undefined,
+      accept: 'Rename',
     });
     if (!name || name === attachment.name) return;
     const updated = await api.renameAttachment(attachment.id, name);
@@ -293,7 +286,15 @@ export function AttachmentLightbox({
   };
 
   return (
-    <Backdrop dim="75" blur className="flex flex-col" onClick={onClose}>
+    <Overlay
+      layer="overlay"
+      placement="fill"
+      dim="strong"
+      blur
+      onDismiss={onClose}
+      captureEscape
+      dismissOn="none"
+    >
       <div
         className="gap-space-4 px-space-7 flex h-13 shrink-0 items-center"
         onClick={(e) => e.stopPropagation()}
@@ -371,6 +372,6 @@ export function AttachmentLightbox({
           {body()}
         </div>
       </div>
-    </Backdrop>
+    </Overlay>
   );
 }

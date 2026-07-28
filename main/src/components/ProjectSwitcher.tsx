@@ -5,14 +5,14 @@ import {
   Label,
   Surface,
 } from '@taskscape/common-ui/components';
-import { useEffect, useRef, useState } from 'react';
+import { useDismissable } from '@taskscape/common-ui/overlay';
+import { useCallback, useRef, useState } from 'react';
 import {
   createProject,
   deleteProject,
   renameProject,
   selectProject,
 } from '../commands/projects';
-import { setOverlay } from '../lib/overlays';
 import { useProjectStore } from '../stores/projectStore';
 
 /** The recessed pill in the titlebar — the one machined "well" in the chrome.
@@ -22,25 +22,8 @@ export function ProjectSwitcher() {
   const selectedId = useProjectStore((s) => s.activeId);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
   const selected = projects.find((p) => p.id === selectedId) ?? null;
-
-  useEffect(() => {
-    if (!open) return;
-    setOverlay(true);
-    const close = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('mousedown', close);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      setOverlay(false);
-      window.removeEventListener('mousedown', close);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   return (
     <div ref={rootRef} className="relative flex items-center" data-no-drag>
@@ -66,12 +49,7 @@ export function ProjectSwitcher() {
       </button>
 
       {open && (
-        <Surface
-          elevation="menu"
-          surface={3}
-          radius="panel"
-          className="z-dropdown py-space-3 absolute top-10 left-0 min-w-60"
-        >
+        <ProjectMenu anchorRef={rootRef} onDismiss={close}>
           {projects.map((p) => (
             <div
               key={p.id}
@@ -132,8 +110,35 @@ export function ProjectSwitcher() {
               New project…
             </Label>
           </button>
-        </Surface>
+        </ProjectMenu>
       )}
     </div>
+  );
+}
+
+/** The dropdown itself. Split out so the shared dismiss wiring (Escape, a press
+ *  outside the switcher, the overlay-depth slot) mounts and unmounts with the
+ *  menu. It's anchored to its trigger rather than centered, so it hangs off the
+ *  pill instead of riding a scrim — `anchorRef` spans both, so pressing the pill
+ *  again closes it by toggle rather than counting as an outside press. */
+function ProjectMenu({
+  anchorRef,
+  onDismiss,
+  children,
+}: {
+  anchorRef: React.RefObject<HTMLDivElement | null>;
+  onDismiss: () => void;
+  children: React.ReactNode;
+}) {
+  useDismissable({ onDismiss, ref: anchorRef });
+  return (
+    <Surface
+      elevation="menu"
+      surface={3}
+      radius="panel"
+      className="z-dropdown animate-sheet-in py-space-3 absolute top-10 left-0 min-w-60 origin-top-left"
+    >
+      {children}
+    </Surface>
   );
 }

@@ -1,15 +1,14 @@
 import {
-  Backdrop,
   HotkeyHint,
   Label,
   MenuItem,
+  Overlay,
   Surface,
   TextInput,
 } from '@taskscape/common-ui/components';
 import { parseAccel, type Accel } from '@taskscape/common-ui/hotkeys';
 import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { setOverlay } from '../lib/overlays';
 
 export interface PaletteCommand {
   id: string;
@@ -39,9 +38,7 @@ export function CommandPalette({
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setOverlay(true);
     inputRef.current?.focus();
-    return () => setOverlay(false);
   }, []);
 
   const results = useMemo(() => {
@@ -71,17 +68,18 @@ export function CommandPalette({
   };
 
   return (
-    <Backdrop
-      dim="30"
-      className="flex items-start justify-center pt-[12vh]"
-      onMouseDown={onClose}
+    <Overlay
+      layer="overlay"
+      placement="top"
+      onDismiss={onClose}
+      captureEscape
+      trapFocus
     >
       <Surface
-        elevation="lift"
-        surface={1}
-        radius="control"
-        onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[60vh] w-[min(560px,92vw)] flex-col overflow-hidden"
+        elevation="menu"
+        surface={2}
+        radius="panel"
+        className="animate-sheet-in flex max-h-[60vh] w-[min(35rem,100%)] flex-col overflow-hidden"
       >
         <div className="border-edge-1l dark:border-edge-1d gap-space-5 px-space-6 flex h-11 shrink-0 items-center border-b">
           <Icon
@@ -110,9 +108,6 @@ export function CommandPalette({
               } else if (e.key === 'Enter') {
                 e.preventDefault();
                 runAt(active);
-              } else if (e.key === 'Escape') {
-                e.preventDefault();
-                onClose();
               }
             }}
           />
@@ -173,6 +168,6 @@ export function CommandPalette({
           })}
         </div>
       </Surface>
-    </Backdrop>
+    </Overlay>
   );
 }

@@ -1,10 +1,5 @@
-// Tracks transient popovers (context menu, project dropdown) that live inside
-// the main window, so window-level key handlers can defer to them — e.g. an
-// Escape that only dismisses a menu shouldn't also clear the task selection.
-let depth = 0;
-
-export const overlayOpen = () => depth > 0;
-
-export function setOverlay(open: boolean) {
-  depth = Math.max(0, depth + (open ? 1 : -1));
-}
+// The overlay-depth tracker now lives in the shared library, alongside <Overlay>
+// itself, so both apps count depth the same way and overlays register themselves
+// on mount instead of each one remembering to. Re-exported here because the app's
+// global key map is the only consumer that needs to *read* the count.
+export { overlayOpen } from '@taskscape/common-ui/overlay';

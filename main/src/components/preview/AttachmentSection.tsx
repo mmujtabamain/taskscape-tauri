@@ -17,7 +17,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useEffect, useState } from 'react';
 import { api, type Attachment, type Task } from '../../api';
 import { propagateAttachmentRename } from '../../lib/mentions';
-import { confirmModal, openModal, promptName } from '../../lib/modal';
+import { askConfirm, askText } from '../../lib/sheet';
 import { useContextMenu } from '../contextMenuContext';
 
 function referenceName(location: string): string {
@@ -86,17 +86,14 @@ export function AttachmentSection({
   };
 
   const addLink = async () => {
-    const res = await openModal({
-      icon: 'add_link',
-      title: 'Add link',
-      input: { placeholder: 'https:// or /absolute/path' },
-      buttons: [
-        { id: 'cancel', label: 'Cancel', variant: 'ghost' },
-        { id: 'add', label: 'Add', variant: 'primary' },
-      ],
+    const value = await askText({
+      glyph: 'add_link',
+      headline: 'Link a file or page',
+      detail: 'A URL, or an absolute path to a file on this Mac.',
+      placeholder: 'https://…',
+      accept: 'Link',
     });
-    const value = res.value?.trim();
-    if (res.buttonId !== 'add' || !value) return;
+    if (!value) return;
     await api.addReference(task.id, referenceName(value), value);
     onRefresh();
   };
@@ -108,16 +105,16 @@ export function AttachmentSection({
 
   const renameAttachment = async (a: Attachment) => {
     const { base, ext } = splitFileName(a.name);
-    const name = await promptName({
-      title: 'Rename attachment',
-      icon: 'drive_file_rename_outline',
-      message:
+    const name = await askText({
+      glyph: 'drive_file_rename_outline',
+      headline: 'Rename attachment',
+      detail:
         a.link_type === 'copy'
           ? 'The stored file is renamed to match.'
-          : 'Renames the reference label; the linked file is untouched.',
-      initialValue: base,
-      suffix: ext ? `.${ext}` : undefined,
-      confirmLabel: 'Rename',
+          : 'Renames the label only — the linked file is untouched.',
+      value: base,
+      tail: ext ? `.${ext}` : undefined,
+      accept: 'Rename',
     });
     if (!name || name === a.name) return;
     const updated = await api.renameAttachment(a.id, name);
@@ -126,11 +123,12 @@ export function AttachmentSection({
   };
 
   const removeAttachment = async (a: Attachment) => {
-    const ok = await confirmModal({
-      danger: true,
-      title: 'Remove attachment?',
-      message: a.name,
-      confirmLabel: 'Remove',
+    const ok = await askConfirm({
+      glyph: 'delete_forever',
+      tone: 'danger',
+      headline: 'Remove attachment?',
+      detail: `“${a.name}” — attachments skip the Trash.`,
+      accept: 'Remove',
     });
     if (!ok) return;
     await api.deleteAttachment(a.id);

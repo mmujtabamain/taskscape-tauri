@@ -11,7 +11,7 @@ import { Icon } from '@taskscape/common-ui/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { api, type Note, type Task } from '../../api';
 import { requestDeleteTask, updateTask } from '../../commands/tasks';
-import { confirmModal } from '../../lib/modal';
+import { askConfirm } from '../../lib/sheet';
 import { toggleDone as actToggleDone } from '../../stores/actions';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useListStore } from '../../stores/listStore';
@@ -126,11 +126,12 @@ export function TaskInspector({ task }: { task: Task }) {
   };
 
   const removeNote = async (note: Note) => {
-    const ok = await confirmModal({
-      danger: true,
-      title: 'Delete note?',
-      message: 'This note will be permanently removed.',
-      confirmLabel: 'Delete',
+    const ok = await askConfirm({
+      glyph: 'delete_forever',
+      tone: 'danger',
+      headline: 'Delete note?',
+      detail: 'Notes skip the Trash — this one is gone for good.',
+      accept: 'Delete',
     });
     if (!ok) return;
     setNotes((prev) => prev.filter((n) => n.id !== note.id));
@@ -420,8 +421,8 @@ export function TaskInspector({ task }: { task: Task }) {
                 onRequestLink={requestNoteLink}
                 onChange={scheduleAddNote}
                 onBlur={() => {
-                  // The link toolbar opens a native modal window (and the user
-                  // may just switch apps); either drops window focus. Keep the
+                  // The link toolbar opens a sheet (and the user may just switch
+                  // apps); either pulls focus off the editor. Keep the
                   // editor mounted then so that flow can return to it — finalize
                   // only when focus stays in this window (clicked elsewhere here).
                   if (document.hasFocus()) void finishAddNote();

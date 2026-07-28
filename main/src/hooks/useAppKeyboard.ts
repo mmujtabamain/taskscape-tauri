@@ -26,10 +26,10 @@ import { useHistoryStore } from '../stores/history';
 import { useHotkeyStore } from '../stores/hotkeyStore';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useListStore } from '../stores/listStore';
-import { useModalStore } from '../stores/modalStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useSheetStore } from '../stores/sheetStore';
 import { useTaskStore } from '../stores/taskStore';
 import { useUiStore } from '../stores/uiStore';
 import { flattenVisible } from '../stores/visibility';
@@ -40,10 +40,10 @@ import { flattenVisible } from '../stores/visibility';
 export function useAppKeyboard(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // A modal is a blocking overlay that owns the keyboard entirely (its own
-      // Escape/Enter and text input live in Modal.tsx) — the global map, which
-      // now shares the main window with it, must defer while one is open.
-      if (useModalStore.getState().current) return;
+      // A sheet is a blocking overlay that owns the keyboard entirely (its own
+      // Escape/Enter and text input live in SheetHost.tsx) — the global map,
+      // which shares the main window with it, must defer while one is open.
+      if (useSheetStore.getState().current) return;
 
       const el = e.target as HTMLElement;
       const typing =

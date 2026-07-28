@@ -10,6 +10,9 @@ export interface SuffixInputProps
   /** The locked, greyed tail — a file extension (`.png`). It is never editable
    *  and is not part of `value`; append it yourself when you commit. */
   suffix: string;
+  /** Drop the recessed well: transparent and chrome-less, inheriting the type
+   *  size — for a field that is itself the body of a panel. */
+  bare?: boolean;
 }
 
 const strip = (s: string) => s.replace(/\./g, '');
@@ -20,56 +23,69 @@ const strip = (s: string) => s.replace(/\./g, '');
  *  redefined from inside the field. */
 export const SuffixInput = forwardRef<HTMLInputElement, SuffixInputProps>(
   function SuffixInput(
-    { value, onValueChange, suffix, placeholder, className, ...rest },
+    {
+      value,
+      onValueChange,
+      suffix,
+      bare = false,
+      placeholder,
+      className,
+      ...rest
+    },
     ref
   ) {
-    return (
-      <InputWell
-        className={cn('h-9', className)}
-        trailing={
-          <Label
-            tone="muted"
-            className="text-[13px] whitespace-pre select-none"
-          >
-            {suffix}
-          </Label>
-        }
-      >
-        <span className="relative inline-flex max-w-full min-w-[1ch] flex-none">
-          {/* Sizer: the well shrink-wraps the text, which is what glues the
-              suffix to the name instead of to the field's right edge. */}
-          <span
-            aria-hidden
-            className="invisible overflow-hidden text-[13px] whitespace-pre"
-          >
-            {value || placeholder || '​'}
-          </span>
-          <input
-            ref={ref}
-            value={value}
-            placeholder={placeholder}
-            spellCheck={false}
-            {...rest}
-            onChange={(e) => onValueChange(strip(e.target.value))}
-            onKeyDown={(e) => {
-              // Swallowed rather than stripped after the fact, so the caret
-              // never jumps over a character that was never inserted.
-              if (e.key === '.') e.preventDefault();
-            }}
-            onPaste={(e) => {
-              const text = e.clipboardData.getData('text');
-              if (!text.includes('.')) return;
-              e.preventDefault();
-              const el = e.currentTarget;
-              const start = el.selectionStart ?? el.value.length;
-              const end = el.selectionEnd ?? el.value.length;
-              onValueChange(
-                el.value.slice(0, start) + strip(text) + el.value.slice(end)
-              );
-            }}
-            className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d absolute inset-0 w-full bg-transparent text-[13px] outline-none"
-          />
+    const field = (
+      <span className="relative inline-flex max-w-full min-w-[1ch] flex-none">
+        {/* Sizer: the name shrink-wraps its text, which is what glues the suffix
+            to the name instead of to the field's right edge. */}
+        <span aria-hidden className="invisible overflow-hidden whitespace-pre">
+          {value || placeholder || '​'}
         </span>
+        <input
+          ref={ref}
+          value={value}
+          placeholder={placeholder}
+          spellCheck={false}
+          {...rest}
+          onChange={(e) => onValueChange(strip(e.target.value))}
+          onKeyDown={(e) => {
+            // Swallowed rather than stripped after the fact, so the caret never
+            // jumps over a character that was never inserted.
+            if (e.key === '.') e.preventDefault();
+          }}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData('text');
+            if (!text.includes('.')) return;
+            e.preventDefault();
+            const el = e.currentTarget;
+            const start = el.selectionStart ?? el.value.length;
+            const end = el.selectionEnd ?? el.value.length;
+            onValueChange(
+              el.value.slice(0, start) + strip(text) + el.value.slice(end)
+            );
+          }}
+          className="text-content-1l dark:text-content-1d placeholder:text-content-3l dark:placeholder:text-content-3d absolute inset-0 w-full bg-transparent outline-none"
+        />
+      </span>
+    );
+
+    const tail = (
+      <Label tone="muted" className="whitespace-pre select-none">
+        {suffix}
+      </Label>
+    );
+
+    if (bare)
+      return (
+        <div className={cn('gap-space-4 flex min-w-0 items-center', className)}>
+          {field}
+          {tail}
+        </div>
+      );
+
+    return (
+      <InputWell className={cn('h-9 text-[13px]', className)} trailing={tail}>
+        {field}
       </InputWell>
     );
   }

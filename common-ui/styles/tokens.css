@@ -226,6 +226,7 @@
   --z-index-dropdown: 40;
   --z-index-overlay: 50;
   --z-index-modal: 60;
+  --z-index-menu: 65;
   --z-index-tooltip: 70;
 
   /* Motion tokens ported from punkt_xii for later use — the CSS twins below and
@@ -261,16 +262,6 @@
   }
 }
 
-/* Auto-dismiss drain inside a modal's default button (duration set inline). */
-@keyframes drain {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-
 /* ── Motion CSS twins (ported from punkt_xii for later use; NOT yet applied to
    any component). JS equivalents live in src/motion/lib/motion.ts. All share the
    --ease-out curve and are neutralized by the reduced-motion block below. ── */
@@ -299,6 +290,25 @@
     opacity: 0;
     transform: scale(0.97);
   }
+}
+
+/* A sheet arrives in place rather than travelling: a fade and a hair of scale, so
+   a centered card reads as *appearing* instead of sliding in from somewhere it
+   never was. Short, because a native app snaps. Used by <Sheet>. */
+.animate-sheet-in {
+  animation: sheet-in 140ms var(--ease-standard) both;
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Every scrim fades up on its own — slightly slower than the panel it dims, so
+   the panel leads and the dimming follows. Used by <Backdrop>. */
+.animate-scrim-in {
+  animation: fade-in 160ms var(--ease-standard) both;
 }
 
 /* Done-task strikethrough draws left→right (animated background-size). */

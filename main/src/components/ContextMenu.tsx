@@ -3,11 +3,10 @@ import { cn } from '@taskscape/common-ui/cn';
 import {
   Divider,
   MenuItem as MenuRow,
+  Overlay,
   Surface,
 } from '@taskscape/common-ui/components';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { setOverlay } from '../lib/overlays';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   MenuContext,
   type MenuItem,
@@ -22,50 +21,38 @@ export function ContextMenuProvider({
   children: React.ReactNode;
 }) {
   const [menu, setMenu] = useState<OpenMenu | null>(null);
-
-  useEffect(() => {
-    if (!menu) return;
-    setOverlay(true);
-    const close = () => setMenu(null);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    window.addEventListener('blur', close);
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('resize', close);
-    return () => {
-      setOverlay(false);
-      window.removeEventListener('blur', close);
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', close);
-    };
-  }, [menu]);
+  const close = useCallback(() => setMenu(null), []);
 
   return (
     <MenuContext.Provider value={{ open: setMenu }}>
       {children}
-      {menu &&
-        createPortal(
-          <div
-            className="z-overlay fixed inset-0"
-            onMouseDown={() => setMenu(null)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setMenu(null);
+      {menu && (
+        // A menu is pinned to a coordinate, so anything that moves the window out
+        // from under it — a blur, a resize — closes it. It rides above the sheet
+        // layer because a sheet's own content can raise one.
+        <Overlay
+          layer="menu"
+          placement="anchored"
+          dim="none"
+          onDismiss={close}
+          captureEscape
+          dismissOnWindowChange
+          onContextMenu={(e) => {
+            e.preventDefault();
+            close();
+          }}
+        >
+          <MenuPanel
+            items={menu.items}
+            x={menu.x}
+            y={menu.y}
+            onPick={(id) => {
+              close();
+              menu.onPick(id);
             }}
-          >
-            <MenuPanel
-              items={menu.items}
-              x={menu.x}
-              y={menu.y}
-              onPick={(id) => {
-                setMenu(null);
-                menu.onPick(id);
-              }}
-            />
-          </div>,
-          document.body
-        )}
+          />
+        </Overlay>
+      )}
     </MenuContext.Provider>
   );
 }
@@ -108,7 +95,6 @@ function MenuPanel({
       radius="panel"
       style={nested ? undefined : { left: pos.x, top: pos.y }}
       className={cn(!nested && 'absolute', 'py-space-3 min-w-44')}
-      onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item) => (
         <div key={item.id} className="relative">

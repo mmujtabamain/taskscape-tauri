@@ -1,43 +1,62 @@
 import { cn } from '@taskscape/common-ui/cn';
-import type { HTMLAttributes } from 'react';
+import { forwardRef, type HTMLAttributes } from 'react';
 
-export type BackdropDim = '30' | '75';
+/** `none` still absorbs presses — an invisible scrim is how a menu catches the
+ *  click that dismisses it. */
+export type BackdropDim = 'none' | 'soft' | 'strong';
+
+/** Which named z-layer the scrim (and its content) sits on. Every overlay states
+ *  its own, so stacking never depends on render order in App. */
+export type OverlayLayer =
+  | 'dropdown'
+  | 'overlay'
+  | 'modal'
+  | 'menu'
+  | 'tooltip';
 
 const DIM: Record<BackdropDim, string> = {
-  '30': 'bg-black/30',
-  '75': 'bg-black/75',
+  none: '',
+  soft: 'bg-black/30',
+  strong: 'bg-black/75',
+};
+
+const LAYER: Record<OverlayLayer, string> = {
+  dropdown: 'z-dropdown',
+  overlay: 'z-overlay',
+  modal: 'z-modal',
+  menu: 'z-menu',
+  tooltip: 'z-tooltip',
 };
 
 export interface BackdropProps extends HTMLAttributes<HTMLDivElement> {
   dim?: BackdropDim;
   blur?: boolean;
+  layer?: OverlayLayer;
 }
 
-/** Full-window scrim behind modals, the command palette and the lightbox.
- *  Layout of the centred content is passed via `className`.
- *
- *  Every scrim shares one z-layer: each is `fixed` and nothing between them and
- *  the root creates a stacking context, so two that coexist (a modal summoned
- *  from the lightbox) stack by DOM order — which is why `ModalHost` must stay
- *  last in App.tsx. */
-export function Backdrop({
-  dim = '30',
-  blur = false,
-  className,
-  children,
-  ...rest
-}: BackdropProps) {
-  return (
-    <div
-      className={cn(
-        'z-modal fixed inset-0',
-        DIM[dim],
-        blur && 'backdrop-blur-sm',
-        className
-      )}
-      {...rest}
-    >
-      {children}
-    </div>
-  );
-}
+/** The full-window scrim behind an overlay: dim, optional blur, and the z-layer
+ *  the whole overlay rides on. Purely visual — the behaviour that goes with it
+ *  (Escape, outside press, focus) lives in `<Overlay>`, which composes this. */
+export const Backdrop = forwardRef<HTMLDivElement, BackdropProps>(
+  function Backdrop(
+    { dim = 'soft', blur = false, layer = 'modal', className, children, ...rest },
+    ref
+  ) {
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'fixed inset-0 outline-none',
+          LAYER[layer],
+          DIM[dim],
+          dim !== 'none' && 'animate-scrim-in',
+          blur && 'backdrop-blur-sm',
+          className
+        )}
+        {...rest}
+      >
+        {children}
+      </div>
+    );
+  }
+);

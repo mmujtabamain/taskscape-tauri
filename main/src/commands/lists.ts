@@ -1,8 +1,8 @@
 // List-level commands: CRUD, JSON import/export, and tab navigation. The
-// "modal → mutation" orchestration that used to live inline in App.
+// "sheet → mutation" orchestration that used to live inline in App.
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { api, type List } from '../api';
-import { confirmModal, promptName, promptNewList } from '../lib/modal';
+import { askConfirm, askText, openSheet } from '../lib/sheet';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useListStore } from '../stores/listStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -35,20 +35,26 @@ export async function exportList(list: List): Promise<void> {
 export async function createList(): Promise<void> {
   const projectId = useProjectStore.getState().activeId;
   if (!projectId) return;
-  const res = await promptNewList();
-  if (!res) return;
-  if (res.action === 'import') return importList();
-  const list = await useListStore.getState().create(projectId, res.name);
+  const res = await openSheet({
+    glyph: 'list_alt_add',
+    headline: 'New list',
+    ask: { dice: 'list', placeholder: 'Name this list' },
+    accept: 'Create',
+    instead: { id: 'import', label: 'Import JSON…' },
+  });
+  if (res.action === 'instead') return importList();
+  if (res.action !== 'accept') return;
+  const list = await useListStore.getState().create(projectId, res.text);
   useLayoutStore.getState().selectList(list.id);
 }
 
 export async function renameList(list: List): Promise<void> {
-  const name = await promptName({
-    title: 'Rename list',
-    icon: 'edit',
-    initialValue: list.name,
-    confirmLabel: 'Rename',
-    suggestKind: 'list',
+  const name = await askText({
+    glyph: 'edit',
+    headline: 'Rename list',
+    value: list.name,
+    dice: 'list',
+    accept: 'Rename',
   });
   if (!name || name === list.name) return;
   await useListStore.getState().rename(list.id, name);
@@ -58,14 +64,15 @@ export async function deleteList(list: List): Promise<void> {
   const taskCount = useTaskStore
     .getState()
     .tasks.filter((t) => t.list_id === list.id).length;
-  const ok = await confirmModal({
-    danger: true,
-    title: `Delete “${list.name}”?`,
-    message:
+  const ok = await askConfirm({
+    glyph: 'delete',
+    tone: 'danger',
+    headline: `Delete “${list.name}”?`,
+    detail:
       taskCount > 0
-        ? `Its ${taskCount} task${taskCount === 1 ? ' is' : 's are'} deleted with it. This cannot be undone.`
-        : 'The list is empty. This cannot be undone.',
-    confirmLabel: 'Delete list',
+        ? `Its ${taskCount} task${taskCount === 1 ? '' : 's'} go with it. No undo.`
+        : 'The list is empty. No undo.',
+    accept: 'Delete list',
   });
   if (!ok) return;
   await useListStore.getState().remove(list.id);

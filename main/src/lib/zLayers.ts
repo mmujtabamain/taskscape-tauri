@@ -11,9 +11,10 @@ export const zLayers = {
   base: 0,
   raised: 10, // in-content accents, indicators, floating close buttons
   popover: 20, // rich-text inline toolbar
-  dropdown: 40, // project switcher / menus
-  overlay: 50, // loading veils, context-menu scrim
-  modal: 60, // attachment lightbox
+  dropdown: 40, // project switcher
+  overlay: 50, // loading veils, toasts, attachment lightbox, command palette
+  modal: 60, // sheets — a question sits above the thing it's asked about
+  menu: 65, // context menus, which can be raised from any surface incl. a sheet
   tooltip: 70, // mention suggestions (top-most)
 } as const;
 
